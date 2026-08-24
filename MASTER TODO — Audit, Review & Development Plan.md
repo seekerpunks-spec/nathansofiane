@@ -692,7 +692,10 @@ ajouter la complexité d'un réseau social complet :
 - [x] score d'équipe dérivé de Network Power et leaderboard `DENSE_RANK` ;
 - [x] UI mobile fonctionnelle et analytics ;
 - [x] revue concurrence : join simultané rejoué sans membre dupliqué.
-- [ ] cooperative events — lot ultérieur ;
+- [x] cooperative events — `Crew Uplink` réutilise les sources de points du
+      moteur Neon Rush, avec score partagé, contribution personnelle minimale,
+      milestones data-driven et claim unique par joueur même après changement
+      d'équipe ;
 - [ ] chat limité — différé, modération requise ;
 - [ ] donations — non retenues à ce stade, l'échange 1-pour-1 évite les abus.
 
@@ -782,6 +785,11 @@ rewards
 leaderboard
 assets
 ```
+
+Statut R24 : le même moteur alimente désormais les variantes individuelles,
+classement et coopératives. `Crew Uplink` ne duplique aucune règle de scoring :
+les actions configurées pour Neon Rush alimentent atomiquement le joueur, sa
+saison et son équipe active.
 
 ---
 
@@ -1114,8 +1122,8 @@ purchase_started
 purchase_complete
 ```
 
-Statut R24 : les 25 événements ci-dessus et 23 événements rétention/social,
-soit 48 événements, sont instrumentés et couverts
+Statut R24 : les 25 événements ci-dessus et 25 événements rétention/social,
+soit 50 événements, sont instrumentés et couverts
 par la gate `tools/analytics_check.ps1`. Les batches sont bornés, validés et
 dédupliqués côté serveur par `batchId` lors des retries réseau.
 

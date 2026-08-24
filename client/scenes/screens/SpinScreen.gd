@@ -723,6 +723,17 @@ func _on_landed() -> void:
 				"milestoneIndex": int(milestone_index),
 				"claimMode": "auto",
 			})
+	for team_progress in _pending_progress.get("teamEvents", []):
+		if typeof(team_progress) != TYPE_DICTIONARY:
+			continue
+		Events.track("team_event_progress", {
+			"eventId": str(team_progress.get("eventId", "")),
+			"teamId": str(team_progress.get("teamId", "")),
+			"pointsAdded": int(team_progress.get("pointsAdded", 0)),
+			"teamPoints": int(team_progress.get("teamPoints", 0)),
+			"contributionPoints": int(team_progress.get("contributionPoints", 0)),
+			"source": "spin",
+		})
 	_refresh_hud()
 	_reset_idle_state(false)
 	var pending: Variant = Store.state.get("pendingEncounter", null)

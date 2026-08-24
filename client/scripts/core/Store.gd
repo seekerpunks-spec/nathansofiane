@@ -76,6 +76,7 @@ func apply_spin(d: Dictionary) -> void:
 	var progress: Variant = d.get("progress", {})
 	if typeof(progress) == TYPE_DICTIONARY:
 		_apply_event_progress(progress.get("events", []))
+		_apply_team_event_progress(progress.get("teamEvents", []))
 	if d.has("serverTimeMs"):
 		set_clock(int(d["serverTimeMs"]))
 	state_changed.emit()
@@ -108,11 +109,23 @@ func _apply_event_progress(progress_events: Array) -> void:
 					milestone["claimed"] = true
 					milestone["autoClaimed"] = true
 
+func _apply_team_event_progress(progress_events: Array) -> void:
+	var team_events: Array = state.get("teamEvents", [])
+	for update in progress_events:
+		if typeof(update) != TYPE_DICTIONARY:
+			continue
+		var event_id := str(update.get("eventId", ""))
+		for event in team_events:
+			if typeof(event) != TYPE_DICTIONARY or str(event.get("eventId", "")) != event_id:
+				continue
+			event["teamPoints"] = int(update.get("teamPoints", event.get("teamPoints", 0)))
+			event["contributionPoints"] = int(update.get("contributionPoints", event.get("contributionPoints", 0)))
+
 ## Applique les champs communs d'une mutation puis fusionne les collections.
 func apply_mutation(d: Dictionary) -> void:
 	if typeof(d) != TYPE_DICTIONARY:
 		return
-	for key in ["spins", "credits", "nextSpinAtMs", "districtIndex", "districtProgress", "districtDamage", "firewallCharges", "firewallMax", "pendingEncounter", "profile", "progression", "globalProgression", "cards", "chests", "missions", "events", "seasons", "dailyStreak", "dailyAvailable"]:
+	for key in ["spins", "credits", "nextSpinAtMs", "districtIndex", "districtProgress", "districtDamage", "firewallCharges", "firewallMax", "pendingEncounter", "profile", "progression", "globalProgression", "cards", "chests", "missions", "events", "teamEvents", "seasons", "dailyStreak", "dailyAvailable"]:
 		if d.has(key):
 			state["progression" if key == "globalProgression" else key] = d[key]
 	if d.has("serverTimeMs"):

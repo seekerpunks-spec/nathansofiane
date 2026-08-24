@@ -14,6 +14,15 @@
         { "points": 5000, "autoClaim": false, "reward": { "spins": 200, "credits": 1500000, "chest": "neon" } },
         { "points": 20000, "autoClaim": true, "reward": { "spins": 600, "credits": 4000000, "chest": "elite" } }
       ],
+      "team": {
+        "name": "Crew Uplink",
+        "minContributionPoints": 100,
+        "milestones": [
+          { "points": 1000, "reward": { "spins": 50, "credits": 250000 } },
+          { "points": 5000, "reward": { "spins": 150, "credits": 1000000, "chest": "basic" } },
+          { "points": 20000, "reward": { "spins": 500, "credits": 3000000, "chest": "neon" } }
+        ]
+      },
       "leaderboard": { "cohortSize": 50, "displayLimit": 50 },
       "rewardTiers": [
         { "minRank": 1, "maxRank": 1, "reward": { "spins": 1000, "credits": 5000000, "chest": "elite" } },

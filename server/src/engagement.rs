@@ -73,6 +73,81 @@ pub async fn daily_bonus_for_state(
     }))
 }
 
+pub async fn team_events_for_state(
+    state: &AppState,
+    address: &str,
+) -> Result<Vec<Value>, ApiError> {
+    let team: Option<(String, String)> = sqlx::query_as(
+        "SELECT tm.team_id,t.name FROM team_members tm JOIN teams t ON t.team_id=tm.team_id WHERE tm.address=$1",
+    )
+    .bind(address)
+    .fetch_optional(state.db.pool())
+    .await?;
+    let Some((team_id, team_name)) = team else {
+        return Ok(Vec::new());
+    };
+    let scores: Vec<(String, i64)> =
+        sqlx::query_as("SELECT event_id,points FROM team_event_scores WHERE team_id=$1")
+            .bind(&team_id)
+            .fetch_all(state.db.pool())
+            .await?;
+    let contributions: Vec<(String, i64)> = sqlx::query_as(
+        "SELECT event_id,points FROM team_event_contributions WHERE team_id=$1 AND address=$2",
+    )
+    .bind(&team_id)
+    .bind(address)
+    .fetch_all(state.db.pool())
+    .await?;
+    let claims: Vec<(String, i32)> =
+        sqlx::query_as("SELECT event_id,milestone_index FROM team_event_claims WHERE address=$1")
+            .bind(address)
+            .fetch_all(state.db.pool())
+            .await?;
+    Ok(state
+        .config
+        .events
+        .iter()
+        .filter_map(|event| {
+            let team_config = event.team.as_ref()?;
+            let team_points = scores
+                .iter()
+                .find(|row| row.0 == event.event_id)
+                .map(|row| row.1)
+                .unwrap_or(0);
+            let contribution_points = contributions
+                .iter()
+                .find(|row| row.0 == event.event_id)
+                .map(|row| row.1)
+                .unwrap_or(0);
+            let milestones: Vec<Value> = team_config
+                .milestones
+                .iter()
+                .enumerate()
+                .map(|(index, milestone)| {
+                    json!({
+                        "index":index,
+                        "points":milestone.points,
+                        "reward":milestone.reward,
+                        "claimed":claims.iter().any(|row| row.0 == event.event_id && row.1 == index as i32),
+                    })
+                })
+                .collect();
+            Some(json!({
+                "eventId":event.event_id,
+                "name":team_config.name,
+                "teamId":team_id,
+                "teamName":team_name,
+                "startsAtMs":event.starts_at_ms,
+                "endsAtMs":event.ends_at_ms,
+                "teamPoints":team_points,
+                "contributionPoints":contribution_points,
+                "minContributionPoints":team_config.min_contribution_points,
+                "milestones":milestones,
+            }))
+        })
+        .collect())
+}
+
 pub async fn claim_daily_bonus(
     State(state): State<AppState>,
     Extension(addr): Extension<Addr>,
@@ -416,6 +491,135 @@ pub async fn claim_event_milestone(
         &addr.0,
         "event_milestone_claim",
         &json!({"points": points, "spins": player.spins, "credits": player.credits}),
+        &response,
+        Some(&rid),
+    )
+    .await?;
+    state.db.store_idempotent(&mut tx, &key, &response).await?;
+    tx.commit().await?;
+    Ok(Json(response))
+}
+
+pub async fn claim_team_event_milestone(
+    State(state): State<AppState>,
+    Extension(addr): Extension<Addr>,
+    Path((event_id, milestone_index)): Path<(String, u32)>,
+    headers: HeaderMap,
+    Json(body): Json<ClaimReq>,
+) -> Result<Json<Value>, ApiError> {
+    let rid = game::request_id(&headers, body.request_id.as_deref())?;
+    let action = format!("team_event_milestone_claim:{event_id}:{milestone_index}");
+    let key = game::idem_key(&action, &addr.0, &rid);
+    if let Some(value) = state.db.fetch_idempotent(&key).await? {
+        return Ok(Json(value));
+    }
+    let event = state
+        .config
+        .events
+        .iter()
+        .find(|candidate| candidate.event_id == event_id)
+        .ok_or(ApiError::NotFound)?;
+    let team_config = event.team.as_ref().ok_or(ApiError::NotFound)?;
+    let milestone = team_config
+        .milestones
+        .get(milestone_index as usize)
+        .ok_or(ApiError::NotFound)?;
+    let mut tx = state.db.begin().await?;
+    let player = state
+        .db
+        .fetch_state_locked(&mut tx, &addr.0)
+        .await?
+        .ok_or_else(|| ApiError::Internal(anyhow!("player_state absent")))?;
+    if let Some(value) = state.db.fetch_idempotent_locked(&mut tx, &key).await? {
+        tx.rollback().await?;
+        return Ok(Json(value));
+    }
+    let team_id: Option<String> =
+        sqlx::query_scalar("SELECT team_id FROM team_members WHERE address=$1")
+            .bind(&addr.0)
+            .fetch_optional(&mut *tx)
+            .await?;
+    let Some(team_id) = team_id else {
+        tx.rollback().await?;
+        return Err(ApiError::Unavailable("aucune équipe".to_string()));
+    };
+    let team_points: i64 = sqlx::query_scalar(
+        "SELECT points FROM team_event_scores WHERE event_id=$1 AND team_id=$2 FOR UPDATE",
+    )
+    .bind(&event.event_id)
+    .bind(&team_id)
+    .fetch_optional(&mut *tx)
+    .await?
+    .unwrap_or(0);
+    let contribution_points: i64 = sqlx::query_scalar(
+        "SELECT points FROM team_event_contributions WHERE event_id=$1 AND team_id=$2 AND address=$3 FOR UPDATE",
+    )
+    .bind(&event.event_id)
+    .bind(&team_id)
+    .bind(&addr.0)
+    .fetch_optional(&mut *tx)
+    .await?
+    .unwrap_or(0);
+    if team_points < game::checked_u64_to_i64(milestone.points, "teamMilestone.points")? {
+        tx.rollback().await?;
+        return Err(ApiError::Unavailable(
+            "palier d'équipe non atteint".to_string(),
+        ));
+    }
+    if contribution_points
+        < game::checked_u64_to_i64(
+            team_config.min_contribution_points,
+            "teamEvent.minContributionPoints",
+        )?
+    {
+        tx.rollback().await?;
+        return Err(ApiError::Unavailable(
+            "contribution personnelle insuffisante".to_string(),
+        ));
+    }
+    let inserted = sqlx::query(
+        "INSERT INTO team_event_claims(event_id,milestone_index,address,team_id) \
+         VALUES($1,$2,$3,$4) ON CONFLICT DO NOTHING",
+    )
+    .bind(&event.event_id)
+    .bind(milestone_index as i32)
+    .bind(&addr.0)
+    .bind(&team_id)
+    .execute(&mut *tx)
+    .await?
+    .rows_affected();
+    if inserted == 0 {
+        tx.rollback().await?;
+        return Err(ApiError::AlreadyClaimed);
+    }
+    game::grant_reward_tx(&mut tx, &addr.0, &milestone.reward, &state.config).await?;
+    let balances: (i32, i64) =
+        sqlx::query_as("SELECT spins,credits FROM player_state WHERE address=$1")
+            .bind(&addr.0)
+            .fetch_one(&mut *tx)
+            .await?;
+    let response = json!({
+        "eventId":event.event_id,
+        "milestoneIndex":milestone_index,
+        "teamId":team_id,
+        "teamPoints":team_points,
+        "contributionPoints":contribution_points,
+        "reward":milestone.reward,
+        "spins":balances.0,
+        "credits":balances.1,
+        "serverTimeMs":Utc::now().timestamp_millis(),
+    });
+    Db::audit_tx(
+        &mut tx,
+        &addr.0,
+        "team_event_milestone_claim",
+        &json!({
+            "teamId":team_id,
+            "teamPoints":team_points,
+            "contributionPoints":contribution_points,
+            "spins":player.spins,
+            "credits":player.credits,
+        }),
         &response,
         Some(&rid),
     )

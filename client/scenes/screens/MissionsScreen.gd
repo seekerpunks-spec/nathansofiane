@@ -72,6 +72,16 @@ func _refresh() -> void:
 			Ui.reveal(card, reveal_index * 0.05)
 			reveal_index += 1
 
+	var team_events: Array = Store.state.get("teamEvents", [])
+	if not team_events.is_empty():
+		_content.add_child(Ui.section_title("ÉVÉNEMENT D'ÉQUIPE", Ui.NEON_CYAN))
+		for event in team_events:
+			if typeof(event) == TYPE_DICTIONARY:
+				var card := _team_event_card(event)
+				_content.add_child(card)
+				Ui.reveal(card, reveal_index * 0.05)
+				reveal_index += 1
+
 	_content.add_child(Ui.section_title("SEASON PASS", Ui.GOLD))
 	for season in Store.state.get("seasons", []):
 		if typeof(season) == TYPE_DICTIONARY:
@@ -149,6 +159,47 @@ func _event_card(event: Dictionary) -> PanelContainer:
 	panel.add_child(box)
 	return panel
 
+func _team_event_card(event: Dictionary) -> PanelContainer:
+	var panel := Ui.panel(Ui.PANEL_HI, Ui.NEON_CYAN)
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 8)
+	box.add_child(Ui.label(str(event.get("name", "Crew Event")), 21, Ui.NEON_CYAN))
+	box.add_child(Ui.label(str(event.get("teamName", "ÉQUIPE")).to_upper(), 13, Ui.TEXT_DIM))
+	var remain := int(event.get("endsAtMs", 0)) - Store.now_ms()
+	var team_points := int(event.get("teamPoints", 0))
+	var contribution := int(event.get("contributionPoints", 0))
+	var minimum := int(event.get("minContributionPoints", 0))
+	box.add_child(Ui.label(
+		"%s RESTANT  •  ÉQUIPE %s  •  TOI %s/%s" % [
+			Ui.mmss_long(remain), Ui.compact(team_points), Ui.compact(contribution), Ui.compact(minimum)
+		], 13, Ui.TEXT_DIM
+	))
+	for milestone in event.get("milestones", []):
+		if typeof(milestone) != TYPE_DICTIONARY:
+			continue
+		var target := int(milestone.get("points", 0))
+		var reward: Dictionary = milestone.get("reward", {})
+		var claimed := bool(milestone.get("claimed", false))
+		var progress := Ui.progress_bar(Ui.NEON_CYAN, 8)
+		progress.value = clampf(float(team_points) / float(maxi(1, target)) * 100.0, 0.0, 100.0)
+		box.add_child(progress)
+		var reward_text := "+%s SPINS" % Ui.compact(int(reward.get("spins", 0)))
+		if int(reward.get("credits", 0)) > 0:
+			reward_text += "  +%s CR" % Ui.compact(int(reward.get("credits", 0)))
+		var claim_text := "ÉQUIPE %s  •  %s" % [Ui.compact(target), reward_text]
+		if contribution < minimum:
+			claim_text = "CONTRIBUE %s  •  %s" % [Ui.compact(minimum), reward_text]
+		elif claimed:
+			claim_text = "RÉCUPÉRÉ  •  " + reward_text
+		var claim := Ui.button(claim_text, Ui.NEON_CYAN, true)
+		claim.disabled = _busy or claimed or team_points < target or contribution < minimum
+		claim.pressed.connect(_claim_team_event_milestone.bind(
+			str(event.get("eventId", "")), int(milestone.get("index", 0))
+		))
+		box.add_child(claim)
+	panel.add_child(box)
+	return panel
+
 func _season_card(season: Dictionary) -> PanelContainer:
 	var panel := Ui.panel()
 	var box := VBoxContainer.new()
@@ -208,6 +259,13 @@ func _claim_event_milestone(event_id: String, milestone_index: int) -> void:
 		"milestone_claim"
 	)
 
+func _claim_team_event_milestone(event_id: String, milestone_index: int) -> void:
+	await _mutate(
+		"/team-events/%s/milestones/%d/claim" % [event_id, milestone_index],
+		{"eventId": event_id, "milestoneIndex": milestone_index},
+		"team_event_milestone_claim"
+	)
+
 func _claim_event_finish(event_id: String) -> void:
 	await _mutate("/events/%s/claim" % event_id, {"eventId": event_id}, "leaderboard_finish")
 
@@ -223,7 +281,7 @@ func _mutate(path: String, body: Dictionary, event_name: String) -> void:
 		var props := body.duplicate()
 		props.erase("requestId")
 		if typeof(response.data) == TYPE_DICTIONARY:
-			for key in ["rank", "cohortId", "milestoneIndex", "points", "day", "streak", "missionId", "seasonId", "tier", "premium"]:
+			for key in ["rank", "cohortId", "milestoneIndex", "points", "teamId", "teamPoints", "contributionPoints", "day", "streak", "missionId", "seasonId", "tier", "premium"]:
 				if response.data.has(key):
 					props[key] = response.data[key]
 		Events.track(event_name, props)

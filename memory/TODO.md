@@ -56,6 +56,7 @@ itérations intermédiaires utilisent uniquement Godot desktop, captures et test
 - [x] Crews, leaderboard d'équipe et échanges directs de doublons entre amis.
 - [x] Signal Cache quotidien, RNG pondéré et anti-double-claim.
 - [x] Catalogue d'offres autoritaire et éligibilités commerciales data-driven.
-- [ ] Achievements, événements coopératifs et systèmes
-      restants du MASTER TODO.
+- [x] Événement coopératif Crew Uplink : score partagé, contribution minimale,
+      milestones et claim personnel anti-changement d'équipe.
+- [ ] Achievements et systèmes restants du MASTER TODO.
 - [ ] Design et Wallet Adapter explicitement différés par l'utilisateur.

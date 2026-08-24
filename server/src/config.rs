@@ -294,6 +294,21 @@ pub struct EventMilestone {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct TeamEventMilestone {
+    pub points: u64,
+    pub reward: Reward,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TeamEventConfig {
+    pub name: String,
+    pub min_contribution_points: u64,
+    pub milestones: Vec<TeamEventMilestone>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct EventLeaderboardConfig {
     pub cohort_size: u32,
     pub display_limit: u32,
@@ -309,6 +324,8 @@ pub struct EventConfig {
     pub point_sources: Vec<EventPointSource>,
     #[serde(default)]
     pub milestones: Vec<EventMilestone>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub team: Option<TeamEventConfig>,
     pub leaderboard: EventLeaderboardConfig,
     pub reward_tiers: Vec<EventRewardTier>,
 }
@@ -1010,6 +1027,33 @@ impl RemoteConfig {
                     problems.push(format!("event {} : milestone invalide", event.event_id));
                 }
                 previous_milestone = milestone.points;
+            }
+            if let Some(team) = &event.team {
+                if team.name.trim().is_empty()
+                    || team.min_contribution_points == 0
+                    || team.min_contribution_points > i64::MAX as u64
+                    || team.milestones.is_empty()
+                {
+                    problems.push(format!("event {} : équipe invalide", event.event_id));
+                }
+                let mut previous_team_milestone = 0u64;
+                for milestone in &team.milestones {
+                    if milestone.points <= previous_team_milestone
+                        || milestone.points > i64::MAX as u64
+                        || milestone
+                            .reward
+                            .chest
+                            .as_deref()
+                            .is_some_and(|id| !chest_ids.contains(id))
+                        || !reward_fits_storage(&milestone.reward)
+                    {
+                        problems.push(format!(
+                            "event {} : milestone équipe invalide",
+                            event.event_id
+                        ));
+                    }
+                    previous_team_milestone = milestone.points;
+                }
             }
             let mut previous_max_rank = 0u32;
             for tier in &event.reward_tiers {

@@ -13,6 +13,7 @@ use sqlx::{Postgres, Transaction};
 #[serde(rename_all = "camelCase")]
 pub struct ProgressResult {
     pub events: Vec<EventProgressResult>,
+    pub team_events: Vec<TeamEventProgressResult>,
 }
 
 #[derive(Debug, Serialize)]
@@ -23,6 +24,16 @@ pub struct EventProgressResult {
     pub points: i64,
     pub cohort_id: i32,
     pub auto_milestones_claimed: Vec<u32>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TeamEventProgressResult {
+    pub event_id: String,
+    pub team_id: String,
+    pub points_added: i64,
+    pub team_points: i64,
+    pub contribution_points: i64,
 }
 
 pub fn request_id(headers: &HeaderMap, fallback: Option<&str>) -> Result<String, ApiError> {
@@ -139,6 +150,11 @@ pub async fn progress_action_tx(
 
     let now_ms = now.timestamp_millis();
     let mut season_points = 0i64;
+    let current_team: Option<String> =
+        sqlx::query_scalar("SELECT team_id FROM team_members WHERE address=$1")
+            .bind(address)
+            .fetch_optional(&mut **tx)
+            .await?;
     for event in config
         .events
         .iter()
@@ -235,6 +251,38 @@ pub async fn progress_action_tx(
                 cohort_id,
                 auto_milestones_claimed,
             });
+            if event.team.is_some() {
+                if let Some(team_id) = &current_team {
+                    let team_points: i64 = sqlx::query_scalar(
+                        "INSERT INTO team_event_scores(event_id,team_id,points) VALUES($1,$2,$3) \
+                         ON CONFLICT(event_id,team_id) DO UPDATE SET points = LEAST(9223372036854775807::numeric, team_event_scores.points::numeric + EXCLUDED.points::numeric)::bigint \
+                         RETURNING points",
+                    )
+                    .bind(&event.event_id)
+                    .bind(team_id)
+                    .bind(points)
+                    .fetch_one(&mut **tx)
+                    .await?;
+                    let contribution_points: i64 = sqlx::query_scalar(
+                        "INSERT INTO team_event_contributions(event_id,team_id,address,points) VALUES($1,$2,$3,$4) \
+                         ON CONFLICT(event_id,team_id,address) DO UPDATE SET points = LEAST(9223372036854775807::numeric, team_event_contributions.points::numeric + EXCLUDED.points::numeric)::bigint \
+                         RETURNING points",
+                    )
+                    .bind(&event.event_id)
+                    .bind(team_id)
+                    .bind(address)
+                    .bind(points)
+                    .fetch_one(&mut **tx)
+                    .await?;
+                    result.team_events.push(TeamEventProgressResult {
+                        event_id: event.event_id.clone(),
+                        team_id: team_id.clone(),
+                        points_added: points,
+                        team_points,
+                        contribution_points,
+                    });
+                }
+            }
         }
     }
     for season in config

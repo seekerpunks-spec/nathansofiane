@@ -86,10 +86,11 @@
 - [x] Deux districts séquentiels, prérequis de déblocage et transition client.
 - [x] Milestones événementiels auto/manuels, claims idempotents et cohortes de
       leaderboard avec égalités `DENSE_RANK`.
-- [x] Funnel analytics complet, gate 48 événements et batches idempotents.
+- [x] Funnel analytics complet, gate 50 événements et batches idempotents.
 - [x] Signal Jam, Ghost Vault, Firewalls et réparations autoritaires.
 - [x] Network Power, profils, amis, classement, ciblage ami et revanche.
 - [x] Crews, classement d'équipe et trading social 1-pour-1 sans SKR.
-- [ ] Achievements, événement coopératif et autres systèmes
-      restants du MASTER TODO.
+- [x] Événement coopératif d'équipe, contribution minimale et claims personnels
+      protégés contre les changements d'équipe.
+- [ ] Achievements et autres systèmes restants du MASTER TODO.
 - [ ] Design et Wallet Adapter différés explicitement pour ce lot.

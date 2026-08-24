@@ -210,6 +210,10 @@ async fn main() -> anyhow::Result<()> {
             "/events/:event_id/milestones/:milestone_index/claim",
             post(engagement::claim_event_milestone),
         )
+        .route(
+            "/team-events/:event_id/milestones/:milestone_index/claim",
+            post(engagement::claim_team_event_milestone),
+        )
         .route("/events/:event_id/claim", post(engagement::claim_event))
         .route("/season/claim", post(engagement::claim_season))
         .route("/ad/reward", post(commerce::reward_ad))
@@ -358,6 +362,7 @@ async fn get_state(
             "points":score.map(|s|s.1).unwrap_or(0),"rewardClaimed":score.map(|s|s.2).unwrap_or(false),
             "milestones":milestones})
     }).collect();
+    let team_events = engagement::team_events_for_state(&state, &address).await?;
     let season_rows: Vec<(String, i64, bool, Value, Value)> = sqlx::query_as(
         "SELECT season_id,points,premium,free_claimed,paid_claimed FROM season_progress WHERE address=$1",
     ).bind(&address).fetch_all(state.db.pool()).await?;
@@ -396,6 +401,7 @@ async fn get_state(
         "dailyBonus": daily_bonus,
         "missions": missions,
         "events": events,
+        "teamEvents": team_events,
         "seasons": seasons,
         "configVersion": state.config.version,
         // Horloge serveur — le client en dérive son offset clock-skew (regen/countdowns).
