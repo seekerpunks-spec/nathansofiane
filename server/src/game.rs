@@ -127,15 +127,74 @@ pub async fn progress_action_tx(
             season_points = season_points
                 .checked_add(points)
                 .ok_or_else(|| ApiError::Internal(anyhow!("overflow économique: season.points")))?;
-            sqlx::query(
-                "INSERT INTO event_scores(event_id,address,points) VALUES($1,$2,$3) \
-                 ON CONFLICT(event_id,address) DO UPDATE SET points = LEAST(9223372036854775807::numeric, event_scores.points::numeric + EXCLUDED.points::numeric)::bigint",
+            // Sérialise uniquement l'affectation de cohorte de cet événement.
+            sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))")
+                .bind(&event.event_id)
+                .execute(&mut **tx)
+                .await?;
+            let existing_cohort: Option<i32> = sqlx::query_scalar(
+                "SELECT cohort_id FROM event_scores WHERE event_id=$1 AND address=$2",
+            )
+            .bind(&event.event_id)
+            .bind(address)
+            .fetch_optional(&mut **tx)
+            .await?;
+            let cohort_id = if let Some(cohort) = existing_cohort {
+                cohort
+            } else {
+                let last_cohort: i32 = sqlx::query_scalar(
+                    "SELECT COALESCE(MAX(cohort_id),1) FROM event_scores WHERE event_id=$1",
+                )
+                .bind(&event.event_id)
+                .fetch_one(&mut **tx)
+                .await?;
+                let members: i64 = sqlx::query_scalar(
+                    "SELECT COUNT(*) FROM event_scores WHERE event_id=$1 AND cohort_id=$2",
+                )
+                .bind(&event.event_id)
+                .bind(last_cohort)
+                .fetch_one(&mut **tx)
+                .await?;
+                if members >= event.leaderboard.cohort_size as i64 {
+                    last_cohort.checked_add(1).ok_or_else(|| {
+                        ApiError::Internal(anyhow!("overflow économique: event.cohort"))
+                    })?
+                } else {
+                    last_cohort
+                }
+            };
+            let total_points: i64 = sqlx::query_scalar(
+                "INSERT INTO event_scores(event_id,address,points,cohort_id) VALUES($1,$2,$3,$4) \
+                 ON CONFLICT(event_id,address) DO UPDATE SET points = LEAST(9223372036854775807::numeric, event_scores.points::numeric + EXCLUDED.points::numeric)::bigint \
+                 RETURNING points",
             )
             .bind(&event.event_id)
             .bind(address)
             .bind(points)
-            .execute(&mut **tx)
+            .bind(cohort_id)
+            .fetch_one(&mut **tx)
             .await?;
+
+            for (index, milestone) in event.milestones.iter().enumerate() {
+                if !milestone.auto_claim
+                    || total_points < checked_u64_to_i64(milestone.points, "milestone.points")?
+                {
+                    continue;
+                }
+                let inserted = sqlx::query(
+                    "INSERT INTO event_milestone_claims(event_id,address,milestone_index,auto_claimed) \
+                     VALUES($1,$2,$3,true) ON CONFLICT DO NOTHING",
+                )
+                .bind(&event.event_id)
+                .bind(address)
+                .bind(index as i32)
+                .execute(&mut **tx)
+                .await?
+                .rows_affected();
+                if inserted == 1 {
+                    grant_reward_tx(tx, address, &milestone.reward).await?;
+                }
+            }
         }
     }
     for season in config

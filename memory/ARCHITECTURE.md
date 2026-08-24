@@ -27,6 +27,7 @@
 - Lecture : `/health`, `/config`, `/state`, `/events/:event_id/leaderboard`.
 - Économie : `/spin`, `/district/upgrade`, `/chest/buy`, `/chest/open`,
   `/set/claim`, `/daily/claim`, `/mission/claim`,
+  `/events/:event_id/milestones/:milestone_index/claim`,
   `/events/:event_id/claim`, `/season/claim`, `/ad/reward`,
   `/purchase/verify`, `/analytics`.
 - Chaque mutation économique reçoit un identifiant d'idempotence et relit la
@@ -38,6 +39,9 @@
   achats, idempotence, audit et analytics.
 - `0002_progression_liveops.sql` : daily, missions, coffres, événements/saisons
   et champs de progression R17.
+- `0003_core_integrity.sql` : soldes/quantités non négatifs et relations joueur.
+- `0004_event_milestones_cohorts.sql` : cohortes de classement et claims de
+  milestones événementiels.
 - Configs typées : économie, roue, district, cartes, sets, coffres, daily,
   missions, événements, saisons et offres.
 

@@ -15,6 +15,14 @@
 - Regen corrigée pour conserver le reliquat d'intervalle.
 - Validation : 7 tests Rust, économie OK, 6 scènes Godot, intégration PostgreSQL
   ×4/invalid/insufficient/replay exacte.
+- District 2 `Chrome Heights` ajouté avec prérequis ordonné ; le client sélectionne
+  le district actif depuis `districtIndex` et la complétion reste unique.
+- Événement Neon Rush : quatre milestones configurables (auto/manuels), claims
+  transactionnels idempotents, cohortes de 50 et classement `DENSE_RANK` par cohorte.
+- Validation liveops : 8 tests Rust, économie des deux districts (225,4 puis
+  484,5 spins), 6 scènes Godot et intégration PostgreSQL auto-claim/claim manuel/
+  replay/cohorte/verrouillage District 2, complétion unique de Neon Slums puis
+  premier upgrade autorisé dans Chrome Heights.
 
 ## Produit livré
 
@@ -34,16 +42,19 @@
   onboarding illustré, fond de portail propre et transitions compatibles
   mouvement réduit.
 - Navigation mobile : Spin, District, Cards, Missions, Store.
-- District 1 : cinq éléments et trente états visuels programmés.
+- Deux districts séquentiels : Neon Slums et Chrome Heights, avec cinq éléments
+  et trente niveaux chacun.
 - Deux sets, huit cartes et trois coffres avec assets originaux.
-- Daily streak, missions, événement Neon Rush, leaderboard, claims et saison.
+- Daily streak, missions, événement Neon Rush, milestones auto/manuels,
+  leaderboard par cohortes, claims et saison.
 - Offres temporisées, rewarded ad et achats derrière adaptateurs sécurisés.
 - Réglages son, haptique, mouvement réduit et lisibilité.
 
 ## Serveur livré
 
 - Modules R17 : `game`, `district`, `collection`, `engagement`, `commerce`.
-- Migration additive `0002_progression_liveops.sql`.
+- Migrations additives `0002_progression_liveops.sql`, `0003_core_integrity.sql`
+  et `0004_event_milestones_cohorts.sql`.
 - Idempotence par action, transactions, audit économique, horloge serveur,
   rate-limit et nettoyage périodique.
 - Mode release protégé : refus de `DEV_AUTH`, secret JWT fort, CORS allowlist,
@@ -51,8 +62,9 @@
 
 ## Validation exécutée
 
-- `tools/economy_check.ps1` : OK, 225,4 spins attendus pour District 1.
-- `cargo test` : 4/4.
+- `tools/economy_check.ps1` : OK, 225,4 spins pour District 1 et 484,5 pour
+  District 2, avec courbe strictement croissante.
+- `cargo test --locked` : 8/8.
 - `cargo build --release` : OK.
 - Garde release `DEV_AUTH=true` : refus confirmé.
 - Intégration API live : auth, spin idempotent, upgrade, daily, coffre, pub dev,

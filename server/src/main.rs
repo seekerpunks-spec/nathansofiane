@@ -164,6 +164,10 @@ async fn main() -> anyhow::Result<()> {
             "/events/:event_id/leaderboard",
             get(engagement::leaderboard),
         )
+        .route(
+            "/events/:event_id/milestones/:milestone_index/claim",
+            post(engagement::claim_event_milestone),
+        )
         .route("/events/:event_id/claim", post(engagement::claim_event))
         .route("/season/claim", post(engagement::claim_season))
         .route("/ad/reward", post(commerce::reward_ad))
@@ -288,10 +292,25 @@ async fn get_state(
             .bind(&address)
             .fetch_all(state.db.pool())
             .await?;
+    let milestone_claims: Vec<(String, i32, bool)> = sqlx::query_as(
+        "SELECT event_id,milestone_index,auto_claimed FROM event_milestone_claims WHERE address=$1",
+    )
+    .bind(&address)
+    .fetch_all(state.db.pool())
+    .await?;
     let events: Vec<Value> = state.config.events.iter().map(|e| {
         let score = event_scores.iter().find(|(id,_,_)| id == &e.event_id);
+        let milestones: Vec<Value> = e.milestones.iter().enumerate().map(|(index,milestone)| {
+            let claim = milestone_claims.iter().find(|(event_id,milestone_index,_)| {
+                event_id == &e.event_id && *milestone_index == index as i32
+            });
+            json!({"index":index,"points":milestone.points,"reward":milestone.reward,
+                "autoClaim":milestone.auto_claim,"claimed":claim.is_some(),
+                "autoClaimed":claim.map(|row|row.2).unwrap_or(false)})
+        }).collect();
         json!({"eventId":e.event_id,"name":e.name,"startsAtMs":e.starts_at_ms,"endsAtMs":e.ends_at_ms,
-            "points":score.map(|s|s.1).unwrap_or(0),"rewardClaimed":score.map(|s|s.2).unwrap_or(false)})
+            "points":score.map(|s|s.1).unwrap_or(0),"rewardClaimed":score.map(|s|s.2).unwrap_or(false),
+            "milestones":milestones})
     }).collect();
     let season_rows: Vec<(String, i64, bool, Value, Value)> = sqlx::query_as(
         "SELECT season_id,points,premium,free_claimed,paid_claimed FROM season_progress WHERE address=$1",

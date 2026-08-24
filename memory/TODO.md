@@ -48,8 +48,9 @@ itérations intermédiaires utilisent uniquement Godot desktop, captures et test
 
 ## Exécution gameplay en cours
 
-- [ ] Multi-districts avec transition et exigences de déblocage.
-- [ ] Milestones, cohortes/égalités de leaderboard et funnel analytics.
+- [x] Multi-districts avec transition et exigences de déblocage.
+- [x] Milestones événementiels et cohortes/égalités de leaderboard.
+- [ ] Funnel analytics complet et vérifié de bout en bout.
 - [ ] Attack, Raid et défense originaux dans une boucle sociale type Coin Master.
 - [ ] Progression globale, social léger et systèmes restants du MASTER TODO.
 - [ ] Design et Wallet Adapter explicitement différés par l'utilisateur.

@@ -390,9 +390,18 @@ func _refresh_hud() -> void:
 	_credits_value.text = Ui.compact(Store.credits())
 	_normalize_multiplier()
 	var districts := Config.districts()
-	if not districts.is_empty() and typeof(districts[0]) == TYPE_DICTIONARY:
+	var active_district: Dictionary = {}
+	var completed := int(Store.state.get("districtIndex", 0))
+	for candidate in districts:
+		if typeof(candidate) != TYPE_DICTIONARY:
+			continue
+		active_district = candidate
+		if int(candidate.get("id", 0)) > completed:
+			break
+	if not active_district.is_empty():
 		_district_label.text = (
-			str(districts[0].get("name", "NEON SLUMS")).to_upper() + " · NODE 01"
+			str(active_district.get("name", "NEON SLUMS")).to_upper()
+			+ " · NODE %02d" % int(active_district.get("id", 1))
 		)
 
 

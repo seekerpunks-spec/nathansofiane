@@ -75,3 +75,15 @@
 - [ ] Refaire un passage UX sur appareil physique et corriger les écarts trouvés.
 - [ ] Construire l'APK/AAB uniquement lorsque ces gates sont fermées ; aucun build
       Android pendant les itérations de design.
+
+## P8 — Expansion gameplay R24
+
+- [x] Multiplicateurs de spin data-driven ×1 à ×100K, économie autoritaire et
+      animation unique.
+- [x] Deux districts séquentiels, prérequis de déblocage et transition client.
+- [x] Milestones événementiels auto/manuels, claims idempotents et cohortes de
+      leaderboard avec égalités `DENSE_RANK`.
+- [ ] Funnel analytics complet.
+- [ ] Attack, Raid et défense originaux.
+- [ ] Progression globale, amis/équipes/trading et autres systèmes du MASTER TODO.
+- [ ] Design et Wallet Adapter différés explicitement pour ce lot.

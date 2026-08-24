@@ -167,18 +167,23 @@ async fn perform_spin(
     .execute(&mut *tx)
     .await?;
 
+    game::progress_action_tx(&mut tx, address, "spin", multiplier as i64, config).await?;
+    let final_balances: (i32, i64) =
+        sqlx::query_as("SELECT spins,credits FROM player_state WHERE address=$1")
+            .bind(address)
+            .fetch_one(&mut *tx)
+            .await?;
     let after = json!({
-        "spins": new_spins,
-        "credits": new_credits,
+        "spins": final_balances.0,
+        "credits": final_balances.1,
         "lastSpinAt": persisted_anchor.to_rfc3339(),
         "multiplier": multiplier,
         "baseCreditsGained": base_credits_gained,
         "creditsGained": credits_gained,
     });
-    game::progress_action_tx(&mut tx, address, "spin", multiplier as i64, config).await?;
     Db::audit_tx(&mut tx, address, "spin", &before, &after, Some(request_id)).await?;
 
-    let next_spin_at_ms = if new_spins < config.economy.max_free_spins as i32 {
+    let next_spin_at_ms = if final_balances.0 < config.economy.max_free_spins as i32 {
         Some(
             (persisted_anchor + ChronoDuration::milliseconds(config.economy.spin_regen_ms as i64))
                 .timestamp_millis(),
@@ -198,8 +203,8 @@ async fn perform_spin(
         "spinsSpent": multiplier,
         "baseCreditsGained": base_credits_gained,
         "creditsGained": credits_gained,
-        "spins": new_spins,
-        "credits": new_credits,
+        "spins": final_balances.0,
+        "credits": final_balances.1,
         "nextSpinAtMs": next_spin_at_ms,
         "serverTimeMs": now.timestamp_millis(),
     });

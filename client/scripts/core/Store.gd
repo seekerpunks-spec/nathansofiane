@@ -70,7 +70,7 @@ func apply_spin(d: Dictionary) -> void:
 func apply_mutation(d: Dictionary) -> void:
 	if typeof(d) != TYPE_DICTIONARY:
 		return
-	for key in ["spins", "credits", "nextSpinAtMs", "districtProgress", "cards", "chests", "missions", "events", "seasons", "dailyStreak", "dailyAvailable"]:
+	for key in ["spins", "credits", "nextSpinAtMs", "districtIndex", "districtProgress", "cards", "chests", "missions", "events", "seasons", "dailyStreak", "dailyAvailable"]:
 		if d.has(key):
 			state[key] = d[key]
 	if d.has("serverTimeMs"):

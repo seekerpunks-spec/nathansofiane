@@ -36,7 +36,7 @@ func _build() -> void:
 	if districts.is_empty():
 		add_child(Ui.label("AUCUN DISTRICT CONFIGURÉ", 20, Ui.DANGER))
 		return
-	_district = districts[0]
+	_district = _active_district()
 	var body := Ui.screen_body()
 	body.add_child(Ui.hero_card("res://assets/generated/api_gpt/heroes/district_hero.png", "DISTRICT 01  •  REBUILD", str(_district.get("name", "Neon Slums")), "Améliore chaque bâtiment et rallume la ville.", Ui.NEON_CYAN))
 
@@ -71,6 +71,9 @@ func _build() -> void:
 	add_child(body)
 
 func _refresh() -> void:
+	var active := _active_district()
+	if not active.is_empty() and int(active.get("id", 0)) != int(_district.get("id", 0)):
+		_district = active
 	if _district.is_empty() or _list == null:
 		return
 	_credits.text = Ui.compact(Store.credits()) + " CR"
@@ -92,7 +95,19 @@ func _refresh() -> void:
 		reveal_index += 1
 	var percent := 100.0 if total_levels == 0 else float(earned_levels) / float(total_levels) * 100.0
 	_progress.value = percent
-	_progress_label.text = "DISTRICT POWER  •  %d / %d UPGRADES" % [earned_levels, total_levels]
+	_progress_label.text = "%s  •  %d / %d UPGRADES" % [str(_district.get("name", "DISTRICT")).to_upper(), earned_levels, total_levels]
+
+
+func _active_district() -> Dictionary:
+	var completed := int(Store.state.get("districtIndex", 0))
+	var fallback: Dictionary = {}
+	for candidate in Config.districts():
+		if typeof(candidate) != TYPE_DICTIONARY:
+			continue
+		fallback = candidate
+		if int(candidate.get("id", 0)) > completed:
+			return candidate
+	return fallback
 
 func _element_card(element: Dictionary, current: int, max_level: int) -> PanelContainer:
 	var card := Ui.panel(Color(Ui.PANEL, 0.94), Ui.BORDER if current < max_level else Ui.GREEN)
@@ -131,15 +146,21 @@ func _upgrade(element_id: int) -> void:
 	if _busy:
 		return
 	_busy = true
+	var upgraded_district_id := int(_district.get("id", 1))
 	Sfx.click()
 	var rid := Net.request_id()
 	var response := await Net.protected_request("POST", "/district/upgrade", {"districtId": int(_district.get("id", 1)), "elementId": element_id, "requestId": rid}, rid)
 	if response.ok:
 		Store.apply_mutation(response.data)
-		Events.track("upgrade", {"districtId": _district.get("id", 1), "elementId": element_id, "level": response.data.get("level", 0)})
+		Events.track("upgrade_completed", {"districtId": upgraded_district_id, "elementId": element_id, "level": response.data.get("level", 0), "cost": response.data.get("cost", 0)})
 		Haptics.vibrate(0.55, 45)
 		if response.data.get("districtComplete", false):
-			_show_complete(response.data.get("completionReward", {}))
+			_show_complete(
+				response.data.get("completionReward", {}),
+				upgraded_district_id,
+				int(response.data.get("nextDistrictId", 0)),
+				bool(response.data.get("allDistrictsComplete", false))
+			)
 	elif response.code == 401:
 		Store.session_expired.emit()
 	else:
@@ -148,8 +169,8 @@ func _upgrade(element_id: int) -> void:
 	_busy = false
 	_refresh()
 
-func _show_complete(reward: Dictionary) -> void:
-	Events.track("district_complete", {"districtId": _district.get("id", 1)})
+func _show_complete(reward: Dictionary, district_id: int, next_district_id: int, all_complete: bool) -> void:
+	Events.track("district_completed", {"districtId": district_id, "nextDistrictId": next_district_id, "allDistrictsComplete": all_complete})
 	var overlay := ColorRect.new()
 	overlay.color = Color(0.02, 0.03, 0.08, 0.94)
 	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -160,8 +181,11 @@ func _show_complete(reward: Dictionary) -> void:
 	box.add_theme_constant_override("separation", 18)
 	box.add_child(Ui.label("DISTRICT COMPLETE", 34, Ui.GOLD))
 	box.add_child(Ui.label("+%s CR   +%s SPINS" % [Ui.compact(int(reward.get("credits", 0))), Ui.compact(int(reward.get("spins", 0)))], 20, Ui.TEXT))
-	var close := Ui.button("CONTINUER", Ui.GOLD)
-	close.pressed.connect(overlay.queue_free)
+	var close := Ui.button("CITY SECURED" if all_complete else "NEXT DISTRICT", Ui.GOLD)
+	close.pressed.connect(func() -> void:
+		overlay.queue_free()
+		navigate_requested.emit("spin")
+	)
 	box.add_child(close)
 	center.add_child(box)
 	overlay.add_child(center)

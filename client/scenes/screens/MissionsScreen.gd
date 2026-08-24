@@ -21,6 +21,12 @@ func _ready() -> void:
 	add_child(body)
 	Store.state_changed.connect(_refresh)
 	_refresh()
+	_load_fresh_state.call_deferred()
+
+func _load_fresh_state() -> void:
+	var response := await Net.protected_request("GET", "/state")
+	if response.ok and typeof(response.data) == TYPE_DICTIONARY:
+		Store.apply_state(response.data)
 
 func _refresh() -> void:
 	if _content == null:
@@ -95,7 +101,32 @@ func _event_card(event: Dictionary) -> PanelContainer:
 	box.add_theme_constant_override("separation", 8)
 	box.add_child(Ui.label(str(event.get("name", "Event")), 21, Ui.NEON_MAGENTA))
 	var remain := int(event.get("endsAtMs", 0)) - Store.now_ms()
-	box.add_child(Ui.label("%s RESTANT  •  %s POINTS" % [Ui.mmss_long(remain), Ui.compact(int(event.get("points", 0)))], 14, Ui.TEXT_DIM))
+	var points := int(event.get("points", 0))
+	box.add_child(Ui.label("%s RESTANT  •  %s POINTS" % [Ui.mmss_long(remain), Ui.compact(points)], 14, Ui.TEXT_DIM))
+	for milestone in event.get("milestones", []):
+		if typeof(milestone) != TYPE_DICTIONARY:
+			continue
+		var target := int(milestone.get("points", 0))
+		var reward: Dictionary = milestone.get("reward", {})
+		var claimed := bool(milestone.get("claimed", false))
+		var auto_claim := bool(milestone.get("autoClaim", false))
+		var progress := Ui.progress_bar(Ui.GOLD, 8)
+		progress.value = clampf(float(points) / float(maxi(1, target)) * 100.0, 0.0, 100.0)
+		box.add_child(progress)
+		var reward_text := "+%s SPINS" % Ui.compact(int(reward.get("spins", 0)))
+		if int(reward.get("credits", 0)) > 0:
+			reward_text += "  +%s CR" % Ui.compact(int(reward.get("credits", 0)))
+		var claim_text := "PALIER %s  •  %s" % [Ui.compact(target), reward_text]
+		if claimed:
+			claim_text = "RÉCUPÉRÉ  •  " + reward_text
+		elif auto_claim:
+			claim_text = "AUTO  •  " + claim_text
+		var claim := Ui.button(claim_text, Ui.GOLD, true)
+		claim.disabled = _busy or claimed or auto_claim or points < target
+		claim.pressed.connect(_claim_event_milestone.bind(
+			str(event.get("eventId", "")), int(milestone.get("index", 0))
+		))
+		box.add_child(claim)
 	var leaderboard := Ui.button("VOIR LE CLASSEMENT", Ui.NEON_MAGENTA, true)
 	leaderboard.pressed.connect(_show_leaderboard.bind(str(event.get("eventId", ""))))
 	box.add_child(leaderboard)
@@ -151,6 +182,13 @@ func _claim_mission(mission_id: String) -> void:
 func _claim_season(season_id: String, tier: int, premium: bool) -> void:
 	await _mutate("/season/claim", {"seasonId": season_id, "tier": tier, "premium": premium}, "season_claim")
 
+func _claim_event_milestone(event_id: String, milestone_index: int) -> void:
+	await _mutate(
+		"/events/%s/milestones/%d/claim" % [event_id, milestone_index],
+		{},
+		"event_milestone_claimed"
+	)
+
 func _mutate(path: String, body: Dictionary, event_name: String) -> void:
 	if _busy:
 		return
@@ -187,12 +225,13 @@ func _show_leaderboard(event_id: String) -> void:
 	var box := VBoxContainer.new()
 	box.custom_minimum_size.x = 410
 	box.add_theme_constant_override("separation", 8)
-	box.add_child(Ui.label("NEON LEADERBOARD", 28, Ui.NEON_MAGENTA))
+	box.add_child(Ui.label("NEON LEADERBOARD  •  GROUP %d" % int(response.data.get("cohortId", 1)), 24, Ui.NEON_MAGENTA))
 	var leaders: Array = response.data.get("leaders", [])
 	for row in leaders.slice(0, mini(10, leaders.size())):
 		box.add_child(Ui.label("#%d   %s   %s" % [int(row.get("rank", 0)), str(row.get("address", "")).left(12), Ui.compact(int(row.get("points", 0)))], 14, Ui.TEXT))
 	var me: Dictionary = response.data.get("player", {})
-	box.add_child(Ui.label("TON RANG  #%d  •  %s PTS" % [int(me.get("rank", 0)), Ui.compact(int(me.get("points", 0)))], 16, Ui.GOLD))
+	var my_rank := int(me.get("rank", 0))
+	box.add_child(Ui.label("TON RANG  %s  •  %s PTS" % ["#%d" % my_rank if my_rank > 0 else "--", Ui.compact(int(me.get("points", 0)))], 16, Ui.GOLD))
 	var close := Ui.button("FERMER", Ui.NEON_MAGENTA)
 	close.pressed.connect(overlay.queue_free)
 	box.add_child(close)

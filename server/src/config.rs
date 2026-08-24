@@ -174,12 +174,31 @@ pub struct EventRewardTier {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct EventMilestone {
+    pub points: u64,
+    pub reward: Reward,
+    #[serde(default)]
+    pub auto_claim: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EventLeaderboardConfig {
+    pub cohort_size: u32,
+    pub display_limit: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct EventConfig {
     pub event_id: String,
     pub name: String,
     pub starts_at_ms: i64,
     pub ends_at_ms: i64,
     pub point_sources: Vec<EventPointSource>,
+    #[serde(default)]
+    pub milestones: Vec<EventMilestone>,
+    pub leaderboard: EventLeaderboardConfig,
     pub reward_tiers: Vec<EventRewardTier>,
 }
 
@@ -253,10 +272,18 @@ pub struct DistrictElement {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct DistrictUnlockRequirements {
+    pub completed_district_id: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct District {
     pub id: u32,
     pub name: String,
     pub background: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub unlock_requirements: Option<DistrictUnlockRequirements>,
     pub elements: Vec<DistrictElement>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub completion_reward: Option<CompletionReward>,
@@ -501,6 +528,22 @@ impl RemoteConfig {
             if d.elements.is_empty() {
                 problems.push(format!("district {} : éléments vides", d.id));
             }
+            if d.id == 1 {
+                if d.unlock_requirements.is_some() {
+                    problems.push("district 1 ne doit pas avoir de prérequis".to_string());
+                }
+            } else if d
+                .unlock_requirements
+                .as_ref()
+                .map(|requirements| requirements.completed_district_id)
+                != Some(d.id - 1)
+            {
+                problems.push(format!(
+                    "district {} doit exiger la complétion du district {}",
+                    d.id,
+                    d.id - 1
+                ));
+            }
             let mut elem_ids = BTreeSet::new();
             for e in &d.elements {
                 if !elem_ids.insert(e.id) {
@@ -534,6 +577,9 @@ impl RemoteConfig {
             }) {
                 problems.push(format!("district {} : récompense hors stockage", d.id));
             }
+        }
+        if !(1..=self.districts.len() as u32).all(|id| district_ids.contains(&id)) {
+            problems.push("districts : ids attendus contigus à partir de 1".to_string());
         }
 
         let card_ids: BTreeSet<&str> = self.cards.iter().map(|c| c.card_id.as_str()).collect();
@@ -630,6 +676,23 @@ impl RemoteConfig {
                 .any(|source| source.points > i64::MAX as u64)
             {
                 problems.push(format!("event {} : points hors BIGINT", event.event_id));
+            }
+            if event.leaderboard.cohort_size == 0
+                || event.leaderboard.cohort_size > 500
+                || event.leaderboard.display_limit == 0
+                || event.leaderboard.display_limit > 100
+            {
+                problems.push(format!("event {} : leaderboard invalide", event.event_id));
+            }
+            let mut previous_milestone = 0u64;
+            for milestone in &event.milestones {
+                if milestone.points <= previous_milestone
+                    || milestone.points > i64::MAX as u64
+                    || !reward_fits_storage(&milestone.reward)
+                {
+                    problems.push(format!("event {} : milestone invalide", event.event_id));
+                }
+                previous_milestone = milestone.points;
             }
             for tier in &event.reward_tiers {
                 if tier.min_rank == 0

@@ -6,6 +6,13 @@
       "pointSources": [
         { "action": "spin", "points": 10 }, { "action": "upgrade", "points": 50 }, { "action": "chest_open", "points": 100 }
       ],
+      "milestones": [
+        { "points": 250, "autoClaim": true, "reward": { "spins": 20, "credits": 100000 } },
+        { "points": 1000, "autoClaim": false, "reward": { "spins": 60, "credits": 500000 } },
+        { "points": 5000, "autoClaim": false, "reward": { "spins": 200, "credits": 1500000, "chest": "neon" } },
+        { "points": 20000, "autoClaim": true, "reward": { "spins": 600, "credits": 4000000, "chest": "elite" } }
+      ],
+      "leaderboard": { "cohortSize": 50, "displayLimit": 50 },
       "rewardTiers": [
         { "minRank": 1, "maxRank": 1, "reward": { "spins": 1000, "credits": 5000000, "chest": "elite" } },
         { "minRank": 2, "maxRank": 3, "reward": { "spins": 500, "credits": 2500000, "chest": "neon" } },

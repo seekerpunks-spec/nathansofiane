@@ -14,6 +14,14 @@ use serde::Deserialize;
 use serde_json::{json, Value};
 use std::collections::HashMap;
 
+fn active_district_id(config: &crate::config::RemoteConfig, completed_index: i32) -> Option<u32> {
+    config
+        .districts
+        .iter()
+        .find(|candidate| candidate.id as i32 > completed_index)
+        .map(|candidate| candidate.id)
+}
+
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UpgradeReq {
@@ -56,6 +64,25 @@ pub async fn upgrade(
     if let Some(stored) = state.db.fetch_idempotent_locked(&mut tx, &key).await? {
         tx.rollback().await?;
         return Ok(Json(stored));
+    }
+    let active_district = active_district_id(&state.config, player.district_index);
+    if active_district != Some(district.id) {
+        tx.rollback().await?;
+        return Err(ApiError::Unavailable(
+            "district verrouillé ou déjà complété".to_string(),
+        ));
+    }
+    if district
+        .unlock_requirements
+        .as_ref()
+        .map_or(false, |requirements| {
+            player.district_index < requirements.completed_district_id as i32
+        })
+    {
+        tx.rollback().await?;
+        return Err(ApiError::Unavailable(
+            "prérequis du district non atteint".to_string(),
+        ));
     }
 
     let current: i32 = sqlx::query_scalar(
@@ -141,12 +168,24 @@ pub async fn upgrade(
     }
     game::progress_action_tx(&mut tx, &addr.0, "upgrade", 1, &state.config).await?;
 
-    let balances: (i32, i64) =
-        sqlx::query_as("SELECT spins,credits FROM player_state WHERE address=$1")
+    let balances: (i32, i64, i32) =
+        sqlx::query_as("SELECT spins,credits,district_index FROM player_state WHERE address=$1")
             .bind(&addr.0)
             .fetch_one(&mut *tx)
             .await?;
-    let after = json!({"spins": balances.0, "credits": balances.1, "districtId": district.id, "elementId": element.id, "level": next_level, "complete": complete});
+    let all_rows: Vec<(i32, i32, i32)> = sqlx::query_as(
+        "SELECT district_id,element_id,level FROM district_progress WHERE address=$1 ORDER BY district_id,element_id",
+    )
+    .bind(&addr.0)
+    .fetch_all(&mut *tx)
+    .await?;
+    let next_district_id = state
+        .config
+        .districts
+        .iter()
+        .find(|candidate| candidate.id > district.id)
+        .map(|candidate| candidate.id);
+    let after = json!({"spins": balances.0, "credits": balances.1, "districtIndex": balances.2, "districtId": district.id, "elementId": element.id, "level": next_level, "complete": complete});
     Db::audit_tx(
         &mut tx,
         &addr.0,
@@ -159,11 +198,31 @@ pub async fn upgrade(
     let response = json!({
         "districtId": district.id, "elementId": element.id, "level": next_level,
         "cost": level_cfg.cost, "spins": balances.0, "credits": balances.1,
-        "districtProgress": rows.into_iter().map(|(element_id, level)| json!({"districtId": district.id, "elementId": element_id, "level": level})).collect::<Vec<_>>(),
+        "districtIndex": balances.2,
+        "districtProgress": all_rows.into_iter().map(|(district_id, element_id, level)| json!({"districtId": district_id, "elementId": element_id, "level": level})).collect::<Vec<_>>(),
         "districtComplete": complete, "completionReward": completion_reward,
+        "nextDistrictId": next_district_id,
+        "allDistrictsComplete": complete && next_district_id.is_none(),
         "serverTimeMs": chrono::Utc::now().timestamp_millis()
     });
     state.db.store_idempotent(&mut tx, &key, &response).await?;
     tx.commit().await?;
     Ok(Json(response))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::Path;
+
+    #[test]
+    fn active_district_advances_in_order() {
+        let config = crate::config::RemoteConfig::load(
+            &Path::new(env!("CARGO_MANIFEST_DIR")).join("../config"),
+        )
+        .unwrap();
+        assert_eq!(active_district_id(&config, 0), Some(1));
+        assert_eq!(active_district_id(&config, 1), Some(2));
+        assert_eq!(active_district_id(&config, 2), None);
+    }
 }

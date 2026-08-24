@@ -11,7 +11,8 @@ calculé par le client.
 - `GET /config` — configuration complète versionnée SHA-256.
 - `GET /state` — soldes, district, inventaire, daily, missions, événements,
   saison et horloge serveur.
-- `GET /events/:event_id/leaderboard` — top 50 et rang du joueur.
+- `GET /events/:event_id/leaderboard` — classement `DENSE_RANK` et rang du
+  joueur dans sa cohorte configurable.
 
 ## Auth
 
@@ -31,6 +32,7 @@ calculé par le client.
 - `POST /set/claim {setId,requestId}`
 - `POST /daily/claim {requestId}`
 - `POST /mission/claim {missionId,requestId}`
+- `POST /events/:event_id/milestones/:milestone_index/claim {requestId}`
 - `POST /events/:event_id/claim {requestId}`
 - `POST /season/claim {seasonId,tier,premium,requestId}`
 - `POST /ad/reward {receipt,requestId}`
