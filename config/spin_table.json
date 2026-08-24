@@ -1,11 +1,16 @@
 {
-  "note": "PROVISIONAL — table de spin M1 (crédits uniquement). Issues de type chest/card ajoutées en M3 avec leurs loot tables. Weights entiers, normalisation sur la somme (ici 10000).",
+  "note": "R24 — slot social complet. Les poids restent entiers et normalisés sur 10000 ; Attack/Raid créent une action pending autoritaire.",
   "outcomes": [
-    { "id": "credits_small",  "type": "credits", "tier": "common",    "weight": 4200, "min": 50000,   "max": 150000 },
-    { "id": "credits_medium", "type": "credits", "tier": "common",    "weight": 2600, "min": 150000,  "max": 400000 },
-    { "id": "credits_big",    "type": "credits", "tier": "rare",      "weight": 1000, "min": 400000,  "max": 1000000 },
-    { "id": "credits_huge",   "type": "credits", "tier": "epic",      "weight": 400,  "min": 1000000, "max": 2500000 },
-    { "id": "credits_mega",   "type": "credits", "tier": "legendary", "weight": 80,   "min": 2500000, "max": 6000000 },
-    { "id": "glitch",         "type": "none",    "tier": "common",    "weight": 1720, "label": "GLITCH — aucun gain" }
+    { "id": "credits_small",  "type": "credits", "tier": "common",    "weight": 3300, "min": 50000,   "max": 150000 },
+    { "id": "credits_medium", "type": "credits", "tier": "common",    "weight": 2100, "min": 150000,  "max": 400000 },
+    { "id": "credits_big",    "type": "credits", "tier": "rare",      "weight": 800,  "min": 400000,  "max": 1000000 },
+    { "id": "credits_huge",   "type": "credits", "tier": "epic",      "weight": 300,  "min": 1000000, "max": 2500000 },
+    { "id": "credits_mega",   "type": "credits", "tier": "legendary", "weight": 60,   "min": 2500000, "max": 6000000 },
+    { "id": "signal_jam",     "type": "attack",  "tier": "rare",      "weight": 900,  "label": "SIGNAL JAM" },
+    { "id": "ghost_vault",    "type": "raid",    "tier": "epic",      "weight": 700,  "label": "GHOST VAULT" },
+    { "id": "firewall",       "type": "shield",  "tier": "uncommon",  "weight": 500,  "label": "FIREWALL" },
+    { "id": "basic_cache",    "type": "chest",   "tier": "uncommon",  "weight": 250,  "rewardId": "basic", "label": "CACHE DROP" },
+    { "id": "signal_card",    "type": "card",    "tier": "rare",      "weight": 150,  "label": "CARD SIGNAL" },
+    { "id": "glitch",         "type": "none",    "tier": "common",    "weight": 940,  "label": "GLITCH — aucun gain" }
   ]
 }

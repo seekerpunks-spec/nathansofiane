@@ -1,6 +1,8 @@
 $ErrorActionPreference = "Stop"
 $workspace = Split-Path -Parent $PSScriptRoot
 $spin = Get-Content -LiteralPath (Join-Path $workspace "config\spin_table.json") -Raw | ConvertFrom-Json
+$social = Get-Content -LiteralPath (Join-Path $workspace "config\social.json") -Raw | ConvertFrom-Json
+$chests = (Get-Content -LiteralPath (Join-Path $workspace "config\chests.json") -Raw | ConvertFrom-Json).items
 $districtFiles = Get-ChildItem -LiteralPath (Join-Path $workspace "config\districts") -Filter "district_*.json" |
     Sort-Object Name
 if ($districtFiles.Count -lt 2) { throw "Au moins deux districts sont requis pour valider la progression" }
@@ -10,10 +12,28 @@ if ($weight -le 0) { throw "Poids de spin nul" }
 $expected = 0.0
 $glitchWeight = 0
 foreach ($outcome in $spin.outcomes) {
-    if ($outcome.type -eq "credits") {
-        $mean = ([double]$outcome.min + [double]$outcome.max) / 2.0
-        $expected += $mean * [double]$outcome.weight / [double]$weight
-    } else { $glitchWeight += [int]$outcome.weight }
+    $mean = 0.0
+    switch ($outcome.type) {
+        "credits" { $mean = ([double]$outcome.min + [double]$outcome.max) / 2.0 }
+        "attack" { $mean = [double]$social.attack.baseRewardCredits }
+        "raid" {
+            $safe = [double]($social.raid.nodeCount - $social.raid.traceNodes)
+            $probabilityTwoSafe = ($safe / [double]$social.raid.nodeCount) * (($safe - 1.0) / ([double]$social.raid.nodeCount - 1.0))
+            $averageShare = (($social.raid.safeNodeSharesBps | Measure-Object -Average).Average / 10000.0)
+            $mean = [double]$social.raid.basePotCredits * $probabilityTwoSafe * $averageShare * 2.0
+        }
+        "shield" { $mean = [double]$social.shieldOverflowCredits }
+        "chest" {
+            $chest = $chests | Where-Object { $_.chestId -eq $outcome.rewardId } | Select-Object -First 1
+            if ($null -ne $chest) { $mean = [double]$chest.priceCredits }
+        }
+        "card" {
+            $basic = $chests | Sort-Object priceCredits | Select-Object -First 1
+            if ($null -ne $basic) { $mean = [double]$basic.priceCredits / [double]$basic.cardsPerOpen }
+        }
+        "none" { $glitchWeight += [int]$outcome.weight }
+    }
+    $expected += $mean * [double]$outcome.weight / [double]$weight
 }
 $glitchRate = [double]$glitchWeight / [double]$weight
 

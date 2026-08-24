@@ -27,7 +27,13 @@ calculé par le client.
   Réponse : `{outcome,multiplier,spinsSpent,baseCreditsGained,creditsGained,
   spins,credits,progress,nextSpinAtMs,serverTimeMs}`. `progress.events` contient
   les points ajoutés/totaux, la cohorte et les milestones auto-claimés.
+  En DEV_AUTH uniquement, `debugOutcomeId` et `debugTargetAddress` permettent
+  des tests déterministes ; ces champs sont refusés en production.
 - `POST /district/upgrade {districtId,elementId,requestId}`
+- `POST /district/repair {districtId,elementId,requestId}`
+- `POST /attack/resolve {encounterId,elementId,requestId}`
+- `POST /raid/pick {encounterId,nodeIndex,requestId}`
+- `POST /raid/cashout {encounterId,requestId}`
 - `POST /chest/buy {chestId,requestId}`
 - `POST /chest/open {chestId,requestId}`
 - `POST /set/claim {setId,requestId}`

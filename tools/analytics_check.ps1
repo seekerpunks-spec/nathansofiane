@@ -25,7 +25,15 @@ $expected = @(
     "rewarded_ad_complete",
     "purchase_offer_view",
     "purchase_started",
-    "purchase_complete"
+    "purchase_complete",
+    "attack_started",
+    "attack_completed",
+    "raid_started",
+    "raid_node_revealed",
+    "raid_cashout",
+    "raid_failed",
+    "repair_started",
+    "repair_completed"
 )
 
 $sources = Get-ChildItem -LiteralPath (Join-Path $workspace "client") -Filter "*.gd" -Recurse |

@@ -460,12 +460,12 @@ Cette partie doit être repensée.
 
 AVANT D'IMPLÉMENTER :
 
-- [ ] Étudier l'architecture actuelle.
-- [ ] Vérifier si Attack existe déjà.
-- [ ] Vérifier si Raid existe déjà.
-- [ ] Si oui, auditer mais NE PAS supprimer immédiatement.
-- [ ] Identifier leur rôle actuel dans la boucle.
-- [ ] Identifier ce qu'elles apportent psychologiquement :
+- [x] Étudier l'architecture actuelle.
+- [x] Vérifier si Attack existe déjà.
+- [x] Vérifier si Raid existe déjà.
+- [x] Si oui, auditer mais NE PAS supprimer immédiatement.
+- [x] Identifier leur rôle actuel dans la boucle.
+- [x] Identifier ce qu'elles apportent psychologiquement :
   - interaction sociale ;
   - interruption de la boucle ;
   - jackpot ;
@@ -556,6 +556,11 @@ Puis attendre validation.
 
 Tu peux seulement corriger les bugs fondamentaux de l'ancienne implémentation si nécessaire.
 
+Statut R24 : cinq concepts Attack et cinq concepts Raid sont documentés dans
+`docs/ATTACK_RAID_DESIGN.md`. La directive utilisateur ultérieure demande de
+prendre les décisions produit et de poursuivre sans pause ; la combinaison
+Signal Jam + Ghost Vault + Firewalls a donc été validée avant implémentation.
+
 ---
 
 # PHASE 6 — DEFENSIVE SYSTEM
@@ -589,7 +594,7 @@ Fonction :
 
 Avant implémentation finale :
 
-- [ ] vérifier relation avec future Attack feature.
+- [x] vérifier relation avec future Attack feature.
 
 ---
 
@@ -1075,13 +1080,14 @@ purchase_started
 purchase_complete
 ```
 
-Statut R24 : les 25 événements ci-dessus sont instrumentés et couverts par la
-gate `tools/analytics_check.ps1`. Les batches sont bornés, validés et dédupliqués
-côté serveur par `batchId` lors des retries réseau.
+Statut R24 : les 25 événements ci-dessus et les 8 événements sociaux validés
+(Attack, Raid et réparation), soit 33 événements, sont instrumentés et couverts
+par la gate `tools/analytics_check.ps1`. Les batches sont bornés, validés et
+dédupliqués côté serveur par `batchId` lors des retries réseau.
 
 Pour Attack/Raid :
 
-ne définir analytics définitifs qu'après validation du nouveau design.
+Les analytics sociaux ont été figés après validation de Signal Jam et Ghost Vault.
 
 ---
 

@@ -22,6 +22,7 @@ const TOP_LEVEL_FILES: &[&str] = &[
     "offers.json",
     "seasons.json",
     "sets.json",
+    "social.json",
     "spin_table.json",
 ];
 
@@ -49,6 +50,9 @@ pub enum OutcomeType {
     Credits,
     Chest,
     Card,
+    Attack,
+    Raid,
+    Shield,
     None,
 }
 
@@ -75,11 +79,43 @@ pub struct SpinOutcome {
     pub max: Option<u64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub label: Option<String>,
+    #[serde(default, rename = "rewardId", skip_serializing_if = "Option::is_none")]
+    pub reward_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SpinTable {
     pub outcomes: Vec<SpinOutcome>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AttackConfig {
+    pub base_reward_credits: u64,
+    pub blocked_reward_credits: u64,
+    pub repair_cost_bps: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RaidConfig {
+    pub node_count: u32,
+    pub max_picks: u32,
+    pub trace_nodes: u32,
+    pub base_pot_credits: u64,
+    pub protected_credits: u64,
+    pub max_steal_bps: u32,
+    pub safe_node_shares_bps: Vec<u32>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SocialConfig {
+    pub firewall_max_charges: u32,
+    pub shield_overflow_credits: u64,
+    pub encounter_ttl_ms: u64,
+    pub attack: AttackConfig,
+    pub raid: RaidConfig,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -295,6 +331,7 @@ pub struct RemoteConfig {
     pub hash: String,
     pub economy: EconomyConfig,
     pub spin_table: SpinTable,
+    pub social: SocialConfig,
     pub daily: DailyConfig,
     pub districts: Vec<District>,
     pub cards: Vec<CardConfig>,
@@ -323,7 +360,7 @@ fn parse_flat_stub(name: &str, bytes: &[u8]) -> Result<Value> {
         serde_json::from_slice(bytes).with_context(|| format!("{} : JSON invalide", name))?;
     match &v {
         Value::Array(_) => Ok(v),
-        Value::Object(obj) if obj.get("items").map_or(false, |i| i.is_array()) => Ok(v),
+        Value::Object(obj) if obj.get("items").is_some_and(|i| i.is_array()) => Ok(v),
         _ => bail!(
             "{} : attendu un tableau JSON ou un objet avec un champ items[]",
             name
@@ -386,6 +423,8 @@ impl RemoteConfig {
             .context("economy.json invalide")?;
         let spin_table: SpinTable = serde_json::from_slice(get_entry(&entries, "spin_table.json")?)
             .context("spin_table.json invalide")?;
+        let social: SocialConfig = serde_json::from_slice(get_entry(&entries, "social.json")?)
+            .context("social.json invalide")?;
         let daily: DailyConfig = serde_json::from_slice(get_entry(&entries, "daily.json")?)
             .context("daily.json invalide")?;
         let districts: Vec<District> = entries
@@ -408,6 +447,7 @@ impl RemoteConfig {
             hash,
             economy,
             spin_table,
+            social,
             daily,
             districts,
             cards,
@@ -474,7 +514,7 @@ impl RemoteConfig {
                                     self.economy.spin_multipliers.last().copied().unwrap_or(1)
                                         as u64,
                                 )
-                                .map_or(false, |scaled| scaled <= i64::MAX as u64) => {}
+                                .is_some_and(|scaled| scaled <= i64::MAX as u64) => {}
                     _ => problems.push(format!(
                         "spin_table.{} : bornes invalides ou gain multiplié hors BIGINT",
                         o.id
@@ -484,6 +524,74 @@ impl RemoteConfig {
         }
         if self.spin_table.outcomes.is_empty() {
             problems.push("spin_table.outcomes est vide".to_string());
+        }
+        let total_weight: u64 = self
+            .spin_table
+            .outcomes
+            .iter()
+            .map(|outcome| outcome.weight as u64)
+            .sum();
+        if total_weight == 0 || total_weight > u32::MAX as u64 {
+            problems.push("spin_table : somme des poids hors u32".to_string());
+        }
+        for required in [
+            OutcomeType::Attack,
+            OutcomeType::Raid,
+            OutcomeType::Shield,
+            OutcomeType::Chest,
+            OutcomeType::Card,
+        ] {
+            if !self
+                .spin_table
+                .outcomes
+                .iter()
+                .any(|outcome| outcome.outcome_type == required)
+            {
+                problems.push(format!("spin_table : outcome {:?} manquant", required));
+            }
+        }
+        let max_multiplier = self.economy.spin_multipliers.last().copied().unwrap_or(1);
+        if self.social.firewall_max_charges == 0
+            || self.social.firewall_max_charges > i32::MAX as u32
+            || self.social.encounter_ttl_ms < 30_000
+            || self.social.encounter_ttl_ms > 86_400_000
+            || self.social.attack.repair_cost_bps == 0
+            || self.social.attack.repair_cost_bps > 10_000
+            || self.social.raid.node_count < 4
+            || self.social.raid.node_count > 12
+            || self.social.raid.max_picks == 0
+            || self.social.raid.max_picks >= self.social.raid.node_count
+            || self.social.raid.trace_nodes == 0
+            || self.social.raid.trace_nodes >= self.social.raid.node_count
+            || self.social.raid.max_steal_bps == 0
+            || self.social.raid.max_steal_bps > 10_000
+            || self.social.raid.safe_node_shares_bps.len()
+                != (self.social.raid.node_count - self.social.raid.trace_nodes) as usize
+            || self
+                .social
+                .raid
+                .safe_node_shares_bps
+                .iter()
+                .any(|share| *share == 0 || *share > 10_000)
+            || self
+                .social
+                .attack
+                .base_reward_credits
+                .checked_mul(max_multiplier as u64)
+                .is_none_or(|value| value > i64::MAX as u64)
+            || self
+                .social
+                .shield_overflow_credits
+                .checked_mul(max_multiplier as u64)
+                .is_none_or(|value| value > i64::MAX as u64)
+            || self
+                .social
+                .raid
+                .base_pot_credits
+                .checked_mul(max_multiplier as u64)
+                .is_none_or(|value| value > i64::MAX as u64)
+        {
+            problems.push("social.json : paramètres hors limites".to_string());
         }
 
         let mut days = BTreeSet::new();
@@ -572,7 +680,7 @@ impl RemoteConfig {
                     ));
                 }
             }
-            if d.completion_reward.as_ref().map_or(false, |reward| {
+            if d.completion_reward.as_ref().is_some_and(|reward| {
                 reward.spins > i32::MAX as u32 || reward.credits > i64::MAX as u64
             }) {
                 problems.push(format!("district {} : récompense hors stockage", d.id));
@@ -612,6 +720,23 @@ impl RemoteConfig {
         if chest_ids.len() != self.chests.len() {
             problems.push("chests : chestId en double".to_string());
         }
+        for outcome in self
+            .spin_table
+            .outcomes
+            .iter()
+            .filter(|outcome| outcome.outcome_type == OutcomeType::Chest)
+        {
+            if outcome
+                .reward_id
+                .as_deref()
+                .is_none_or(|id| !chest_ids.contains(id))
+            {
+                problems.push(format!(
+                    "spin_table.{} : rewardId de coffre inconnu",
+                    outcome.id
+                ));
+            }
+        }
         for chest in &self.chests {
             if chest.cards_per_open == 0
                 || chest.loot_table.iter().map(|l| l.weight).sum::<u32>() == 0
@@ -634,7 +759,7 @@ impl RemoteConfig {
             if daily
                 .chest
                 .as_deref()
-                .map_or(false, |id| !chest_ids.contains(id))
+                .is_some_and(|id| !chest_ids.contains(id))
             {
                 problems.push(format!("daily jour {} : coffre inconnu", daily.day));
             }
@@ -644,7 +769,7 @@ impl RemoteConfig {
                 .reward
                 .chest
                 .as_deref()
-                .map_or(false, |id| !chest_ids.contains(id))
+                .is_some_and(|id| !chest_ids.contains(id))
             {
                 problems.push(format!("mission {} : coffre inconnu", mission.mission_id));
             }
@@ -654,7 +779,7 @@ impl RemoteConfig {
                 .completion_reward
                 .as_ref()
                 .and_then(|r| r.chest.as_deref())
-                .map_or(false, |id| !chest_ids.contains(id))
+                .is_some_and(|id| !chest_ids.contains(id))
             {
                 problems.push(format!(
                     "district {} : coffre de récompense inconnu",
@@ -704,7 +829,7 @@ impl RemoteConfig {
                         .reward
                         .chest
                         .as_deref()
-                        .map_or(false, |id| !chest_ids.contains(id))
+                        .is_some_and(|id| !chest_ids.contains(id))
                     || !reward_fits_storage(&tier.reward)
                 {
                     problems.push(format!("event {} : palier invalide", event.event_id));
@@ -736,7 +861,7 @@ impl RemoteConfig {
                     || tier
                         .premium_reward
                         .as_ref()
-                        .map_or(false, |reward| !reward_fits_storage(reward))
+                        .is_some_and(|reward| !reward_fits_storage(reward))
             }) {
                 problems.push(format!(
                     "season {} : palier hors stockage",
@@ -765,13 +890,12 @@ impl RemoteConfig {
                         if content
                             .id
                             .as_deref()
-                            .map_or(false, |id| self.chests.iter().any(|c| c.chest_id == id)) => {}
+                            .is_some_and(|id| self.chests.iter().any(|c| c.chest_id == id)) => {}
                     "season_premium"
                         if content
                             .id
                             .as_deref()
-                            .map_or(false, |id| self.seasons.iter().any(|s| s.season_id == id)) => {
-                    }
+                            .is_some_and(|id| self.seasons.iter().any(|s| s.season_id == id)) => {}
                     _ => problems.push(format!("offer {} : contenu invalide", offer.offer_id)),
                 }
             }
@@ -788,6 +912,7 @@ impl RemoteConfig {
         json!({
             "economy": self.economy,
             "spinTable": self.spin_table,
+            "social": self.social,
             "daily": self.daily,
             "districts": self.districts,
             "cards": self.cards,

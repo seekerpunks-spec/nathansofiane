@@ -47,6 +47,9 @@ var _final_symbols: Array[String] = []
 var _anticipation := false
 var _landed_count := 0
 var _selected_multiplier := 1
+var _social_overlay: ColorRect
+var _social_busy := false
+var _tracked_social_starts: Dictionary = {}
 
 
 func _ready() -> void:
@@ -55,6 +58,7 @@ func _ready() -> void:
 	_start_idle_animation()
 	Store.state_changed.connect(_refresh_hud)
 	Store.no_spins.connect(_show_no_spins)
+	_resume_pending_encounter.call_deferred()
 
 
 func _build() -> void:
@@ -403,6 +407,7 @@ func _refresh_hud() -> void:
 		_district_label.text = (
 			str(active_district.get("name", "NEON SLUMS")).to_upper()
 			+ " · NODE %02d" % int(active_district.get("id", 1))
+			+ " · FIREWALL %d/%d" % [int(Store.state.get("firewallCharges", 0)), int(Store.state.get("firewallMax", 3))]
 		)
 
 
@@ -517,6 +522,20 @@ func _symbols_for_result(outcome: Dictionary) -> Array[String]:
 		result.assign(["glitch", "credits", "energy"])
 		return result
 	var symbol := "credits"
+	match result_type:
+		"attack":
+			symbol = "hack"
+		"raid":
+			symbol = "vault"
+		"shield":
+			symbol = "shield"
+		"chest":
+			symbol = "energy"
+		"card":
+			symbol = "hack"
+	if result_type != "credits":
+		result.assign([symbol, symbol, symbol])
+		return result
 	match tier:
 		"uncommon":
 			symbol = "energy"
@@ -633,6 +652,21 @@ func _on_landed() -> void:
 		accent = Ui.NEON_MAGENTA
 		_status_label.text = "GLITCH!"
 		_result_banner.text = "NO LOOT  •  TRY AGAIN"
+	elif result_type == "attack":
+		_status_label.text = "SIGNAL JAM!"
+		_result_banner.text = "CHOOSE A NETWORK NODE"
+	elif result_type == "raid":
+		_status_label.text = "GHOST VAULT!"
+		_result_banner.text = "BREACH OR CASH OUT"
+	elif result_type == "shield":
+		_status_label.text = "FIREWALL!"
+		_result_banner.text = "DEFENSE CHARGE SECURED"
+	elif result_type == "chest":
+		_status_label.text = "CACHE DROP!"
+		_result_banner.text = "CHEST ADDED TO CARDS"
+	elif result_type == "card":
+		_status_label.text = "CARD SIGNAL!"
+		_result_banner.text = "NEW DATA FRAGMENT"
 	else:
 		_status_label.text = "MEGA JACKPOT!" if tier == "legendary" else "YOU WIN!"
 		_result_banner.text = "+" + Ui.compact(_pending_credits) + " CR"
@@ -681,6 +715,9 @@ func _on_landed() -> void:
 			})
 	_refresh_hud()
 	_reset_idle_state(false)
+	var pending: Variant = Store.state.get("pendingEncounter", null)
+	if typeof(pending) == TYPE_DICTIONARY:
+		_show_social_encounter(pending)
 
 
 func _impact_result(tier: String, accent: Color) -> void:
@@ -783,6 +820,173 @@ func _show_no_spins(_next_ms: int) -> void:
 	_no_spins.visible = true
 	_no_spins_label.text = "Recharge réseau en cours…"
 	Events.track("spins_empty")
+
+
+func _resume_pending_encounter() -> void:
+	var pending: Variant = Store.state.get("pendingEncounter", null)
+	if typeof(pending) == TYPE_DICTIONARY:
+		_show_social_encounter(pending)
+
+
+func _clear_social_overlay() -> void:
+	if is_instance_valid(_social_overlay):
+		remove_child(_social_overlay)
+		_social_overlay.queue_free()
+	_social_overlay = null
+
+
+func _show_social_encounter(encounter: Dictionary, banner: String = "") -> void:
+	_clear_social_overlay()
+	_social_busy = false
+	_social_overlay = ColorRect.new()
+	_social_overlay.color = Color(0.015, 0.02, 0.07, 0.97)
+	_social_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	var center := CenterContainer.new()
+	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	var panel := Ui.panel(Ui.PANEL_HI, Ui.NEON_MAGENTA)
+	panel.custom_minimum_size = Vector2(440, 0)
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 12)
+	var kind := str(encounter.get("kind", ""))
+	var encounter_id := str(encounter.get("encounterId", ""))
+	box.add_child(Ui.label("SIGNAL JAM" if kind == "attack" else "GHOST VAULT", 31, Ui.NEON_MAGENTA if kind == "attack" else Ui.GOLD))
+	box.add_child(Ui.label("TARGET  •  " + str(encounter.get("target", "NEON CORP")), 14, Ui.TEXT_DIM))
+	if banner != "":
+		box.add_child(Ui.label(banner, 18, Ui.NEON_CYAN))
+	if kind == "attack":
+		box.add_child(Ui.label("Choisis le nœud à brouiller. Un Firewall adverse peut absorber l'impulsion.", 14, Ui.TEXT))
+		var choices: Array = encounter.get("choices", [])
+		for element_id in choices:
+			var attack := Ui.button("JAM NODE %d" % int(element_id), Ui.NEON_MAGENTA)
+			attack.pressed.connect(_resolve_attack.bind(encounter, int(element_id), box))
+			box.add_child(attack)
+		if not _tracked_social_starts.has(encounter_id):
+			_tracked_social_starts[encounter_id] = true
+			Events.track("attack_started", {"encounterId": encounter_id, "multiplier": encounter.get("multiplier", 1), "corporate": encounter.get("corporate", false)})
+	else:
+		var unbanked := int(encounter.get("unbankedCredits", 0))
+		box.add_child(Ui.label("UNBANKED  •  %s CR" % Ui.compact(unbanked), 19, Ui.GOLD))
+		box.add_child(Ui.label("Chaque cache augmente le butin. Une TRACE détruit tout le non-encaissé.", 14, Ui.TEXT))
+		var grid := GridContainer.new()
+		grid.columns = 3
+		var picked: Array = encounter.get("picked", [])
+		for node_index in int(encounter.get("nodeCount", 6)):
+			var node := Ui.button("NODE %d" % (node_index + 1), Ui.NEON_CYAN, true)
+			node.disabled = picked.has(node_index)
+			node.pressed.connect(_raid_pick.bind(encounter, node_index))
+			grid.add_child(node)
+		box.add_child(grid)
+		if bool(encounter.get("canCashout", false)):
+			var cashout := Ui.button("CASH OUT  %s CR" % Ui.compact(unbanked), Ui.GOLD)
+			cashout.pressed.connect(_raid_cashout.bind(encounter, box))
+			box.add_child(cashout)
+		if not _tracked_social_starts.has(encounter_id):
+			_tracked_social_starts[encounter_id] = true
+			Events.track("raid_started", {"encounterId": encounter_id, "multiplier": encounter.get("multiplier", 1), "corporate": encounter.get("corporate", false)})
+	var later := Ui.button("REVENIR PLUS TARD", Ui.TEXT_DIM, true)
+	later.pressed.connect(_clear_social_overlay)
+	box.add_child(later)
+	panel.add_child(box)
+	center.add_child(panel)
+	_social_overlay.add_child(center)
+	add_child(_social_overlay)
+
+
+func _resolve_attack(encounter: Dictionary, element_id: int, box: VBoxContainer) -> void:
+	if _social_busy:
+		return
+	_social_busy = true
+	var rid := Net.request_id()
+	var response := await Net.protected_request("POST", "/attack/resolve", {
+		"encounterId": encounter.get("encounterId", ""), "elementId": element_id, "requestId": rid
+	}, rid)
+	if response.ok and typeof(response.data) == TYPE_DICTIONARY:
+		await _sync_social_state()
+		var blocked := bool(response.data.get("blocked", false))
+		Events.track("attack_completed", {"encounterId": encounter.get("encounterId", ""), "elementId": element_id, "blocked": blocked, "rewardCredits": response.data.get("rewardCredits", 0)})
+		Events.track("currency_earned", {"currency": "credits", "amount": int(response.data.get("rewardCredits", 0)), "source": "attack"})
+		box.add_child(Ui.label("BLOCKED BY FIREWALL" if blocked else "NODE JAMMED", 22, Ui.GOLD if blocked else Ui.NEON_MAGENTA))
+		box.add_child(Ui.label("+%s CR" % Ui.compact(int(response.data.get("rewardCredits", 0))), 20, Ui.GOLD))
+		var close := Ui.button("CONTINUE", Ui.NEON_CYAN)
+		close.pressed.connect(_clear_social_overlay)
+		box.add_child(close)
+	else:
+		_social_busy = false
+		Sfx.error()
+		box.add_child(Ui.label("SIGNAL LOST — RÉESSAIE", 15, Ui.NEON_MAGENTA))
+
+
+func _raid_pick(encounter: Dictionary, node_index: int) -> void:
+	if _social_busy:
+		return
+	_social_busy = true
+	var rid := Net.request_id()
+	var response := await Net.protected_request("POST", "/raid/pick", {
+		"encounterId": encounter.get("encounterId", ""), "nodeIndex": node_index, "requestId": rid
+	}, rid)
+	if not response.ok or typeof(response.data) != TYPE_DICTIONARY:
+		_social_busy = false
+		Sfx.error()
+		return
+	var reveal: Dictionary = response.data.get("reveal", {})
+	Events.track("raid_node_revealed", {"encounterId": encounter.get("encounterId", ""), "nodeIndex": node_index, "type": reveal.get("type", ""), "credits": reveal.get("credits", 0)})
+	if bool(response.data.get("complete", false)):
+		await _sync_social_state()
+		var failed := bool(response.data.get("failed", false))
+		Events.track("raid_failed" if failed else "raid_cashout", {"encounterId": encounter.get("encounterId", ""), "rewardCredits": response.data.get("rewardCredits", 0), "autoCashout": response.data.get("autoCashout", false)})
+		if not failed:
+			Events.track("currency_earned", {"currency": "credits", "amount": int(response.data.get("rewardCredits", 0)), "source": "raid"})
+		_show_social_result("TRACE DETECTED — LOOT LOST" if failed else "VAULT SECURED  +%s CR" % Ui.compact(int(response.data.get("rewardCredits", 0))), failed)
+		return
+	await _sync_social_state()
+	var pending: Variant = Store.state.get("pendingEncounter", null)
+	if typeof(pending) == TYPE_DICTIONARY:
+		_show_social_encounter(pending, "CACHE +%s CR" % Ui.compact(int(reveal.get("credits", 0))))
+
+
+func _raid_cashout(encounter: Dictionary, box: VBoxContainer) -> void:
+	if _social_busy:
+		return
+	_social_busy = true
+	var rid := Net.request_id()
+	var response := await Net.protected_request("POST", "/raid/cashout", {
+		"encounterId": encounter.get("encounterId", ""), "requestId": rid
+	}, rid)
+	if response.ok and typeof(response.data) == TYPE_DICTIONARY:
+		await _sync_social_state()
+		Events.track("raid_cashout", {"encounterId": encounter.get("encounterId", ""), "rewardCredits": response.data.get("rewardCredits", 0), "autoCashout": false})
+		Events.track("currency_earned", {"currency": "credits", "amount": int(response.data.get("rewardCredits", 0)), "source": "raid"})
+		_show_social_result("CASH OUT  +%s CR" % Ui.compact(int(response.data.get("rewardCredits", 0))), false)
+	else:
+		_social_busy = false
+		Sfx.error()
+		box.add_child(Ui.label("CASH OUT IMPOSSIBLE", 15, Ui.NEON_MAGENTA))
+
+
+func _show_social_result(message: String, failed: bool) -> void:
+	_clear_social_overlay()
+	_social_busy = true
+	_social_overlay = ColorRect.new()
+	_social_overlay.color = Color(0.015, 0.02, 0.07, 0.97)
+	_social_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	var center := CenterContainer.new()
+	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	var box := VBoxContainer.new()
+	box.custom_minimum_size.x = 410
+	box.add_theme_constant_override("separation", 16)
+	box.add_child(Ui.label(message, 25, Ui.NEON_MAGENTA if failed else Ui.GOLD))
+	var close := Ui.button("CONTINUE", Ui.NEON_CYAN)
+	close.pressed.connect(_clear_social_overlay)
+	box.add_child(close)
+	center.add_child(box)
+	_social_overlay.add_child(center)
+	add_child(_social_overlay)
+
+
+func _sync_social_state() -> void:
+	var state_response := await Net.protected_request("GET", "/state")
+	if state_response.ok and typeof(state_response.data) == TYPE_DICTIONARY:
+		Store.apply_state(state_response.data)
 
 
 class SlotCabinet extends Control:

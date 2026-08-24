@@ -61,6 +61,16 @@ func apply_spin(d: Dictionary) -> void:
 		state["credits"] = d["credits"]
 	if d.has("nextSpinAtMs"):
 		state["nextSpinAtMs"] = d["nextSpinAtMs"]
+	if d.has("pendingEncounter"):
+		state["pendingEncounter"] = d["pendingEncounter"]
+	var feature: Variant = d.get("featureReward", null)
+	if typeof(feature) == TYPE_DICTIONARY:
+		if feature.has("firewallCharges"):
+			state["firewallCharges"] = feature["firewallCharges"]
+		if feature.has("chestId"):
+			_upsert_quantity("chests", "chestId", str(feature.get("chestId", "")), int(feature.get("quantity", 0)))
+		if feature.has("cardId"):
+			_upsert_quantity("cards", "cardId", str(feature.get("cardId", "")), int(feature.get("quantity", 0)))
 	var progress: Variant = d.get("progress", {})
 	if typeof(progress) == TYPE_DICTIONARY:
 		_apply_event_progress(progress.get("events", []))
@@ -68,6 +78,17 @@ func apply_spin(d: Dictionary) -> void:
 		set_clock(int(d["serverTimeMs"]))
 	state_changed.emit()
 	spin_result.emit(d)
+
+func _upsert_quantity(collection_key: String, id_key: String, id_value: String, quantity: int) -> void:
+	var rows: Array = state.get(collection_key, [])
+	for row in rows:
+		if typeof(row) == TYPE_DICTIONARY and str(row.get(id_key, "")) == id_value:
+			row["qty"] = quantity
+			return
+	var entry := {"qty": quantity}
+	entry[id_key] = id_value
+	rows.append(entry)
+	state[collection_key] = rows
 
 func _apply_event_progress(progress_events: Array) -> void:
 	var events: Array = state.get("events", [])
@@ -89,7 +110,7 @@ func _apply_event_progress(progress_events: Array) -> void:
 func apply_mutation(d: Dictionary) -> void:
 	if typeof(d) != TYPE_DICTIONARY:
 		return
-	for key in ["spins", "credits", "nextSpinAtMs", "districtIndex", "districtProgress", "cards", "chests", "missions", "events", "seasons", "dailyStreak", "dailyAvailable"]:
+	for key in ["spins", "credits", "nextSpinAtMs", "districtIndex", "districtProgress", "districtDamage", "firewallCharges", "firewallMax", "pendingEncounter", "cards", "chests", "missions", "events", "seasons", "dailyStreak", "dailyAvailable"]:
 		if d.has(key):
 			state[key] = d[key]
 	if d.has("serverTimeMs"):
@@ -101,6 +122,12 @@ func district_level(district_id: int, element_id: int) -> int:
 		if typeof(row) == TYPE_DICTIONARY and int(row.get("districtId", 0)) == district_id and int(row.get("elementId", 0)) == element_id:
 			return int(row.get("level", 0))
 	return 0
+
+func district_damaged(district_id: int, element_id: int) -> bool:
+	for row in state.get("districtDamage", []):
+		if typeof(row) == TYPE_DICTIONARY and int(row.get("districtId", 0)) == district_id and int(row.get("elementId", 0)) == element_id:
+			return true
+	return false
 
 func chest_qty(chest_id: String) -> int:
 	for row in state.get("chests", []):

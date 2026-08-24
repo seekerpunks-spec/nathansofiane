@@ -4,7 +4,9 @@
       "eventId": "neon_rush_r17", "name": "Neon Rush",
       "startsAtMs": 1787328000000, "endsAtMs": 1790812800000,
       "pointSources": [
-        { "action": "spin", "points": 10 }, { "action": "upgrade", "points": 50 }, { "action": "chest_open", "points": 100 }
+        { "action": "spin", "points": 10 }, { "action": "upgrade", "points": 50 },
+        { "action": "chest_open", "points": 100 }, { "action": "attack", "points": 150 },
+        { "action": "raid", "points": 200 }
       ],
       "milestones": [
         { "points": 250, "autoClaim": true, "reward": { "spins": 20, "credits": 100000 } },

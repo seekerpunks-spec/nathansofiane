@@ -110,6 +110,7 @@ func _active_district() -> Dictionary:
 	return fallback
 
 func _element_card(element: Dictionary, current: int, max_level: int) -> PanelContainer:
+	var damaged := Store.district_damaged(int(_district.get("id", 1)), int(element.get("id", 0)))
 	var card := Ui.panel(Color(Ui.PANEL, 0.94), Ui.BORDER if current < max_level else Ui.GREEN)
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 12)
@@ -126,9 +127,20 @@ func _element_card(element: Dictionary, current: int, max_level: int) -> PanelCo
 	var levels := Ui.label("NIVEAU %d / %d   %s" % [current, max_level, "◆".repeat(current) + "◇".repeat(maxi(0, max_level-current))], 12, Ui.NEON_CYAN)
 	levels.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	text.add_child(levels)
+	if damaged:
+		var jammed := Ui.label("SIGNAL JAMMED  •  REPAIR REQUIRED", 11, Ui.NEON_MAGENTA)
+		jammed.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+		text.add_child(jammed)
 	row.add_child(text)
 	var button: Button
-	if current >= max_level:
+	if damaged:
+		var current_cost := int(element.get("levels", [])[current].get("cost", 0))
+		var repair_bps := int(Config.social().get("attack", {}).get("repairCostBps", 2500))
+		var repair_cost := current_cost * repair_bps / 10000
+		button = Ui.button("REPAIR " + Ui.compact(repair_cost) + " CR", Ui.NEON_MAGENTA, Store.credits() < repair_cost)
+		button.disabled = _busy or Store.credits() < repair_cost
+		button.pressed.connect(_repair.bind(int(element.get("id", 0))))
+	elif current >= max_level:
 		button = Ui.button("MAX", Ui.GREEN, true)
 		button.disabled = true
 	else:
@@ -141,6 +153,31 @@ func _element_card(element: Dictionary, current: int, max_level: int) -> PanelCo
 	row.add_child(button)
 	card.add_child(row)
 	return card
+
+func _repair(element_id: int) -> void:
+	if _busy:
+		return
+	_busy = true
+	var district_id := int(_district.get("id", 1))
+	Events.track("repair_started", {"districtId": district_id, "elementId": element_id})
+	var rid := Net.request_id()
+	var response := await Net.protected_request("POST", "/district/repair", {"districtId": district_id, "elementId": element_id, "requestId": rid}, rid)
+	if response.ok and typeof(response.data) == TYPE_DICTIONARY:
+		Store.apply_mutation(response.data)
+		var cost := int(response.data.get("cost", 0))
+		Events.track("repair_completed", {"districtId": district_id, "elementId": element_id, "cost": cost})
+		Events.track("currency_spent", {"currency": "credits", "amount": cost, "sink": "repair", "districtId": district_id, "elementId": element_id})
+		await _sync_state()
+	else:
+		Sfx.error()
+		Haptics.error()
+	_busy = false
+	_refresh()
+
+func _sync_state() -> void:
+	var state_response := await Net.protected_request("GET", "/state")
+	if state_response.ok and typeof(state_response.data) == TYPE_DICTIONARY:
+		Store.apply_state(state_response.data)
 
 func _upgrade(element_id: int) -> void:
 	if _busy:

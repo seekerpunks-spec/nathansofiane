@@ -13,10 +13,12 @@
 //! config versionnée (hashée). Règle d'or GDD §37-39.
 
 use crate::auth::auth_address;
+use crate::collection;
 use crate::config::{OutcomeType, RemoteConfig};
 use crate::db::Db;
 use crate::error::ApiError;
 use crate::game;
+use crate::social;
 use crate::state::AppState;
 use anyhow::anyhow;
 use axum::extract::State;
@@ -34,6 +36,11 @@ pub struct SpinReq {
     pub request_id: Option<String>,
     #[serde(default = "default_multiplier")]
     pub multiplier: u32,
+    /// Test d'intégration local uniquement ; refusé hors DEV_AUTH.
+    #[serde(default, rename = "debugOutcomeId")]
+    pub debug_outcome_id: Option<String>,
+    #[serde(default, rename = "debugTargetAddress")]
+    pub debug_target_address: Option<String>,
 }
 
 fn default_multiplier() -> u32 {
@@ -55,6 +62,11 @@ pub async fn spin(
     if let Some(stored) = state.db.fetch_idempotent(&key).await? {
         return Ok(Json(stored));
     }
+    if (body.debug_outcome_id.is_some() || body.debug_target_address.is_some()) && !state.dev_auth {
+        return Err(ApiError::BadRequest(
+            "champs debug indisponibles hors DEV_AUTH".to_string(),
+        ));
+    }
 
     let response = perform_spin(
         &state.db,
@@ -62,6 +74,8 @@ pub async fn spin(
         &address,
         &request_id,
         body.multiplier,
+        body.debug_outcome_id.as_deref(),
+        body.debug_target_address.as_deref(),
     )
     .await?;
     Ok(Json(response))
@@ -74,6 +88,8 @@ async fn perform_spin(
     address: &str,
     request_id: &str,
     multiplier: u32,
+    forced_outcome_id: Option<&str>,
+    forced_target: Option<&str>,
 ) -> Result<Value, ApiError> {
     if !config.economy.spin_multipliers.contains(&multiplier) {
         return Err(ApiError::BadRequest(
@@ -94,6 +110,7 @@ async fn perform_spin(
         tx.rollback().await?;
         return Ok(stored);
     }
+    social::ensure_no_pending_tx(&mut tx, address).await?;
 
     // 1) Regen temporelle (horloge serveur).
     let now = Utc::now();
@@ -113,15 +130,22 @@ async fn perform_spin(
     // 3) Tirage sur la table de poids (CSPRNG).
     let outcomes = &config.spin_table.outcomes;
     let total: u32 = outcomes.iter().map(|o| o.weight).sum();
-    let pick = rand::rngs::OsRng.gen_range(0..total);
-    let mut acc = 0u32;
-    let outcome = outcomes
-        .iter()
-        .find(|o| {
-            acc += o.weight;
-            pick < acc
-        })
-        .expect("table non vide (validée au boot)");
+    let outcome = if let Some(outcome_id) = forced_outcome_id {
+        outcomes
+            .iter()
+            .find(|outcome| outcome.id == outcome_id)
+            .ok_or_else(|| ApiError::BadRequest("debugOutcomeId inconnu".to_string()))?
+    } else {
+        let pick = rand::rngs::OsRng.gen_range(0..total);
+        let mut acc = 0u32;
+        outcomes
+            .iter()
+            .find(|outcome| {
+                acc += outcome.weight;
+                pick < acc
+            })
+            .expect("table non vide (validée au boot)")
+    };
 
     // 4) Gain en crédits (bornes min/max validées au boot).
     let base_credits_gained: u64 = if outcome.outcome_type == OutcomeType::Credits {
@@ -133,7 +157,7 @@ async fn perform_spin(
         // M1 : pas d'issues chest/card dans la table (activées en M3).
         0
     };
-    let credits_gained =
+    let mut credits_gained =
         game::checked_scale(base_credits_gained, multiplier, "spin.creditsGained")?;
 
     // 5) Écriture atomique : état + audit (+ idempotence).
@@ -167,6 +191,44 @@ async fn perform_spin(
     .execute(&mut *tx)
     .await?;
 
+    let mut pending_encounter: Option<Value> = None;
+    let mut feature_reward: Option<Value> = None;
+    match outcome.outcome_type {
+        OutcomeType::Attack | OutcomeType::Raid => {
+            pending_encounter = social::create_encounter_tx(
+                &mut tx,
+                address,
+                row.district_index,
+                outcome.outcome_type,
+                multiplier,
+                config,
+                forced_target,
+            )
+            .await?;
+        }
+        OutcomeType::Shield => {
+            let reward = social::apply_shield_tx(&mut tx, address, multiplier, config).await?;
+            credits_gained = reward
+                .get("overflowCredits")
+                .and_then(Value::as_u64)
+                .unwrap_or(0);
+            feature_reward = Some(reward);
+        }
+        OutcomeType::Chest => {
+            let chest_id = outcome
+                .reward_id
+                .as_deref()
+                .ok_or_else(|| ApiError::Internal(anyhow!("spin chest sans rewardId")))?;
+            feature_reward =
+                Some(collection::grant_spin_chest_tx(&mut tx, address, chest_id).await?);
+        }
+        OutcomeType::Card => {
+            feature_reward =
+                Some(collection::grant_spin_card_tx(&mut tx, address, &config.cards).await?);
+        }
+        OutcomeType::Credits | OutcomeType::None => {}
+    }
+
     let progress =
         game::progress_action_tx(&mut tx, address, "spin", multiplier as i64, config).await?;
     let final_balances: (i32, i64) =
@@ -181,6 +243,8 @@ async fn perform_spin(
         "multiplier": multiplier,
         "baseCreditsGained": base_credits_gained,
         "creditsGained": credits_gained,
+        "featureReward": feature_reward.clone(),
+        "pendingEncounter": pending_encounter.clone(),
     });
     Db::audit_tx(&mut tx, address, "spin", &before, &after, Some(request_id)).await?;
 
@@ -206,6 +270,8 @@ async fn perform_spin(
         "creditsGained": credits_gained,
         "spins": final_balances.0,
         "credits": final_balances.1,
+        "featureReward": feature_reward,
+        "pendingEncounter": pending_encounter,
         "progress": progress,
         "nextSpinAtMs": next_spin_at_ms,
         "serverTimeMs": now.timestamp_millis(),

@@ -1,0 +1,19 @@
+{
+  "firewallMaxCharges": 3,
+  "shieldOverflowCredits": 75000,
+  "encounterTtlMs": 600000,
+  "attack": {
+    "baseRewardCredits": 250000,
+    "blockedRewardCredits": 50000,
+    "repairCostBps": 2500
+  },
+  "raid": {
+    "nodeCount": 6,
+    "maxPicks": 3,
+    "traceNodes": 1,
+    "basePotCredits": 600000,
+    "protectedCredits": 500000,
+    "maxStealBps": 1000,
+    "safeNodeSharesBps": [2000, 2500, 3000, 4000, 5000]
+  }
+}

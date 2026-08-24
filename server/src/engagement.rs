@@ -438,9 +438,10 @@ pub async fn claim_season(
     } else {
         &free_claimed
     };
-    if claims.as_array().map_or(false, |a| {
-        a.iter().any(|v| v.as_u64() == Some(body.tier as u64))
-    }) {
+    if claims
+        .as_array()
+        .is_some_and(|a| a.iter().any(|v| v.as_u64() == Some(body.tier as u64)))
+    {
         tx.rollback().await?;
         return Err(ApiError::AlreadyClaimed);
     }

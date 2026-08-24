@@ -12,6 +12,8 @@
   "missions": [
     { "missionId": "use_spins", "name": "Use 10 Spins", "action": "spin", "target": 10, "reward": { "spins": 20, "credits": 100000 } },
     { "missionId": "upgrade_grid", "name": "Upgrade 2 Structures", "action": "upgrade", "target": 2, "reward": { "spins": 35, "credits": 250000 } },
-    { "missionId": "open_cache", "name": "Open a Cache", "action": "chest_open", "target": 1, "reward": { "spins": 50, "credits": 0, "chest": "basic" } }
+    { "missionId": "open_cache", "name": "Open a Cache", "action": "chest_open", "target": 1, "reward": { "spins": 50, "credits": 0, "chest": "basic" } },
+    { "missionId": "jam_signal", "name": "Jam a Rival Node", "action": "attack", "target": 1, "reward": { "spins": 40, "credits": 200000 } },
+    { "missionId": "ghost_cashout", "name": "Cash Out a Ghost Vault", "action": "raid", "target": 1, "reward": { "spins": 60, "credits": 300000 } }
   ]
 }

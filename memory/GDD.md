@@ -5,7 +5,7 @@
 ## Concept
 Spin game cyberpunk/mobile (portrait) pour Solana Seeker / dApp Store. Structure de boucle inspirée de Coin Master, univers/noms/branding 100% originaux (pas une copie).
 
-**Boucle centrale** : SPINS → récompenses → progression → collection → events → nouveaux spins.
+**Boucle centrale** : SPINS → récompenses/Signal Jam/Ghost Vault → progression → collection → events → nouveaux spins.
 
 ## Spin
 - Action principale : gros bouton → POST /spin → résultat calculé **côté serveur uniquement**.
@@ -28,6 +28,15 @@ Spin game cyberpunk/mobile (portrait) pour Solana Seeker / dApp Store. Structure
 - Cartes avec rareté configurable (Common → Legendary). Sets/collections : Crypto Legends, Seeker Tech, Hacker Tools, Digital Relics, Neon Districts (représentations graphiques ORIGINALES, pas de logos existants).
 - Collection complétée = un des plus gros moments du jeu → énorme reward de spins (1k–15k selon difficulté, configurable).
 - Doublons : conservés (qty), pas de marketplace.
+
+## Social instantané
+- **Signal Jam** : choisir un nœud construit rival, reward crédit × mise ; un
+  Firewall adverse bloque automatiquement, sinon le nœud doit être réparé.
+- **Ghost Vault** : six nœuds serveur, trois choix max ; cache = butin non
+  encaissé, trace = perte, cash-out libre après un cache sûr.
+- Les Firewalls viennent du slot, capacité 3, consommation automatique ; une
+  mise ×N accorde N charges puis convertit chaque charge excédentaire en crédits.
+  Fallback NEON CORP si aucune cible valide.
 
 ## Interdictions MVP (règles dures)
 - **AUCUN** marketplace, trading, cash-out, promesse de valeur financière, NFT par carte.

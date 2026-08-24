@@ -23,7 +23,7 @@
   484,5 spins), 6 scènes Godot et intégration PostgreSQL auto-claim/claim manuel/
   replay/cohorte/verrouillage District 2, complétion unique de Neon Slums puis
   premier upgrade autorisé dans Chrome Heights.
-- Funnel analytics complet : 25 événements obligatoires, batches idempotents,
+- Funnel analytics complet : 25 événements cœur + 8 sociaux, batches idempotents,
   props bornées/validées et progression événementielle incluse dans `/spin`.
 - Tous les rangs 1–50 d'une cohorte reçoivent un palier ; le claim final est
   exposé dans l'écran Missions après expiration.
@@ -57,8 +57,8 @@
 ## Serveur livré
 
 - Modules R17 : `game`, `district`, `collection`, `engagement`, `commerce`.
-- Migrations additives `0002_progression_liveops.sql`, `0003_core_integrity.sql`
-  et `0004_event_milestones_cohorts.sql`.
+- Migrations additives `0002_progression_liveops.sql` à
+  `0006_social_encounters.sql`.
 - Idempotence par action, transactions, audit économique, horloge serveur,
   rate-limit et nettoyage périodique.
 - Mode release protégé : refus de `DEV_AUTH`, secret JWT fort, CORS allowlist,
@@ -66,12 +66,23 @@
 
 ## Validation exécutée
 
-- `tools/economy_check.ps1` : OK, 225,4 spins pour District 1 et 484,5 pour
-  District 2, avec courbe strictement croissante.
-- `cargo test --locked` : 9/9.
-- `tools/analytics_check.ps1` : 25/25 événements présents.
+- `tools/economy_check.ps1` : OK, 277 605 CR équivalents/spin, 9,4 % vides,
+  233,5 spins pour District 1 et 501,8 pour District 2.
+- `cargo test --locked` : 11/11 ; `cargo clippy --locked -- -D warnings` : OK.
+- `tools/analytics_check.ps1` : 33/33 événements présents.
 - Intégration analytics PostgreSQL : batch 25 accepté, replay dédupliqué, props
   invalides refusées et progression de spin renvoyée avec cohorte.
+- Slot social complet : outcomes Attack/Raid/Shield/Chest/Card, Signal Jam,
+  dégâts réparables, Firewalls capés/consommés et Ghost Vault push-your-luck.
+- Intégration PostgreSQL sociale : pending bloque un second spin, Attack et
+  réparation idempotents, Firewall ×2 bloque sans dégât, plateau Raid non exposé,
+  pick/cash-out idempotents et débit/crédit exact entre deux joueurs.
+- Revue concurrence : deux résolutions Attack simultanées avec le même
+  `requestId` renvoient deux HTTP 200 strictement identiques pour une mutation ;
+  Firewall ×4 donne trois charges et convertit exactement une charge en surplus,
+  et un Raid perdu progresse bien mission et événement une seule fois.
+- Économie réauditée : 277 605 CR équivalents/spin, 9,4 % de spins vides,
+  districts estimés à 233,5 puis 501,8 spins. `cargo clippy -D warnings` vert.
 - `cargo build --release` : OK.
 - Garde release `DEV_AUTH=true` : refus confirmé.
 - Intégration API live : auth, spin idempotent, upgrade, daily, coffre, pub dev,

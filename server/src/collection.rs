@@ -13,6 +13,7 @@ use axum::Json;
 use rand::Rng;
 use serde::Deserialize;
 use serde_json::{json, Value};
+use sqlx::{Postgres, Transaction};
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -30,7 +31,7 @@ pub struct SetReq {
     request_id: Option<String>,
 }
 
-fn pick_weighted<'a, T, F>(items: &'a [T], weight: F) -> Option<&'a T>
+fn pick_weighted<T, F>(items: &[T], weight: F) -> Option<&T>
 where
     F: Fn(&T) -> u32,
 {
@@ -62,6 +63,42 @@ fn draw_card<'a>(chest: &ChestConfig, cards: &'a [CardConfig]) -> Option<&'a Car
         acc += card.drop_weight;
         pick < acc
     })
+}
+
+pub async fn grant_spin_chest_tx(
+    tx: &mut Transaction<'_, Postgres>,
+    address: &str,
+    chest_id: &str,
+) -> Result<Value, ApiError> {
+    let qty: i32 = sqlx::query_scalar(
+        "INSERT INTO player_chests(address,chest_id,qty) VALUES($1,$2,1) \
+         ON CONFLICT(address,chest_id) DO UPDATE SET qty=player_chests.qty+1 RETURNING qty",
+    )
+    .bind(address)
+    .bind(chest_id)
+    .fetch_one(&mut **tx)
+    .await?;
+    Ok(json!({"chestId":chest_id,"quantity":qty}))
+}
+
+pub async fn grant_spin_card_tx(
+    tx: &mut Transaction<'_, Postgres>,
+    address: &str,
+    cards: &[CardConfig],
+) -> Result<Value, ApiError> {
+    let card = pick_weighted(cards, |candidate| candidate.drop_weight)
+        .ok_or_else(|| ApiError::Internal(anyhow!("aucune carte tirable")))?;
+    let qty: i32 = sqlx::query_scalar(
+        "INSERT INTO player_cards(address,card_id,qty) VALUES($1,$2,1) \
+         ON CONFLICT(address,card_id) DO UPDATE SET qty=player_cards.qty+1 RETURNING qty",
+    )
+    .bind(address)
+    .bind(&card.card_id)
+    .fetch_one(&mut **tx)
+    .await?;
+    Ok(
+        json!({"cardId":card.card_id,"setId":card.set_id,"name":card.name,"rarity":card.rarity,"quantity":qty,"duplicate":qty>1}),
+    )
 }
 
 pub async fn buy_chest(

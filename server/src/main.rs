@@ -22,6 +22,7 @@ mod env;
 mod error;
 mod game;
 mod rate_limit;
+mod social;
 mod spin;
 mod state;
 
@@ -163,6 +164,10 @@ async fn main() -> anyhow::Result<()> {
         .route("/state", get(get_state))
         .route("/spin", post(spin::spin))
         .route("/district/upgrade", post(district::upgrade))
+        .route("/district/repair", post(social::repair))
+        .route("/attack/resolve", post(social::resolve_attack))
+        .route("/raid/pick", post(social::raid_pick))
+        .route("/raid/cashout", post(social::raid_cashout))
         .route("/chest/buy", post(collection::buy_chest))
         .route("/chest/open", post(collection::open_chest))
         .route("/set/claim", post(collection::claim_set))
@@ -227,7 +232,7 @@ async fn guard(
     }
 
     // Routes protégées : JWT obligatoire + rate limit par adresse.
-    let address = auth::auth_address(&state, &req.headers())?;
+    let address = auth::auth_address(&state, req.headers())?;
     if !state.rate.check(&address) {
         return Err(ApiError::RateLimited);
     }
@@ -329,6 +334,8 @@ async fn get_state(
             "points":row.map(|r|r.1).unwrap_or(0),"premium":row.map(|r|r.2).unwrap_or(false),
             "freeClaimed":row.map(|r|r.3.clone()).unwrap_or_else(||json!([])),"paidClaimed":row.map(|r|r.4.clone()).unwrap_or_else(||json!([]))})
     }).collect();
+    let pending_encounter = social::pending_for(&state.db, &address).await?;
+    let district_damage = social::damage_for(&state.db, &address).await?;
 
     Ok(Json(json!({
         "address": address,
@@ -337,6 +344,10 @@ async fn get_state(
         "lastSpinAtMs": row.last_spin_at.map(|t| t.timestamp_millis()),
         "nextSpinAtMs": next_spin_at,
         "districtIndex": row.district_index,
+        "firewallCharges": row.firewall_charges,
+        "firewallMax": state.config.social.firewall_max_charges,
+        "pendingEncounter": pending_encounter,
+        "districtDamage": district_damage,
         "dailyStreak": row.daily_streak,
         "lastDailyClaim": row.last_daily_claim.map(|d| d.format("%Y-%m-%d").to_string()),
         "adsWatchedToday": row.ads_watched_today,

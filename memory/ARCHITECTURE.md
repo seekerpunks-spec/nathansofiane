@@ -27,6 +27,7 @@
 - Lecture : `/health`, `/config`, `/state`, `/events/:event_id/leaderboard`.
 - Économie : `/spin`, `/district/upgrade`, `/chest/buy`, `/chest/open`,
   `/set/claim`, `/daily/claim`, `/mission/claim`,
+  `/district/repair`, `/attack/resolve`, `/raid/pick`, `/raid/cashout`,
   `/events/:event_id/milestones/:milestone_index/claim`,
   `/events/:event_id/claim`, `/season/claim`, `/ad/reward`,
   `/purchase/verify`, `/analytics`.
@@ -43,6 +44,8 @@
 - `0004_event_milestones_cohorts.sql` : cohortes de classement et claims de
   milestones événementiels.
 - `0005_analytics_batches.sql` : déduplication atomique des batches analytics.
+- `0006_social_encounters.sql` : Firewalls, dégâts de district et rencontres
+  Attack/Raid pending avec plateau Raid secret.
 - Configs typées : économie, roue, district, cartes, sets, coffres, daily,
   missions, événements, saisons et offres.
 

@@ -23,10 +23,11 @@ pub struct StateRow {
     pub last_daily_claim: Option<NaiveDate>,
     pub ads_watched_today: i32,
     pub ads_claimed_date: Option<NaiveDate>,
+    pub firewall_charges: i32,
 }
 
 const STATE_SELECT: &str = "SELECT spins, credits, last_spin_at, district_index, daily_streak, \
-                            last_daily_claim, ads_watched_today, ads_claimed_date \
+                            last_daily_claim, ads_watched_today, ads_claimed_date, firewall_charges \
                             FROM player_state WHERE address = $1";
 
 impl Db {

@@ -75,7 +75,7 @@ pub async fn upgrade(
     if district
         .unlock_requirements
         .as_ref()
-        .map_or(false, |requirements| {
+        .is_some_and(|requirements| {
             player.district_index < requirements.completed_district_id as i32
         })
     {
