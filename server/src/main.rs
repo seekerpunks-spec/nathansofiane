@@ -203,6 +203,10 @@ async fn main() -> anyhow::Result<()> {
         .route("/daily/bonus/claim", post(engagement::claim_daily_bonus))
         .route("/mission/claim", post(engagement::claim_mission))
         .route(
+            "/achievements/:achievement_id/claim",
+            post(engagement::claim_achievement),
+        )
+        .route(
             "/events/:event_id/leaderboard",
             get(engagement::leaderboard),
         )
@@ -329,6 +333,7 @@ async fn get_state(
     .await?;
     let today = now.date_naive();
     let daily_bonus = engagement::daily_bonus_for_state(&state, &address, today).await?;
+    let achievements = engagement::achievements_for_state(&state, &address).await?;
     let mission_rows: Vec<(String, i64, bool)> = sqlx::query_as(
         "SELECT mission_id,progress,claimed FROM mission_progress WHERE address=$1 AND mission_day=$2",
     ).bind(&address).bind(today).fetch_all(state.db.pool()).await?;
@@ -399,6 +404,7 @@ async fn get_state(
         "completedSets": completed_sets,
         "dailyAvailable": row.last_daily_claim != Some(today),
         "dailyBonus": daily_bonus,
+        "achievements": achievements,
         "missions": missions,
         "events": events,
         "teamEvents": team_events,

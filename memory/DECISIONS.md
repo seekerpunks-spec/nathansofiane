@@ -52,6 +52,7 @@
 | T30 | Le seul bonus quotidien additionnel est `Signal Cache` : un claim pondéré serveur par jour, séparé du streak, sans seconde roue visuelle | Ajoute une raison de retour courte et contrôlable par config sans multiplier les systèmes redondants ni rouvrir le design |
 | T31 | L'écran Store consomme uniquement `GET /offers`; âge du compte, spins, district, événement et inactivité sont évalués serveur puis revérifiés sous verrou lors de l'achat | Empêche le client d'afficher/forcer une offre inéligible et garde toute règle commerciale hors de l'UI ; le provider réel reste requis en production |
 | T32 | L'événement coopératif est une extension optionnelle du moteur d'événements existant ; score d'équipe et contribution suivent les mêmes `pointSources`, le claim est personnel et unique sur `(eventId, milestoneIndex, address)` indépendamment de l'équipe | Évite un second moteur liveops, empêche le leech sans contribution et ferme le double-claim par changement d'équipe |
+| T33 | Les achievements permanents réutilisent `progress_action_tx`, stockent un total par action et ne créditent la récompense qu'au claim ; chaque claim contribue à Network Power via un poids configurable | Une source cumulative suffit à plusieurs paliers, reste extensible sans nouvelle table par objectif et maintient le score global autoritaire |
 
 ## Noms / brandings (à verrouiller — O1 GDD)
 - Jeu : **CyberSeeker** (provisoire, utilisé partout pour l'instant).

@@ -611,7 +611,7 @@ Peut agréger :
 - villages ;
 - upgrades ;
 - collections ;
-- achievements futurs.
+- achievements permanents.
 
 Utilisations :
 
@@ -623,8 +623,10 @@ Utilisations :
 Le nom final peut être différent de "Stars".
 
 Statut R24 : `Network Power` agrège upgrades, districts complétés, cartes uniques
-pondérées par rareté et sets complétés. Les poids et la limite de leaderboard
-sont data-driven ; le score est recalculé transactionnellement aux mutations.
+pondérées par rareté, sets et achievements réclamés. Les poids et la limite de
+leaderboard sont data-driven ; le score est recalculé transactionnellement aux
+mutations. Sept contrats permanents cumulent les actions serveur `spin`,
+`upgrade`, `chest_open`, `attack` et `raid`, avec claim et reward idempotents.
 
 ---
 

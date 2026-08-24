@@ -1,0 +1,39 @@
+{
+  "items": [
+    {
+      "achievementId": "signal_runner_1", "name": "Signal Runner I",
+      "description": "Dépense 10 spins.", "action": "spin", "target": 10,
+      "reward": { "spins": 25, "credits": 100000 }
+    },
+    {
+      "achievementId": "signal_runner_2", "name": "Signal Runner II",
+      "description": "Dépense 100 spins.", "action": "spin", "target": 100,
+      "reward": { "spins": 100, "credits": 500000 }
+    },
+    {
+      "achievementId": "city_architect_1", "name": "City Architect I",
+      "description": "Améliore 5 structures.", "action": "upgrade", "target": 5,
+      "reward": { "spins": 50, "credits": 750000 }
+    },
+    {
+      "achievementId": "city_architect_2", "name": "City Architect II",
+      "description": "Améliore 25 structures.", "action": "upgrade", "target": 25,
+      "reward": { "spins": 200, "credits": 2500000, "chest": "neon" }
+    },
+    {
+      "achievementId": "cache_breaker", "name": "Cache Breaker",
+      "description": "Ouvre 5 caches.", "action": "chest_open", "target": 5,
+      "reward": { "spins": 75, "credits": 500000, "chest": "basic" }
+    },
+    {
+      "achievementId": "signal_jammer", "name": "Signal Jammer",
+      "description": "Cumule 50 points de puissance Attack.", "action": "attack", "target": 50,
+      "reward": { "spins": 150, "credits": 1500000 }
+    },
+    {
+      "achievementId": "vault_ghost", "name": "Vault Ghost",
+      "description": "Cumule 50 points de puissance Raid.", "action": "raid", "target": 50,
+      "reward": { "spins": 200, "credits": 2000000, "chest": "neon" }
+    }
+  ]
+}

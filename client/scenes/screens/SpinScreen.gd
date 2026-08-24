@@ -734,6 +734,15 @@ func _on_landed() -> void:
 			"contributionPoints": int(team_progress.get("contributionPoints", 0)),
 			"source": "spin",
 		})
+	for achievement_progress in _pending_progress.get("achievements", []):
+		if typeof(achievement_progress) != TYPE_DICTIONARY:
+			continue
+		Events.track("achievement_progress", {
+			"achievementId": str(achievement_progress.get("achievementId", "")),
+			"action": str(achievement_progress.get("action", "spin")),
+			"progress": int(achievement_progress.get("progress", 0)),
+			"target": int(achievement_progress.get("target", 0)),
+		})
 	_refresh_hud()
 	_reset_idle_state(false)
 	var pending: Variant = Store.state.get("pendingEncounter", null)

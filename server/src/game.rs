@@ -14,6 +14,7 @@ use sqlx::{Postgres, Transaction};
 pub struct ProgressResult {
     pub events: Vec<EventProgressResult>,
     pub team_events: Vec<TeamEventProgressResult>,
+    pub achievements: Vec<AchievementProgressResult>,
 }
 
 #[derive(Debug, Serialize)]
@@ -34,6 +35,15 @@ pub struct TeamEventProgressResult {
     pub points_added: i64,
     pub team_points: i64,
     pub contribution_points: i64,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AchievementProgressResult {
+    pub achievement_id: String,
+    pub action: String,
+    pub progress: i64,
+    pub target: u64,
 }
 
 pub fn request_id(headers: &HeaderMap, fallback: Option<&str>) -> Result<String, ApiError> {
@@ -134,6 +144,32 @@ pub async fn progress_action_tx(
     let now = Utc::now();
     let mut result = ProgressResult::default();
     let today: NaiveDate = now.date_naive();
+    let achievement_matches: Vec<_> = config
+        .achievements
+        .iter()
+        .filter(|achievement| achievement.action == action)
+        .collect();
+    if amount > 0 && !achievement_matches.is_empty() {
+        let total: i64 = sqlx::query_scalar(
+            "INSERT INTO player_action_totals(address,action,amount) VALUES($1,$2,$3) \
+             ON CONFLICT(address,action) DO UPDATE SET amount = LEAST(9223372036854775807::numeric, player_action_totals.amount::numeric + EXCLUDED.amount::numeric)::bigint \
+             RETURNING amount",
+        )
+        .bind(address)
+        .bind(action)
+        .bind(amount)
+        .fetch_one(&mut **tx)
+        .await?;
+        result.achievements = achievement_matches
+            .into_iter()
+            .map(|achievement| AchievementProgressResult {
+                achievement_id: achievement.achievement_id.clone(),
+                action: action.to_string(),
+                progress: total,
+                target: achievement.target,
+            })
+            .collect();
+    }
     for mission in config.daily.missions.iter().filter(|m| m.action == action) {
         sqlx::query(
             "INSERT INTO mission_progress(address,mission_id,mission_day,progress) VALUES($1,$2,$3,LEAST($4,$5)) \

@@ -14,6 +14,7 @@ use std::path::Path;
 
 /// Fichiers de premier niveau attendus dans le répertoire config.
 const TOP_LEVEL_FILES: &[&str] = &[
+    "achievements.json",
     "cards.json",
     "chests.json",
     "daily.json",
@@ -171,6 +172,7 @@ pub struct ProgressionConfig {
     pub upgrade_points: u32,
     pub district_completion_points: u32,
     pub set_completion_points: u32,
+    pub achievement_points: u32,
     pub rarity_points: RarityPointsConfig,
     pub global_leaderboard_limit: u32,
 }
@@ -206,6 +208,17 @@ pub struct DailyBonusOutcome {
     pub outcome_id: String,
     pub name: String,
     pub weight: u32,
+    pub reward: Reward,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AchievementConfig {
+    pub achievement_id: String,
+    pub name: String,
+    pub description: String,
+    pub action: String,
+    pub target: u64,
     pub reward: Reward,
 }
 
@@ -446,6 +459,7 @@ pub struct RemoteConfig {
     pub social: SocialConfig,
     pub progression: ProgressionConfig,
     pub daily: DailyConfig,
+    pub achievements: Vec<AchievementConfig>,
     pub districts: Vec<District>,
     pub cards: Vec<CardConfig>,
     pub sets: Vec<SetConfig>,
@@ -498,7 +512,7 @@ fn parse_items<T: for<'de> Deserialize<'de>>(name: &str, bytes: &[u8]) -> Result
 impl RemoteConfig {
     /// Charge + valide la config depuis `dir`. Refuse le boot sur config invalide.
     pub fn load(dir: &Path) -> Result<Self> {
-        // 1) Inventaire : 8 fichiers de premier niveau + districts/*.json (triés).
+        // 1) Inventaire : fichiers de premier niveau + districts/*.json (triés).
         let mut entries: Vec<(String, Vec<u8>)> = Vec::new();
         for name in TOP_LEVEL_FILES {
             let p = dir.join(name);
@@ -543,6 +557,10 @@ impl RemoteConfig {
                 .context("progression.json invalide")?;
         let daily: DailyConfig = serde_json::from_slice(get_entry(&entries, "daily.json")?)
             .context("daily.json invalide")?;
+        let achievements = parse_items(
+            "achievements.json",
+            get_entry(&entries, "achievements.json")?,
+        )?;
         let districts: Vec<District> = entries
             .iter()
             .filter(|(name, _)| name.starts_with("districts/"))
@@ -566,6 +584,7 @@ impl RemoteConfig {
             social,
             progression,
             daily,
+            achievements,
             districts,
             cards,
             sets,
@@ -746,6 +765,8 @@ impl RemoteConfig {
             || self.progression.upgrade_points == 0
             || self.progression.district_completion_points == 0
             || self.progression.set_completion_points == 0
+            || self.progression.achievement_points == 0
+            || self.progression.achievement_points > 10_000
             || self.progression.global_leaderboard_limit == 0
             || self.progression.global_leaderboard_limit > 100
             || [
@@ -776,6 +797,36 @@ impl RemoteConfig {
                 problems.push(format!(
                     "daily.cycle : récompense jour {} hors stockage",
                     d.day
+                ));
+            }
+        }
+        let mut achievement_ids = BTreeSet::new();
+        for achievement in &self.achievements {
+            if !achievement_ids.insert(achievement.achievement_id.as_str())
+                || achievement.achievement_id.trim().is_empty()
+                || achievement.achievement_id.len() > 64
+                || achievement.name.trim().is_empty()
+                || achievement.name.len() > 64
+                || achievement.description.trim().is_empty()
+                || achievement.description.len() > 160
+                || achievement.action.trim().is_empty()
+                || achievement.action.len() > 48
+                || !achievement
+                    .action
+                    .chars()
+                    .all(|character| character.is_ascii_lowercase() || character == '_')
+                || achievement.target == 0
+                || achievement.target > i64::MAX as u64
+                || achievement
+                    .reward
+                    .chest
+                    .as_deref()
+                    .is_some_and(|id| !self.chests.iter().any(|chest| chest.chest_id == id))
+                || !reward_fits_storage(&achievement.reward)
+            {
+                problems.push(format!(
+                    "achievement {} : définition invalide",
+                    achievement.achievement_id
                 ));
             }
         }
@@ -1179,6 +1230,7 @@ impl RemoteConfig {
             "social": self.social,
             "progression": self.progression,
             "daily": self.daily,
+            "achievements": self.achievements,
             "districts": self.districts,
             "cards": self.cards,
             "sets": self.sets,

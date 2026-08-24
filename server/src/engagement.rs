@@ -5,6 +5,7 @@ use crate::config::{DailyBonusOutcome, Reward};
 use crate::db::Db;
 use crate::error::ApiError;
 use crate::game;
+use crate::progression;
 use crate::state::AppState;
 use anyhow::anyhow;
 use axum::extract::{Extension, Path, State};
@@ -144,6 +145,44 @@ pub async fn team_events_for_state(
                 "minContributionPoints":team_config.min_contribution_points,
                 "milestones":milestones,
             }))
+        })
+        .collect())
+}
+
+pub async fn achievements_for_state(
+    state: &AppState,
+    address: &str,
+) -> Result<Vec<Value>, ApiError> {
+    let totals: Vec<(String, i64)> =
+        sqlx::query_as("SELECT action,amount FROM player_action_totals WHERE address=$1")
+            .bind(address)
+            .fetch_all(state.db.pool())
+            .await?;
+    let claims: Vec<String> =
+        sqlx::query_scalar("SELECT achievement_id FROM achievement_claims WHERE address=$1")
+            .bind(address)
+            .fetch_all(state.db.pool())
+            .await?;
+    Ok(state
+        .config
+        .achievements
+        .iter()
+        .map(|achievement| {
+            let progress = totals
+                .iter()
+                .find(|row| row.0 == achievement.action)
+                .map(|row| row.1)
+                .unwrap_or(0);
+            json!({
+                "achievementId":achievement.achievement_id,
+                "name":achievement.name,
+                "description":achievement.description,
+                "action":achievement.action,
+                "target":achievement.target,
+                "progress":progress,
+                "reward":achievement.reward,
+                "claimed":claims.contains(&achievement.achievement_id),
+            })
         })
         .collect())
 }
@@ -617,6 +656,94 @@ pub async fn claim_team_event_milestone(
             "teamId":team_id,
             "teamPoints":team_points,
             "contributionPoints":contribution_points,
+            "spins":player.spins,
+            "credits":player.credits,
+        }),
+        &response,
+        Some(&rid),
+    )
+    .await?;
+    state.db.store_idempotent(&mut tx, &key, &response).await?;
+    tx.commit().await?;
+    Ok(Json(response))
+}
+
+pub async fn claim_achievement(
+    State(state): State<AppState>,
+    Extension(addr): Extension<Addr>,
+    Path(achievement_id): Path<String>,
+    headers: HeaderMap,
+    Json(body): Json<ClaimReq>,
+) -> Result<Json<Value>, ApiError> {
+    let rid = game::request_id(&headers, body.request_id.as_deref())?;
+    let action = format!("achievement_claim:{achievement_id}");
+    let key = game::idem_key(&action, &addr.0, &rid);
+    if let Some(value) = state.db.fetch_idempotent(&key).await? {
+        return Ok(Json(value));
+    }
+    let achievement = state
+        .config
+        .achievements
+        .iter()
+        .find(|candidate| candidate.achievement_id == achievement_id)
+        .ok_or(ApiError::NotFound)?;
+    let mut tx = state.db.begin().await?;
+    let player = state
+        .db
+        .fetch_state_locked(&mut tx, &addr.0)
+        .await?
+        .ok_or_else(|| ApiError::Internal(anyhow!("player_state absent")))?;
+    if let Some(value) = state.db.fetch_idempotent_locked(&mut tx, &key).await? {
+        tx.rollback().await?;
+        return Ok(Json(value));
+    }
+    let progress: i64 = sqlx::query_scalar(
+        "SELECT amount FROM player_action_totals WHERE address=$1 AND action=$2 FOR UPDATE",
+    )
+    .bind(&addr.0)
+    .bind(&achievement.action)
+    .fetch_optional(&mut *tx)
+    .await?
+    .unwrap_or(0);
+    if progress < game::checked_u64_to_i64(achievement.target, "achievement.target")? {
+        tx.rollback().await?;
+        return Err(ApiError::Unavailable("achievement non terminé".to_string()));
+    }
+    let inserted = sqlx::query(
+        "INSERT INTO achievement_claims(achievement_id,address) VALUES($1,$2) ON CONFLICT DO NOTHING",
+    )
+    .bind(&achievement.achievement_id)
+    .bind(&addr.0)
+    .execute(&mut *tx)
+    .await?
+    .rows_affected();
+    if inserted == 0 {
+        tx.rollback().await?;
+        return Err(ApiError::AlreadyClaimed);
+    }
+    game::grant_reward_tx(&mut tx, &addr.0, &achievement.reward, &state.config).await?;
+    let global_progression = progression::refresh_score_tx(&mut tx, &addr.0, &state.config).await?;
+    let balances: (i32, i64) =
+        sqlx::query_as("SELECT spins,credits FROM player_state WHERE address=$1")
+            .bind(&addr.0)
+            .fetch_one(&mut *tx)
+            .await?;
+    let response = json!({
+        "achievementId":achievement.achievement_id,
+        "progress":progress,
+        "target":achievement.target,
+        "reward":achievement.reward,
+        "spins":balances.0,
+        "credits":balances.1,
+        "globalProgression":progression::score_json(global_progression, &state.config),
+        "serverTimeMs":Utc::now().timestamp_millis(),
+    });
+    Db::audit_tx(
+        &mut tx,
+        &addr.0,
+        "achievement_claim",
+        &json!({
+            "progress":progress,
             "spins":player.spins,
             "credits":player.credits,
         }),

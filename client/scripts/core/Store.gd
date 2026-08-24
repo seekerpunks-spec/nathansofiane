@@ -77,6 +77,7 @@ func apply_spin(d: Dictionary) -> void:
 	if typeof(progress) == TYPE_DICTIONARY:
 		_apply_event_progress(progress.get("events", []))
 		_apply_team_event_progress(progress.get("teamEvents", []))
+		_apply_achievement_progress(progress.get("achievements", []))
 	if d.has("serverTimeMs"):
 		set_clock(int(d["serverTimeMs"]))
 	state_changed.emit()
@@ -121,11 +122,21 @@ func _apply_team_event_progress(progress_events: Array) -> void:
 			event["teamPoints"] = int(update.get("teamPoints", event.get("teamPoints", 0)))
 			event["contributionPoints"] = int(update.get("contributionPoints", event.get("contributionPoints", 0)))
 
+func _apply_achievement_progress(progress_achievements: Array) -> void:
+	var achievements: Array = state.get("achievements", [])
+	for update in progress_achievements:
+		if typeof(update) != TYPE_DICTIONARY:
+			continue
+		var achievement_id := str(update.get("achievementId", ""))
+		for achievement in achievements:
+			if typeof(achievement) == TYPE_DICTIONARY and str(achievement.get("achievementId", "")) == achievement_id:
+				achievement["progress"] = int(update.get("progress", achievement.get("progress", 0)))
+
 ## Applique les champs communs d'une mutation puis fusionne les collections.
 func apply_mutation(d: Dictionary) -> void:
 	if typeof(d) != TYPE_DICTIONARY:
 		return
-	for key in ["spins", "credits", "nextSpinAtMs", "districtIndex", "districtProgress", "districtDamage", "firewallCharges", "firewallMax", "pendingEncounter", "profile", "progression", "globalProgression", "cards", "chests", "missions", "events", "teamEvents", "seasons", "dailyStreak", "dailyAvailable"]:
+	for key in ["spins", "credits", "nextSpinAtMs", "districtIndex", "districtProgress", "districtDamage", "firewallCharges", "firewallMax", "pendingEncounter", "profile", "progression", "globalProgression", "cards", "chests", "missions", "achievements", "events", "teamEvents", "seasons", "dailyStreak", "dailyAvailable"]:
 		if d.has(key):
 			state["progression" if key == "globalProgression" else key] = d[key]
 	if d.has("serverTimeMs"):

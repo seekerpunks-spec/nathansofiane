@@ -42,6 +42,9 @@
 - Crew Uplink coopératif réutilise les sources de points Neon Rush : score
   partagé atomique, contribution individuelle minimale, trois milestones
   data-driven et claim unique par joueur même après un changement d'équipe.
+- Sept achievements permanents cumulent les actions autoritaires dans
+  `player_action_totals`, accordent leurs rewards une fois et ajoutent 10 points
+  Network Power configurables par achievement réclamé.
 
 ## Produit livré
 
@@ -73,7 +76,7 @@
 
 - Modules R17 : `game`, `district`, `collection`, `engagement`, `commerce`.
 - Migrations additives `0002_progression_liveops.sql` à
-  `0012_team_events.sql`.
+  `0014_achievement_progression.sql`.
 - Idempotence par action, transactions, audit économique, horloge serveur,
   rate-limit et nettoyage périodique.
 - Mode release protégé : refus de `DEV_AUTH`, secret JWT fort, CORS allowlist,
@@ -84,7 +87,7 @@
 - `tools/economy_check.ps1` : OK, 277 605 CR équivalents/spin, 9,4 % vides,
   233,5 spins pour District 1 et 501,8 pour District 2.
 - `cargo test --locked` : 18/18 ; `cargo clippy --locked -- -D warnings` : OK.
-- `tools/analytics_check.ps1` : 50/50 événements présents.
+- `tools/analytics_check.ps1` : 52/52 événements présents.
 - Intégration analytics PostgreSQL : batch 25 accepté, replay dédupliqué, props
   invalides refusées et progression de spin renvoyée avec cohorte.
 - Slot social complet : outcomes Attack/Raid/Shield/Chest/Card, Signal Jam,
@@ -113,6 +116,9 @@
   claims concurrents donnent une réponse identique et une seule récompense ; un
   membre à zéro contribution est refusé, devient éligible à 100 points, puis
   reste bloqué par `ALREADY_CLAIMED` après avoir changé d'équipe.
+- Intégration achievements : spin ×10 progresse simultanément les contrats 10 et
+  100 ; deux claims concurrents du premier accordent une seule fois +25 spins et
+  +100 000 CR, le second est refusé avant son seuil et Network Power gagne 10.
 - Économie réauditée : 277 605 CR équivalents/spin, 9,4 % de spins vides,
   districts estimés à 233,5 puis 501,8 spins. `cargo clippy -D warnings` vert.
 - `cargo build --release` : OK.

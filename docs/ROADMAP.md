@@ -92,5 +92,7 @@
 - [x] Crews, classement d'équipe et trading social 1-pour-1 sans SKR.
 - [x] Événement coopératif d'équipe, contribution minimale et claims personnels
       protégés contre les changements d'équipe.
-- [ ] Achievements et autres systèmes restants du MASTER TODO.
+- [x] Achievements permanents data-driven, progression cumulative, rewards
+      idempotentes et contribution configurable à Network Power.
+- [ ] Autres systèmes restants du MASTER TODO.
 - [ ] Design et Wallet Adapter différés explicitement pour ce lot.

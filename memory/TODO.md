@@ -58,5 +58,8 @@ itérations intermédiaires utilisent uniquement Godot desktop, captures et test
 - [x] Catalogue d'offres autoritaire et éligibilités commerciales data-driven.
 - [x] Événement coopératif Crew Uplink : score partagé, contribution minimale,
       milestones et claim personnel anti-changement d'équipe.
-- [ ] Achievements et systèmes restants du MASTER TODO.
+- [x] Achievements permanents, sept objectifs data-driven, progression cumulative
+      et intégration Network Power.
+- [ ] Entitlements NFT fail-closed, audit Pets/sécurité/mobile et systèmes
+      restants du MASTER TODO compatibles avec les exclusions utilisateur.
 - [ ] Design et Wallet Adapter explicitement différés par l'utilisateur.

@@ -17,6 +17,7 @@ pub struct ScoreBreakdown {
     pub districts: i64,
     pub cards: i64,
     pub sets: i64,
+    pub achievements: i64,
 }
 
 fn checked_component(value: i64, points: u32, label: &str) -> Result<i64, ApiError> {
@@ -51,6 +52,11 @@ pub async fn calculate_score_tx(
     .bind(address)
     .fetch_one(&mut **tx)
     .await?;
+    let completed_achievements: i64 =
+        sqlx::query_scalar("SELECT COUNT(*)::bigint FROM achievement_claims WHERE address=$1")
+            .bind(address)
+            .fetch_one(&mut **tx)
+            .await?;
     let owned_cards: Vec<String> =
         sqlx::query_scalar("SELECT card_id FROM player_cards WHERE address=$1 AND qty>0")
             .bind(address)
@@ -68,6 +74,11 @@ pub async fn calculate_score_tx(
         config.progression.set_completion_points,
         "set",
     )?;
+    let achievements = checked_component(
+        completed_achievements,
+        config.progression.achievement_points,
+        "achievement",
+    )?;
     let mut cards = 0i64;
     for card_id in owned_cards {
         if let Some(card) = config.cards.iter().find(|card| card.card_id == card_id) {
@@ -80,6 +91,7 @@ pub async fn calculate_score_tx(
         .checked_add(districts)
         .and_then(|score| score.checked_add(cards))
         .and_then(|score| score.checked_add(sets))
+        .and_then(|score| score.checked_add(achievements))
         .ok_or_else(|| ApiError::Internal(anyhow!("global score overflow")))?;
     Ok(ScoreBreakdown {
         total,
@@ -87,6 +99,7 @@ pub async fn calculate_score_tx(
         districts,
         cards,
         sets,
+        achievements,
     })
 }
 
@@ -97,10 +110,10 @@ pub async fn refresh_score_tx(
 ) -> Result<ScoreBreakdown, ApiError> {
     let score = calculate_score_tx(tx, address, config).await?;
     sqlx::query(
-        "INSERT INTO progression_scores(address,score,upgrade_score,district_score,card_score,set_score) \
-         VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT(address) DO UPDATE SET \
+        "INSERT INTO progression_scores(address,score,upgrade_score,district_score,card_score,set_score,achievement_score) \
+         VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT(address) DO UPDATE SET \
          score=EXCLUDED.score,upgrade_score=EXCLUDED.upgrade_score,district_score=EXCLUDED.district_score, \
-         card_score=EXCLUDED.card_score,set_score=EXCLUDED.set_score,updated_at=now()",
+         card_score=EXCLUDED.card_score,set_score=EXCLUDED.set_score,achievement_score=EXCLUDED.achievement_score,updated_at=now()",
     )
     .bind(address)
     .bind(score.total)
@@ -108,6 +121,7 @@ pub async fn refresh_score_tx(
     .bind(score.districts)
     .bind(score.cards)
     .bind(score.sets)
+    .bind(score.achievements)
     .execute(&mut **tx)
     .await?;
     Ok(score)
@@ -117,8 +131,8 @@ pub async fn stored_score_tx(
     tx: &mut Transaction<'_, Postgres>,
     address: &str,
 ) -> Result<ScoreBreakdown, ApiError> {
-    let row: (i64, i64, i64, i64, i64) = sqlx::query_as(
-        "SELECT score,upgrade_score,district_score,card_score,set_score FROM progression_scores WHERE address=$1",
+    let row: (i64, i64, i64, i64, i64, i64) = sqlx::query_as(
+        "SELECT score,upgrade_score,district_score,card_score,set_score,achievement_score FROM progression_scores WHERE address=$1",
     )
     .bind(address)
     .fetch_one(&mut **tx)
@@ -129,6 +143,7 @@ pub async fn stored_score_tx(
         districts: row.2,
         cards: row.3,
         sets: row.4,
+        achievements: row.5,
     })
 }
 
@@ -147,7 +162,7 @@ pub fn score_json(score: ScoreBreakdown, config: &RemoteConfig) -> Value {
     json!({
         "name":config.progression.score_name,
         "score":score.total,
-        "breakdown":{"upgrades":score.upgrades,"districts":score.districts,"cards":score.cards,"sets":score.sets}
+        "breakdown":{"upgrades":score.upgrades,"districts":score.districts,"cards":score.cards,"sets":score.sets,"achievements":score.achievements}
     })
 }
 

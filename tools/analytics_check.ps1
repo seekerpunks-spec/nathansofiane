@@ -18,6 +18,8 @@ $expected = @(
     "set_completed",
     "daily_claim",
     "daily_bonus_claim",
+    "achievement_progress",
+    "achievement_claim",
     "event_progress",
     "team_event_progress",
     "milestone_claim",

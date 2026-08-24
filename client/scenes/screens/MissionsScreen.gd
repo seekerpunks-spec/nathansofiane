@@ -64,6 +64,14 @@ func _refresh() -> void:
 			Ui.reveal(card, reveal_index * 0.05)
 			reveal_index += 1
 
+	_content.add_child(Ui.section_title("CONTRATS PERMANENTS", Ui.GOLD))
+	for achievement in Store.state.get("achievements", []):
+		if typeof(achievement) == TYPE_DICTIONARY:
+			var card := _achievement_card(achievement)
+			_content.add_child(card)
+			Ui.reveal(card, reveal_index * 0.04)
+			reveal_index += 1
+
 	_content.add_child(Ui.section_title("ÉVÉNEMENT ACTIF", Ui.NEON_MAGENTA))
 	for event in Store.state.get("events", []):
 		if typeof(event) == TYPE_DICTIONARY:
@@ -112,6 +120,34 @@ func _mission_card(mission: Dictionary) -> PanelContainer:
 	var claim := Ui.button("RÉCLAMER  +%s SPINS" % Ui.compact(int(reward.get("spins", 0))), Ui.NEON_CYAN, progress < target)
 	claim.disabled = _busy or progress < target or bool(mission.get("claimed", false))
 	claim.pressed.connect(_claim_mission.bind(str(mission.get("missionId", ""))))
+	box.add_child(claim)
+	panel.add_child(box)
+	return panel
+
+func _achievement_card(achievement: Dictionary) -> PanelContainer:
+	var panel := Ui.panel()
+	var box := VBoxContainer.new()
+	var row := HBoxContainer.new()
+	var title := Ui.label(str(achievement.get("name", "Contrat")), 17, Ui.GOLD)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(title)
+	var progress := int(achievement.get("progress", 0))
+	var target := int(achievement.get("target", 1))
+	row.add_child(Ui.label("%s / %s" % [Ui.compact(mini(progress, target)), Ui.compact(target)], 14, Ui.TEXT))
+	box.add_child(row)
+	box.add_child(Ui.label(str(achievement.get("description", "")), 12, Ui.TEXT_DIM))
+	var bar := Ui.progress_bar(Ui.GOLD)
+	bar.value = clampf(float(progress) / float(maxi(1, target)) * 100.0, 0.0, 100.0)
+	box.add_child(bar)
+	var reward: Dictionary = achievement.get("reward", {})
+	var reward_text := "+%s SPINS" % Ui.compact(int(reward.get("spins", 0)))
+	if int(reward.get("credits", 0)) > 0:
+		reward_text += "  +%s CR" % Ui.compact(int(reward.get("credits", 0)))
+	var claimed := bool(achievement.get("claimed", false))
+	var claim := Ui.button("RÉCUPÉRÉ" if claimed else "RÉCLAMER  " + reward_text, Ui.GOLD, true)
+	claim.disabled = _busy or claimed or progress < target
+	claim.pressed.connect(_claim_achievement.bind(str(achievement.get("achievementId", ""))))
 	box.add_child(claim)
 	panel.add_child(box)
 	return panel
@@ -249,6 +285,13 @@ func _claim_daily_bonus() -> void:
 func _claim_mission(mission_id: String) -> void:
 	await _mutate("/mission/claim", {"missionId": mission_id}, "mission_claim")
 
+func _claim_achievement(achievement_id: String) -> void:
+	await _mutate(
+		"/achievements/%s/claim" % achievement_id,
+		{"achievementId": achievement_id},
+		"achievement_claim"
+	)
+
 func _claim_season(season_id: String, tier: int, premium: bool) -> void:
 	await _mutate("/season/claim", {"seasonId": season_id, "tier": tier, "premium": premium}, "season_claim")
 
@@ -281,7 +324,7 @@ func _mutate(path: String, body: Dictionary, event_name: String) -> void:
 		var props := body.duplicate()
 		props.erase("requestId")
 		if typeof(response.data) == TYPE_DICTIONARY:
-			for key in ["rank", "cohortId", "milestoneIndex", "points", "teamId", "teamPoints", "contributionPoints", "day", "streak", "missionId", "seasonId", "tier", "premium"]:
+			for key in ["rank", "cohortId", "milestoneIndex", "points", "teamId", "teamPoints", "contributionPoints", "achievementId", "progress", "target", "day", "streak", "missionId", "seasonId", "tier", "premium"]:
 				if response.data.has(key):
 					props[key] = response.data[key]
 		Events.track(event_name, props)

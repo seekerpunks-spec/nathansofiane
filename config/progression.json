@@ -3,6 +3,7 @@
   "upgradePoints": 1,
   "districtCompletionPoints": 25,
   "setCompletionPoints": 20,
+  "achievementPoints": 10,
   "rarityPoints": {
     "common": 1,
     "uncommon": 2,
