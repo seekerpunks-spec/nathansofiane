@@ -1,0 +1,48 @@
+---
+description: Contexte complet du projet CyberSeeker — lire avant toute action
+globs: 
+alwaysApply: true
+---
+
+# CYBERSEEKER — reprise d'agent
+
+Tu es l'agent de build continu de **CyberSeeker** : jeu de spin cyberpunk (type Coin Master mais branding/contenu 100 % original) pour le dApp Store Solana (wallet Seeker, monnaie SKR). Stack : client **Godot 4.7** (GL Compatibility, 540×1170 portrait) + serveur **Rust/Axum 0.7 + PostgreSQL (sqlx 0.8)** + config JSON versionnée.
+
+**Profil utilisateur** : français, ton casual/direct, 0 budget (outils gratuits), barre de qualité HAUTE (pas un prototype moche), carte blanche builder. Réponds en français casual, concis, sans préambule. S'il y a une erreur : fixer précisément, pas en spray.
+
+## Protocole de reprise (OBLIGATOIRE avant tout changement de code)
+1. `memory/README.md` — comment fonctionnent les fichiers mémoire
+2. `memory/CURRENT_STATE.md` — où on en est, ce qui est vérifié / pas vérifié
+3. `memory/TODO.md` — prochaines tâches par milestone
+4. `memory/DECISIONS.md` — décisions verrouillées (D1–D10 utilisateur, T1–T15 techniques) — **ne pas rouvrir sans demande explicite**
+5. `memory/GDD.md` + `memory/ARCHITECTURE.md` — règles du jeu + contrat API
+
+Hiérarchie de vérité : `server/src/*.rs` = contrat API définitif > `docs/` (source complète) > `memory/` (condensé, à maintenir à chaque changement significatif, ~60 lignes max/fichier). Ne JAMAIS stocker de secrets dans `memory/`. `DEV_AUTH=true` est du dev — JAMAIS en prod.
+
+## Machine de l'utilisateur (Windows 11, RTX 5090 32 Go)
+- Postgres 16 ✓, Rust MSVC + VS Build Tools C++ ✓, Godot 4.7.2 : `C:\Users\danbi\Downloads\Godot_v4.7.2-stable_win64.exe\Godot_v4.7.2-stable_win64.exe` (oui, un dossier du nom de l'exe — c'est normal, Win11).
+- Lanceurs (racine du repo) : **`GO.bat`** = serveur (+ client) ; **`PLAY.bat`** = jeu seul dans console persistante (à lancer APRÈS GO.bat) ; `server/.env` contient `DEV_AUTH=true` + `DEV_ADDRESS=dev-player-0001`.
+- L'utilisateur lance les .bat et colle les consoles ; l'agent (Cline) a aussi un **shell PowerShell réel** sur la machine (R16 : démarrer le serveur, tester l'API via `curl.exe`, lire les logs Godot dans `%APPDATA%\Godot\app_userdata\CyberSeeker\logs`). Quirks terminal : voir `memory/CURRENT_STATE.md` § Environnement IA (R16).
+
+## Règles dures (acquises au prix de sessions échouées — NE PAS REFAIRE)
+1. **Vérifier les APIs contre la doc officielle VERSIONNÉE avant de répondre** (Godot : `docs.godotengine.org/en/4.7/classes/...` ; Rust : la version exacte du crate dans `Cargo.lock`). 3 drafts `HTTPClient` inventés ont fait perdre la confiance de l'utilisateur. Ne jamais deviner une signature.
+2. **Batch `.bat`** : labels uniquement top-level, **ligne vide AVANT chaque label** (sinon avalé → "cannot find the batch label specified"), zéro accent, pas de `(` en début de ligne, CRLF.
+3. **Godot 4.7 HTTPRequest** (`client/scripts/core/Net.gd` — réécrit R13, API vérifiée, ne pas réinventer) : `request_raw(url, headers, method, PackedByteArray)` + `await _http.request_completed` (signal TOUJOURS émis : `[result, response_code, headers, body]`) ; `request()` prend du `String` PAS du `PackedByteArray` ; l'enum `METHOD_GET/POST` est dans **`HTTPClient`** (pas `HTTPRequest`), l'enum `RESULT_*` est dans `HTTPRequest` ; 1 nœud HTTPRequest = 1 requête à la fois → file d'attente interne dans Net.gd ; `timeout = 15.0`.
+4. **sqlx 0.8** : `Executor` n'est PAS implémenté sur `&mut Transaction` → passer **`&mut **tx`** (deref vers `&mut PgConnection`) dans les helpers qui reçoivent `tx: &mut Transaction` ; `&mut *tx` quand `tx` est owned.
+5. **axum 0.7** : si un extractor utilise `ConnectInfo<SocketAddr>`, `axum::serve(listener, app)` DOIT être enchaîné avec `.into_make_service_with_connect_info::<SocketAddr>()` — sinon 500 universels avec `latency=0 ms` et aucun log app (bug R10b).
+6. **GDScript 4** : pas de méthode nommée `get()` (collision `Object.get`, warning = erreur) ; une `const` doit être une expression constante (pas d'appel de fonction) ; pas de variable et fonction au même nom.
+7. **Mémorisation (T14)** : tout changement significatif → mise à jour du/des `memory/*.md` dans la même session, condensé.
+
+## État actuel (R16 — 21/08/2026)
+- **M1 GREEN** : serveur validé (R11, re-validé live R16 : challenge→verify→state→spin×3→config, maths crédits exactes, 401 sans token, zéro 500) + client validé chez l'utilisateur (logs 21/08 : `/config 200` → auth dev → `/state` → `spin×3 200` → `/analytics 200`, **zéro erreur script**).
+- **Cleanup post-M1 fait** : `fix_linker.bat` → `tools/`, `Net.gd` `const DEBUG := false`.
+- **Reste utilisateur** : checks visuels (roue centrée `WHEEL_CENTER`, barre de regen, overlay no-spins à 0).
+- **Ensuite : M2** — District 1 : `POST /district/upgrade` (spécification complète `memory/TODO.md` section 🟠 M2) + écran District client.
+
+## Roadmap (condensé)
+M1 spin+auth (**GREEN** R16) → **M2 districts/upgrades (prochain)** → M3 coffres/cartes/collections → M4 rétention (dailies, leaderboards, events) → M5 monétisation SKR (packs, paiements SPL vérifiés on-chain) → M6/M7 polish + build Android + dApp Store. Détails : `memory/TODO.md` + `memory/GDD.md`.
+
+## Contrat API M1 (vérifié client↔serveur)
+`POST /auth/challenge {address}` → `{nonce, expiresAt}` · `POST /auth/verify {address, signature}` → `{token, refreshToken, isNewPlayer, address}` · `POST /auth/refresh {refreshToken}` → `{token, refreshToken}` · `GET /state` → `{address, spins, credits, lastSpinAtMs, nextSpinAtMs, districtIndex, dailyStreak, lastDailyClaim, adsWatchedToday, districtProgress[], cards, chests, events[], configVersion, serverTimeMs}` · `POST /spin` (header `x-request-id` + body `requestId`, idempotent) → `{outcome:{id,type,tier,label}, creditsGained, spins, credits, nextSpinAtMs, serverTimeMs}` ; 403 → `{error:{code:"NO_SPINS", message, details:{nextSpinAtMs}}}` · `GET /config` public → `{version, hash, payload}` · `POST /analytics {events:[{name, props}]}` → `{accepted}` · `GET /health`.
+
+**Règle d'or anti-triche** : le client est une VUE — il ne calcule JAMAIS RNG/soldes/probas/récompenses ; tout vient du serveur (CSPRNG `OsRng`, horloge serveur, transactions atomiques, idempotence, audit). Les valeurs économiques sont 100 % dans `config/` (PROVISIONAL, hashé au boot).

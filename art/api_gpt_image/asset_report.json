@@ -1,0 +1,142 @@
+{
+  "provider": "built-in GPT Image",
+  "master": {
+    "size": [
+      853,
+      1844
+    ]
+  },
+  "background": {
+    "size": [
+      941,
+      1672
+    ]
+  },
+  "machine": {
+    "size": [
+      1298,
+      1222
+    ]
+  },
+  "mascot": {
+    "size": [
+      1232,
+      1311
+    ]
+  },
+  "spinButton": {
+    "size": [
+      1526,
+      1072
+    ]
+  },
+  "icons": {
+    "credits": {
+      "sourceSize": [
+        1254,
+        1254
+      ],
+      "normalizedSize": [
+        512,
+        512
+      ],
+      "visibleBounds": [
+        86,
+        74,
+        461,
+        438
+      ]
+    },
+    "shield": {
+      "sourceSize": [
+        1254,
+        1254
+      ],
+      "normalizedSize": [
+        512,
+        512
+      ],
+      "visibleBounds": [
+        86,
+        52,
+        452,
+        437
+      ]
+    },
+    "hack": {
+      "sourceSize": [
+        1254,
+        1254
+      ],
+      "normalizedSize": [
+        512,
+        512
+      ],
+      "visibleBounds": [
+        68,
+        60,
+        449,
+        441
+      ]
+    },
+    "vault": {
+      "sourceSize": [
+        1254,
+        1254
+      ],
+      "normalizedSize": [
+        512,
+        512
+      ],
+      "visibleBounds": [
+        85,
+        56,
+        456,
+        438
+      ]
+    },
+    "energy": {
+      "sourceSize": [
+        1254,
+        1254
+      ],
+      "normalizedSize": [
+        512,
+        512
+      ],
+      "visibleBounds": [
+        83,
+        72,
+        461,
+        439
+      ]
+    },
+    "glitch": {
+      "sourceSize": [
+        1254,
+        1254
+      ],
+      "normalizedSize": [
+        512,
+        512
+      ],
+      "visibleBounds": [
+        93,
+        54,
+        430,
+        442
+      ]
+    }
+  },
+  "atlas": {
+    "size": [
+      1536,
+      1024
+    ],
+    "mode": "RGBA",
+    "alphaExtrema": [
+      0,
+      255
+    ]
+  }
+}

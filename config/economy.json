@@ -1,0 +1,11 @@
+{
+  "note": "PROVISIONAL — valeurs d'équilibrage à valider avant M4/M5. Jamais de valeurs économiques dans le code : tout se lit ici.",
+  "spinRegenMs": 300000,
+  "maxFreeSpins": 25,
+  "newPlayerSpins": 20,
+  "adsConfig": {
+    "maxRewardedAdsPerDay": 10,
+    "rewardPerAd": 25,
+    "cooldownMs": 300000
+  }
+}

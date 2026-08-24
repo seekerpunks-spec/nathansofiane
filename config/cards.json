@@ -1,0 +1,13 @@
+{
+  "note": "Cartes originales CyberSeeker, sans logo de crypto existant.",
+  "items": [
+    { "cardId": "ghost_terminal", "setId": "hacker_tools", "name": "Ghost Terminal", "rarity": "common", "dropWeight": 4000, "image": "cards/ghost_terminal" },
+    { "cardId": "data_spike", "setId": "hacker_tools", "name": "Data Spike", "rarity": "common", "dropWeight": 3200, "image": "cards/data_spike" },
+    { "cardId": "neural_key", "setId": "hacker_tools", "name": "Neural Key", "rarity": "rare", "dropWeight": 900, "image": "cards/neural_key" },
+    { "cardId": "quantum_rig", "setId": "hacker_tools", "name": "Quantum Rig", "rarity": "epic", "dropWeight": 250, "image": "cards/quantum_rig" },
+    { "cardId": "secure_chip", "setId": "seeker_tech", "name": "Secure Chip", "rarity": "common", "dropWeight": 4000, "image": "cards/secure_chip" },
+    { "cardId": "neon_antenna", "setId": "seeker_tech", "name": "Neon Antenna", "rarity": "uncommon", "dropWeight": 2200, "image": "cards/neon_antenna" },
+    { "cardId": "mobile_node", "setId": "seeker_tech", "name": "Mobile Node", "rarity": "rare", "dropWeight": 900, "image": "cards/mobile_node" },
+    { "cardId": "seed_vault", "setId": "seeker_tech", "name": "Seed Vault", "rarity": "legendary", "dropWeight": 80, "image": "cards/seed_vault" }
+  ]
+}

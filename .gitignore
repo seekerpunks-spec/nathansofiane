@@ -1,0 +1,27 @@
+# Rust
+server/target/
+server/.env
+
+# Godot
+client/.godot/
+client/android/
+client/build/
+client/.import/
+
+# OS / éditeur
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
+
+# Logs / caches / captures générées
+*.log
+__pycache__/
+*.pyc
+captures/
+art/local_ai/candidates/
+art/local_ai/previous_runtime/
+
+# Sauvegardes automatiques Blender
+*.blend1

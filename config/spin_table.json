@@ -1,0 +1,11 @@
+{
+  "note": "PROVISIONAL — table de spin M1 (crédits uniquement). Issues de type chest/card ajoutées en M3 avec leurs loot tables. Weights entiers, normalisation sur la somme (ici 10000).",
+  "outcomes": [
+    { "id": "credits_small",  "type": "credits", "tier": "common",    "weight": 4200, "min": 50000,   "max": 150000 },
+    { "id": "credits_medium", "type": "credits", "tier": "common",    "weight": 2600, "min": 150000,  "max": 400000 },
+    { "id": "credits_big",    "type": "credits", "tier": "rare",      "weight": 1000, "min": 400000,  "max": 1000000 },
+    { "id": "credits_huge",   "type": "credits", "tier": "epic",      "weight": 400,  "min": 1000000, "max": 2500000 },
+    { "id": "credits_mega",   "type": "credits", "tier": "legendary", "weight": 80,   "min": 2500000, "max": 6000000 },
+    { "id": "glitch",         "type": "none",    "tier": "common",    "weight": 1720, "label": "GLITCH — aucun gain" }
+  ]
+}

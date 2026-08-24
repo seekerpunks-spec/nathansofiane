@@ -1,0 +1,89 @@
+{
+  "provider": "built-in GPT Image",
+  "target": [
+    896,
+    640
+  ],
+  "heroes": {
+    "collection_hero": {
+      "sourceSize": [
+        1536,
+        1024
+      ],
+      "visibleBounds": [
+        49,
+        0,
+        1504,
+        1006
+      ],
+      "normalizedSize": [
+        896,
+        640
+      ],
+      "alphaExtrema": [
+        0,
+        255
+      ]
+    },
+    "district_hero": {
+      "sourceSize": [
+        1536,
+        1024
+      ],
+      "visibleBounds": [
+        49,
+        0,
+        1466,
+        1024
+      ],
+      "normalizedSize": [
+        896,
+        640
+      ],
+      "alphaExtrema": [
+        0,
+        255
+      ]
+    },
+    "missions_hero": {
+      "sourceSize": [
+        1536,
+        1024
+      ],
+      "visibleBounds": [
+        59,
+        0,
+        1522,
+        1024
+      ],
+      "normalizedSize": [
+        896,
+        640
+      ],
+      "alphaExtrema": [
+        0,
+        255
+      ]
+    },
+    "store_hero": {
+      "sourceSize": [
+        1536,
+        1024
+      ],
+      "visibleBounds": [
+        0,
+        0,
+        1522,
+        1007
+      ],
+      "normalizedSize": [
+        896,
+        640
+      ],
+      "alphaExtrema": [
+        0,
+        255
+      ]
+    }
+  }
+}

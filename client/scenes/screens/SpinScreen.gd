@@ -1,0 +1,917 @@
+extends Control
+## SpinScreen R23 — scène premium GPT Image, logique Godot interactive.
+##
+## Le serveur choisit toujours le résultat économique. Les symboles constituent
+## uniquement une représentation animée de la réponse autoritaire.
+
+signal navigate_requested(tab: String)
+
+const SYMBOL_ATLAS := preload("res://assets/generated/api_gpt/slot_symbols_atlas.png")
+const SPIN_BG := preload("res://assets/generated/api_gpt/spin_background.png")
+const SLOT_FRAME := preload("res://assets/generated/api_gpt/slot_machine.png")
+const BYTE_MASCOT := preload("res://assets/generated/api_gpt/byte.png")
+const SPIN_BUTTON_ART := preload("res://assets/generated/api_gpt/spin_button.png")
+const SYMBOLS := ["credits", "shield", "hack", "vault", "energy", "glitch"]
+
+var _spins_value: Label
+var _credits_value: Label
+var _district_label: Label
+var _event_label: Label
+var _event_timer: Label
+var _status_label: Label
+var _result_banner: Label
+var _spin_btn: Button
+var _regen_bar: ProgressBar
+var _regen_label: Label
+var _no_spins: Control
+var _no_spins_label: Label
+var _flash: ColorRect
+var _tick_timer: Timer
+var _cabinet_root: Control
+var _cabinet: SlotCabinet
+var _particles: ParticleBurst
+var _reels: Array = []
+var _reel_tweens: Array = []
+var _idle_tween: Tween
+
+var _busy := false
+var _revealed := false
+var _skip_enabled := false
+var _pending_outcome: Dictionary = {}
+var _pending_credits := 0
+var _final_symbols: Array[String] = []
+var _anticipation := false
+var _landed_count := 0
+
+
+func _ready() -> void:
+	_build()
+	_refresh_hud()
+	_start_idle_animation()
+	Store.state_changed.connect(_refresh_hud)
+	Store.no_spins.connect(_show_no_spins)
+
+
+func _build() -> void:
+	var bg := TextureRect.new()
+	bg.texture = SPIN_BG
+	bg.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	bg.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(bg)
+
+	var atmosphere := AnimatedBackdrop.new()
+	atmosphere.set_anchors_preset(Control.PRESET_FULL_RECT)
+	atmosphere.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(atmosphere)
+
+	_build_header()
+	_build_event_banner()
+	_build_cabinet()
+	_build_lower_controls()
+
+	_no_spins = _build_no_spins()
+	add_child(_no_spins)
+
+	_flash = ColorRect.new()
+	_flash.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_flash.color = Color(1, 1, 1, 0)
+	_flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_flash)
+
+	_particles = ParticleBurst.new()
+	_particles.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_particles.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_particles)
+
+	_tick_timer = Timer.new()
+	_tick_timer.wait_time = 0.055
+	_tick_timer.timeout.connect(_on_tick)
+	add_child(_tick_timer)
+
+
+func _build_header() -> void:
+	var credits_chip := _stat_chip(Vector2(14, 12), Vector2(238, 56), Ui.GOLD)
+	var credits_row := HBoxContainer.new()
+	credits_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	credits_row.add_theme_constant_override("separation", 9)
+	credits_row.add_child(Ui.label("●", 24, Ui.GOLD))
+	_credits_value = Ui.label("0", 21, Color("#2A2551"))
+	credits_row.add_child(_credits_value)
+	credits_chip.add_child(credits_row)
+	add_child(credits_chip)
+
+	var spins_chip := _stat_chip(Vector2(284, 12), Vector2(158, 56), Ui.NEON_CYAN)
+	_spins_value = Ui.label("⚡ 0", 21, Color("#11225A"))
+	_spins_value.position = Vector2(0, 0)
+	_spins_value.size = Vector2(146, 50)
+	spins_chip.add_child(_spins_value)
+	add_child(spins_chip)
+
+	var menu := _promo_button("☰", Ui.NEON_MAGENTA)
+	menu.position = Vector2(458, 12)
+	menu.size = Vector2(68, 56)
+	menu.add_theme_font_size_override("font_size", 25)
+	menu.pressed.connect(func() -> void: navigate_requested.emit("missions"))
+	add_child(menu)
+
+
+func _stat_chip(pos: Vector2, chip_size: Vector2, accent: Color) -> PanelContainer:
+	var panel := PanelContainer.new()
+	panel.position = pos
+	panel.size = chip_size
+	panel.add_theme_stylebox_override(
+		"panel", _game_box(Color("#FFF0C0"), Color(accent, 0.98), 22, 4, 7)
+	)
+	return panel
+
+
+func _game_box(bg: Color, border: Color, radius: int, width: int, shadow: int = 6) -> StyleBoxFlat:
+	var box := Ui.style_box(bg, border, radius, width)
+	box.set_content_margin_all(8)
+	box.shadow_color = Color("#182356", 0.48)
+	box.shadow_size = shadow
+	box.shadow_offset = Vector2(0, 5)
+	return box
+
+
+func _promo_button(text: String, accent: Color) -> Button:
+	var button := Button.new()
+	button.text = text
+	button.focus_mode = Control.FOCUS_NONE
+	button.add_theme_font_size_override("font_size", 14)
+	button.add_theme_color_override("font_color", Color.WHITE)
+	button.add_theme_color_override("font_outline_color", Color("#121A4A"))
+	button.add_theme_constant_override("outline_size", 4)
+	button.add_theme_stylebox_override("normal", _game_box(accent, Color.WHITE, 18, 3, 7))
+	button.add_theme_stylebox_override("hover", _game_box(accent.lightened(0.08), Color.WHITE, 18, 4, 9))
+	button.add_theme_stylebox_override("pressed", _game_box(accent.darkened(0.16), Ui.GOLD, 18, 4, 4))
+	return button
+
+
+func _build_event_banner() -> void:
+	var rush := _promo_button("RUSH\n+10", Ui.NEON_MAGENTA)
+	rush.position = Vector2(18, 82)
+	rush.size = Vector2(82, 66)
+	rush.pressed.connect(func() -> void: navigate_requested.emit("missions"))
+	add_child(rush)
+
+	_event_label = Ui.label("CYBER SEEKER", 29, Ui.GOLD)
+	_event_label.position = Vector2(105, 76)
+	_event_label.size = Vector2(330, 42)
+	add_child(_event_label)
+
+	_district_label = Ui.label("NEON SLUMS  •  NODE 01", 13, Color.WHITE)
+	_district_label.position = Vector2(110, 114)
+	_district_label.size = Vector2(320, 26)
+	add_child(_district_label)
+
+	_event_timer = Ui.label("LIVE", 11, Color("#202151"))
+	_event_timer.position = Vector2(18, 121)
+	_event_timer.size = Vector2(82, 20)
+	_event_timer.visible = false
+	add_child(_event_timer)
+
+	var loot := _promo_button("LOOT", Ui.NEON_BLUE)
+	loot.position = Vector2(444, 82)
+	loot.size = Vector2(78, 44)
+	loot.pressed.connect(func() -> void: navigate_requested.emit("collection"))
+	add_child(loot)
+
+
+func _build_cabinet() -> void:
+	_cabinet_root = Control.new()
+	_cabinet_root.position = Vector2(10, 142)
+	_cabinet_root.size = Vector2(520, 540)
+	add_child(_cabinet_root)
+
+	# Le contrôleur conserve l'état d'accentuation des gains, mais le contour
+	# technique R18 reste masqué au profit du véritable décor illustré.
+	_cabinet = SlotCabinet.new()
+	_cabinet.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_cabinet.visible = false
+	_cabinet_root.add_child(_cabinet)
+
+	var cabinet_art := TextureRect.new()
+	cabinet_art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	cabinet_art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	cabinet_art.custom_minimum_size = Vector2.ZERO
+	cabinet_art.texture = SLOT_FRAME
+	cabinet_art.set_position(Vector2.ZERO)
+	cabinet_art.set_size(Vector2(520, 540))
+	cabinet_art.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_cabinet_root.add_child(cabinet_art)
+
+	_status_label = Ui.label("NEON RUSH", 22, Ui.NEON_MAGENTA)
+	_status_label.position = Vector2(132, 45)
+	_status_label.size = Vector2(256, 40)
+	_status_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_cabinet_root.add_child(_status_label)
+
+	_result_banner = Ui.label("MATCH 3  •  CRACK THE VAULT", 11, Color.WHITE)
+	_result_banner.position = Vector2(132, 84)
+	_result_banner.size = Vector2(256, 26)
+	_result_banner.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_cabinet_root.add_child(_result_banner)
+
+	var reel_x := [116.0, 225.0, 337.0]
+	for i in 3:
+		var reel := SlotReel.new()
+		reel.atlas = SYMBOL_ATLAS
+		reel.symbols = SYMBOLS
+		reel.position = Vector2(reel_x[i], 215)
+		reel.size = Vector2(90 if i == 1 else 88, 186)
+		reel.reel_index = i
+		reel.final_symbol = SYMBOLS[(i * 2) % SYMBOLS.size()]
+		reel.clip_contents = true
+		_cabinet_root.add_child(reel)
+		_reels.append(reel)
+
+	_regen_bar = _make_progress()
+	_regen_bar.position = Vector2(138, 438)
+	_regen_bar.size = Vector2(244, 31)
+	_cabinet_root.add_child(_regen_bar)
+
+	_regen_label = Ui.label("", 11, Color.WHITE)
+	_regen_label.position = Vector2(139, 438)
+	_regen_label.size = Vector2(242, 30)
+	_cabinet_root.add_child(_regen_label)
+
+
+func _build_lower_controls() -> void:
+	var mascot := TextureRect.new()
+	mascot.texture = BYTE_MASCOT
+	mascot.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	mascot.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	mascot.position = Vector2(4, 714)
+	mascot.size = Vector2(168, 198)
+	mascot.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(mascot)
+
+	_spin_btn = _big_button("SPIN")
+	_spin_btn.position = Vector2(148, 732)
+	_spin_btn.size = Vector2(246, 106)
+	_spin_btn.pivot_offset = _spin_btn.size / 2.0
+	_spin_btn.pressed.connect(_on_spin_pressed)
+	var spin_art := TextureRect.new()
+	spin_art.texture = SPIN_BUTTON_ART
+	spin_art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	spin_art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	spin_art.position = Vector2(-20, -30)
+	spin_art.size = Vector2(286, 201)
+	spin_art.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	spin_art.show_behind_parent = true
+	_spin_btn.add_child(spin_art)
+	add_child(_spin_btn)
+
+	var district_btn := _promo_button("CITY", Color("#1867C9"))
+	district_btn.position = Vector2(430, 758)
+	district_btn.size = Vector2(84, 68)
+	district_btn.add_theme_font_size_override("font_size", 15)
+	district_btn.pressed.connect(func() -> void: navigate_requested.emit("district"))
+	add_child(district_btn)
+
+
+func _big_button(text: String) -> Button:
+	var button := Button.new()
+	button.text = text
+	button.focus_mode = Control.FOCUS_NONE
+	button.add_theme_font_size_override("font_size", 36)
+	button.add_theme_stylebox_override("normal", StyleBoxEmpty.new())
+	button.add_theme_stylebox_override("hover", StyleBoxEmpty.new())
+	button.add_theme_stylebox_override("pressed", StyleBoxEmpty.new())
+	button.add_theme_stylebox_override("disabled", StyleBoxEmpty.new())
+	button.add_theme_color_override("font_color", Color.WHITE)
+	button.add_theme_color_override("font_outline_color", Color("#342047"))
+	button.add_theme_constant_override("outline_size", 7)
+	button.add_theme_color_override("font_disabled_color", Color.WHITE)
+	return button
+
+
+func _make_progress() -> ProgressBar:
+	var bar := Ui.progress_bar(Ui.NEON_CYAN, 32)
+	bar.add_theme_stylebox_override("background", _game_box(Color("#17244E"), Color("#D8E7FF"), 15, 4, 4))
+	bar.add_theme_stylebox_override("fill", _game_box(Ui.NEON_CYAN, Color("#B9FFFF"), 15, 2, 3))
+	bar.value = 0
+	return bar
+
+
+func _build_no_spins() -> Control:
+	var overlay := Control.new()
+	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	overlay.visible = false
+
+	var dim := ColorRect.new()
+	dim.color = Color("#030B26", 0.90)
+	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	overlay.add_child(dim)
+
+	var center := CenterContainer.new()
+	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	var box := VBoxContainer.new()
+	box.custom_minimum_size = Vector2(390, 0)
+	box.add_theme_constant_override("separation", 18)
+	box.add_child(Ui.label("ENERGY EMPTY!", 32, Ui.NEON_MAGENTA))
+	_no_spins_label = Ui.label("Recharge réseau en cours…", 16, Ui.TEXT_DIM)
+	_no_spins_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(_no_spins_label)
+
+	var store := Ui.button("OPTIONS DE RECHARGE", Ui.NEON_CYAN)
+	store.pressed.connect(func() -> void:
+		overlay.visible = false
+		navigate_requested.emit("store")
+	)
+	box.add_child(store)
+
+	var missions := Ui.button("RÉCUPÉRER DES RÉCOMPENSES", Ui.GOLD, true)
+	missions.pressed.connect(func() -> void:
+		overlay.visible = false
+		navigate_requested.emit("missions")
+	)
+	box.add_child(missions)
+	center.add_child(box)
+	overlay.add_child(center)
+	return overlay
+
+
+func _process(_delta: float) -> void:
+	_update_regen()
+	_update_event()
+	if _no_spins.visible:
+		var next: Variant = Store.state.get("nextSpinAtMs", null)
+		if next != null:
+			_no_spins_label.text = "Prochain signal dans " + Ui.mmss(Store.regen_remaining_ms())
+
+
+func _update_regen() -> void:
+	var max_spins := int(Config.economy().get("maxFreeSpins", 25))
+	var next: Variant = Store.state.get("nextSpinAtMs", null)
+	if next == null or Store.spins() >= max_spins:
+		_regen_label.text = "%d SPINS  •  BANK FULL" % Store.spins()
+		_regen_bar.value = 100.0
+		return
+	var remain := Store.regen_remaining_ms()
+	_regen_label.text = "%d / %d  •  +1 IN %s" % [Store.spins(), max_spins, Ui.mmss(remain)]
+	_regen_bar.value = clampf(float(Store.spins()) / float(maxi(1, max_spins)), 0.0, 1.0) * 100.0
+
+
+func _update_event() -> void:
+	var events := Config.events()
+	if events.is_empty() or typeof(events[0]) != TYPE_DICTIONARY:
+		_event_timer.text = "LIVE"
+		return
+	var event: Dictionary = events[0]
+	var ends_at := int(event.get("endsAtMs", 0))
+	var points := 0
+	var sources: Variant = event.get("pointSources", [])
+	if typeof(sources) == TYPE_ARRAY:
+		for source in sources:
+			if typeof(source) == TYPE_DICTIONARY and str(source.get("action", "")) == "spin":
+				points = int(source.get("points", 0))
+				break
+	var remaining := maxi(0, ends_at - Store.now_ms())
+	_event_timer.text = "+%d" % points if points > 0 else Ui.mmss_long(remaining)
+
+
+func _refresh_hud() -> void:
+	_spins_value.text = "⚡ " + str(Store.spins())
+	_credits_value.text = Ui.compact(Store.credits())
+	var districts := Config.districts()
+	if not districts.is_empty() and typeof(districts[0]) == TYPE_DICTIONARY:
+		_district_label.text = (
+			str(districts[0].get("name", "NEON SLUMS")).to_upper() + " · NODE 01"
+		)
+
+
+func _on_spin_pressed() -> void:
+	if _busy:
+		if _skip_enabled:
+			_skip_slots()
+		return
+	Sfx.click()
+	_do_spin()
+
+
+func _do_spin() -> void:
+	_busy = true
+	_revealed = false
+	_skip_enabled = false
+	_no_spins.visible = false
+	_result_banner.text = "ROLLING FOR LOOT…"
+	_result_banner.add_theme_color_override("font_color", Ui.TEXT_DIM)
+	_status_label.text = "GOOD LUCK!"
+	_status_label.add_theme_color_override("font_color", Ui.NEON_BLUE)
+	_cabinet.set_mode(Ui.NEON_BLUE, false)
+	_spin_btn.text = "ROLLING…"
+	_spin_btn.disabled = true
+	_stop_idle_animation()
+	Events.track("spin")
+	Sfx.reel_start()
+	Haptics.vibrate(0.28, 22)
+
+	var request_id := Net.request_id()
+	var response := await Net.protected_request(
+		"POST", "/spin", {"requestId": request_id}, request_id
+	)
+
+	if response.ok and typeof(response.data) == TYPE_DICTIONARY:
+		var data: Dictionary = response.data
+		Store.apply_spin(data)
+		var outcome: Variant = data.get("outcome", {})
+		_pending_outcome = outcome if typeof(outcome) == TYPE_DICTIONARY else {}
+		_pending_credits = int(data.get("creditsGained", 0))
+		_final_symbols = _symbols_for_result(_pending_outcome)
+		_animate_slots(_final_symbols)
+	elif response.code == 403:
+		var next_ms := _parse_no_spins_ms(response.data)
+		Store.apply_no_spins(next_ms)
+		_reset_idle_state()
+		_show_no_spins(next_ms)
+	elif response.code == 401:
+		Store.session_expired.emit()
+		_reset_idle_state()
+	else:
+		Sfx.error()
+		Haptics.error()
+		_status_label.text = "SIGNAL LOST"
+		_status_label.add_theme_color_override("font_color", Ui.NEON_MAGENTA)
+		_result_banner.text = "ERREUR RÉSEAU · RÉESSAIE"
+		_result_banner.add_theme_color_override("font_color", Ui.NEON_MAGENTA)
+		_reset_idle_state(false)
+
+
+func _symbols_for_result(outcome: Dictionary) -> Array[String]:
+	var result: Array[String] = []
+	var result_type := str(outcome.get("type", "credits")).to_lower()
+	var tier := str(outcome.get("tier", "common")).to_lower()
+	if result_type in ["none", "glitch"]:
+		result.assign(["glitch", "credits", "energy"])
+		return result
+	var symbol := "credits"
+	match tier:
+		"uncommon":
+			symbol = "energy"
+		"rare":
+			symbol = "shield"
+		"epic":
+			symbol = "hack"
+		"legendary":
+			symbol = "vault"
+	result.assign([symbol, symbol, symbol])
+	return result
+
+
+func _animate_slots(finals: Array[String]) -> void:
+	_reel_tweens.clear()
+	_landed_count = 0
+	var tier := str(_pending_outcome.get("tier", "common")).to_lower()
+	_anticipation = tier in ["rare", "epic", "legendary"]
+	_skip_enabled = true
+	_spin_btn.disabled = false
+	_spin_btn.text = "STOP NOW"
+	_status_label.text = "GOOD LUCK!"
+	_tick_timer.start()
+
+	for i in 3:
+		var reel: SlotReel = _reels[i]
+		reel.start_spin()
+		var duration := 0.24 + i * 0.08 if Preferences.reduced_motion else 0.92 + i * 0.30
+		if i == 2 and _anticipation and not Preferences.reduced_motion:
+			duration += 0.34
+		var travel := SlotReel.CELL_HEIGHT * float(12 + i * 4)
+		var tween := create_tween()
+		if Preferences.reduced_motion:
+			tween.tween_property(reel, "roll_offset", travel, duration) \
+				.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+		else:
+			tween.tween_property(reel, "roll_offset", SlotReel.CELL_HEIGHT * 2.0, 0.14) \
+				.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+			tween.tween_property(reel, "roll_offset", travel - SlotReel.CELL_HEIGHT * 3.0, duration - 0.44) \
+				.set_trans(Tween.TRANS_LINEAR).set_ease(Tween.EASE_IN_OUT)
+			tween.tween_property(reel, "roll_offset", travel, 0.30) \
+				.set_trans(Tween.TRANS_QUINT).set_ease(Tween.EASE_OUT)
+		tween.tween_callback(_land_reel.bind(i, finals[i]))
+		_reel_tweens.append(tween)
+
+
+func _land_reel(index: int, symbol: String) -> void:
+	if _revealed:
+		return
+	var reel: SlotReel = _reels[index]
+	reel.land(symbol)
+	reel.pivot_offset = reel.size / 2.0
+	reel.scale = Vector2(1.07, 0.94)
+	var bounce := create_tween()
+	bounce.tween_property(reel, "scale", Vector2.ONE, 0.20) \
+		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	Sfx.reel_stop(index)
+	Haptics.vibrate(0.25 + index * 0.16, 20 + index * 8)
+	_landed_count += 1
+
+	if index == 1 and _anticipation:
+		_status_label.text = "ALMOST!"
+		_status_label.add_theme_color_override("font_color", Ui.NEON_MAGENTA)
+		_cabinet.set_mode(Ui.NEON_MAGENTA, false)
+		Sfx.anticipation()
+		_anticipation_pulse()
+	if _landed_count >= 3:
+		_on_landed()
+
+
+func _skip_slots() -> void:
+	if not _busy or _revealed:
+		return
+	_skip_enabled = false
+	for tween in _reel_tweens:
+		if tween != null and tween.is_running():
+			tween.kill()
+	for i in 3:
+		var reel: SlotReel = _reels[i]
+		if reel.spinning:
+			reel.land(_final_symbols[i])
+			Sfx.reel_stop(i)
+	_landed_count = 3
+	_on_landed()
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	if not _busy or not _skip_enabled:
+		return
+	var tapped: bool = (
+		event is InputEventScreenTouch and event.pressed
+	) or (
+		event is InputEventMouseButton
+		and event.pressed
+		and event.button_index == MOUSE_BUTTON_LEFT
+	)
+	if tapped:
+		_skip_slots()
+		get_viewport().set_input_as_handled()
+
+
+func _on_landed() -> void:
+	if _revealed:
+		return
+	_revealed = true
+	_skip_enabled = false
+	_tick_timer.stop()
+	Sfx.reel_finish()
+
+	var tier := str(_pending_outcome.get("tier", "common")).to_lower()
+	var result_type := str(_pending_outcome.get("type", "credits")).to_lower()
+	var accent := Ui.tier_color(tier)
+	if result_type in ["none", "glitch"]:
+		accent = Ui.NEON_MAGENTA
+		_status_label.text = "GLITCH!"
+		_result_banner.text = "NO LOOT  •  TRY AGAIN"
+	else:
+		_status_label.text = "MEGA JACKPOT!" if tier == "legendary" else "YOU WIN!"
+		_result_banner.text = "+" + Ui.compact(_pending_credits) + " CR"
+	_result_banner.add_theme_color_override("font_color", accent)
+	_status_label.add_theme_color_override("font_color", accent)
+	_cabinet.set_mode(accent, tier in ["epic", "legendary"])
+
+	_impact_result(tier, accent)
+	Sfx.result(tier if result_type != "none" else "glitch")
+	if tier == "legendary":
+		Sfx.jackpot()
+	Haptics.win(tier)
+	Events.track("spin_result", {
+		"tier": tier,
+		"type": result_type,
+		"credits": _pending_credits,
+	})
+	_refresh_hud()
+	_reset_idle_state(false)
+
+
+func _impact_result(tier: String, accent: Color) -> void:
+	_result_banner.pivot_offset = _result_banner.size / 2.0
+	_result_banner.scale = Vector2(1.38, 1.38)
+	var pop := create_tween()
+	pop.tween_property(_result_banner, "scale", Vector2.ONE, 0.30) \
+		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
+	var count := 18
+	var flash_alpha := 0.12
+	match tier:
+		"rare":
+			count = 34
+			flash_alpha = 0.20
+		"epic":
+			count = 58
+			flash_alpha = 0.32
+		"legendary":
+			count = 90
+			flash_alpha = 0.52
+	_particles.emit_burst(Vector2(270, 500), accent, count)
+
+	_flash.color = Color(accent, flash_alpha)
+	var flash_tween := create_tween()
+	flash_tween.tween_property(_flash, "color", Color(accent, 0), 0.46)
+
+	if not Preferences.reduced_motion:
+		var shake := create_tween()
+		shake.tween_property(_cabinet_root, "position", Vector2(3, 145), 0.035)
+		shake.tween_property(_cabinet_root, "position", Vector2(17, 139), 0.035)
+		shake.tween_property(_cabinet_root, "position", Vector2(6, 144), 0.035)
+		shake.tween_property(_cabinet_root, "position", Vector2(13, 141), 0.035)
+		shake.tween_property(_cabinet_root, "position", Vector2(10, 142), 0.06) \
+			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
+
+func _anticipation_pulse() -> void:
+	if Preferences.reduced_motion:
+		return
+	_cabinet_root.pivot_offset = _cabinet_root.size / 2.0
+	var pulse := create_tween()
+	pulse.tween_property(_cabinet_root, "scale", Vector2(1.025, 1.025), 0.18)
+	pulse.tween_property(_cabinet_root, "scale", Vector2.ONE, 0.24) \
+		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
+
+func _on_tick() -> void:
+	if _busy and not Preferences.reduced_motion:
+		Sfx.tick()
+		for reel in _reels:
+			if reel.spinning:
+				reel.tick_flash = 1.0
+
+
+func _reset_idle_state(reset_message: bool = true) -> void:
+	_busy = false
+	_skip_enabled = false
+	_spin_btn.disabled = false
+	_spin_btn.text = "SPIN"
+	if reset_message:
+		_status_label.text = "NEON RUSH"
+		_status_label.add_theme_color_override("font_color", Ui.NEON_MAGENTA)
+		_result_banner.text = "MATCH 3  •  CRACK THE VAULT"
+		_result_banner.add_theme_color_override("font_color", Color("#272554"))
+		_cabinet.set_mode(Ui.NEON_CYAN, false)
+	_start_idle_animation()
+
+
+func _start_idle_animation() -> void:
+	if Preferences.reduced_motion or _spin_btn == null:
+		return
+	_stop_idle_animation()
+	_idle_tween = create_tween().set_loops()
+	_idle_tween.tween_property(_spin_btn, "scale", Vector2(1.025, 1.025), 0.85) \
+		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	_idle_tween.tween_property(_spin_btn, "scale", Vector2.ONE, 0.85) \
+		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+
+
+func _stop_idle_animation() -> void:
+	if _idle_tween != null and _idle_tween.is_running():
+		_idle_tween.kill()
+	if _spin_btn != null:
+		_spin_btn.scale = Vector2.ONE
+
+
+func _parse_no_spins_ms(data: Variant) -> int:
+	if typeof(data) == TYPE_DICTIONARY and data.has("error"):
+		var error: Variant = data["error"]
+		if typeof(error) == TYPE_DICTIONARY and error.has("details"):
+			var details: Variant = error["details"]
+			if typeof(details) == TYPE_DICTIONARY:
+				return int(details.get("nextSpinAtMs", 0))
+	return 0
+
+
+func _show_no_spins(_next_ms: int) -> void:
+	_no_spins.visible = true
+	_no_spins_label.text = "Recharge réseau en cours…"
+	Events.track("spins_empty")
+
+
+class SlotCabinet extends Control:
+	var accent := Ui.NEON_CYAN
+	var win_mode := false
+	var _time := 0.0
+
+	func _ready() -> void:
+		set_process(true)
+
+	func set_mode(color: Color, winning: bool) -> void:
+		accent = color
+		win_mode = winning
+		queue_redraw()
+
+	func _process(delta: float) -> void:
+		_time += delta
+		queue_redraw()
+
+	func _box(color: Color, border: Color, radius: int, width: int) -> StyleBoxFlat:
+		return Ui.style_box(color, border, radius, width)
+
+	func _draw() -> void:
+		var breathe := 0.60 + sin(_time * (4.0 if win_mode else 1.8)) * 0.18
+		var outer := _box(Color("#080D1D"), Color(accent, breathe), 34, 4)
+		outer.shadow_color = Color(accent, 0.35 + breathe * 0.20)
+		outer.shadow_size = 24 if not win_mode else 34
+		draw_style_box(outer, Rect2(4, 4, size.x - 8, size.y - 8))
+
+		draw_style_box(
+			_box(Color("#151E3D"), Color(accent, 0.88), 22, 2),
+			Rect2(30, 22, size.x - 60, 58)
+		)
+		draw_style_box(
+			_box(Color("#050712"), Color("#35446E"), 26, 2),
+			Rect2(24, 96, size.x - 48, 342)
+		)
+
+		draw_rect(Rect2(30, 265, size.x - 60, 3), Color(accent, 0.92))
+		draw_line(Vector2(30, 266), Vector2(size.x - 30, 266), Color(accent, 0.9), 3.0)
+
+		for i in 7:
+			var energy := 0.16 + 0.10 * sin(_time * 3.0 + i)
+			draw_rect(Rect2(18 + i * 72, 92, 34, 3), Color(accent, energy))
+
+		var corner := 18.0
+		var corners := [
+			Vector2(18, 18), Vector2(size.x - 18, 18),
+			Vector2(18, size.y - 18), Vector2(size.x - 18, size.y - 18),
+		]
+		for point in corners:
+			draw_circle(point, 4.0 + sin(_time * 2.0) * 1.2, Color(accent, 0.85))
+			draw_arc(point, corner, 0, TAU, 20, Color(accent, 0.20), 2.0)
+
+
+class SlotReel extends Control:
+	const CELL_HEIGHT := 58.0
+
+	var atlas: Texture2D
+	var symbols: Array = []
+	var reel_index := 0
+	var spinning := false
+	var final_symbol := "credits"
+	var roll_offset := 0.0:
+		set(value):
+			roll_offset = value
+			queue_redraw()
+	var tick_flash := 0.0
+	var _time := 0.0
+
+	func _ready() -> void:
+		set_process(true)
+
+	func start_spin() -> void:
+		spinning = true
+		roll_offset = 0.0
+		queue_redraw()
+
+	func land(symbol: String) -> void:
+		spinning = false
+		final_symbol = symbol
+		roll_offset = 0.0
+		tick_flash = 1.0
+		queue_redraw()
+
+	func _process(delta: float) -> void:
+		_time += delta
+		tick_flash = maxf(0.0, tick_flash - delta * 6.0)
+		queue_redraw()
+
+	func _draw() -> void:
+		var panel := StyleBoxFlat.new()
+		panel.bg_color = Color(1, 1, 1, 0.015)
+		panel.set_corner_radius_all(8)
+		draw_style_box(panel, Rect2(0, 0, size.x, size.y))
+
+		var row_height := (size.y - 16.0) / 3.0
+		for row in 3:
+			var cell := StyleBoxFlat.new()
+			cell.bg_color = Color("#FFFDF4", 0.105) if row == 1 else Color("#FFFDF4", 0.065)
+			cell.border_color = Color(Ui.GOLD, 0.32)
+			cell.set_border_width_all(1)
+			cell.set_corner_radius_all(7)
+			draw_style_box(
+				cell,
+				Rect2(4, 5 + row * row_height, size.x - 8, row_height - 2)
+			)
+
+		if spinning:
+			_draw_scrolling()
+		else:
+			_draw_resting()
+
+		var center_y := size.y / 2.0
+		draw_rect(Rect2(4, center_y - 34, size.x - 8, 68), Color(Ui.GOLD, 0.045 + tick_flash * 0.09))
+		var center_box := StyleBoxFlat.new()
+		center_box.bg_color = Color(1, 1, 1, 0.018)
+		center_box.border_color = Color("#FFB82E", 0.90)
+		center_box.set_border_width_all(2)
+		center_box.set_corner_radius_all(8)
+		draw_style_box(
+			center_box,
+			Rect2(4, center_y - 34, size.x - 8, 68)
+		)
+
+	func _draw_resting() -> void:
+		var index := symbols.find(final_symbol)
+		if index < 0:
+			index = 0
+		var top: String = symbols[posmod(index - 1, symbols.size())]
+		var bottom: String = symbols[posmod(index + 1, symbols.size())]
+		var bob := sin(_time * 1.7 + reel_index) * (1.8 if not Preferences.reduced_motion else 0.0)
+		var center_y := size.y / 2.0
+		_draw_symbol(top, Rect2(14, center_y - CELL_HEIGHT - 23 + bob, size.x - 28, 46), Color(1, 1, 1, 0.76))
+		_draw_symbol(final_symbol, Rect2(9, center_y - 32 + bob, size.x - 18, 64), Color.WHITE)
+		_draw_symbol(bottom, Rect2(14, center_y + CELL_HEIGHT - 23 + bob, size.x - 28, 46), Color(1, 1, 1, 0.76))
+
+	func _draw_scrolling() -> void:
+		var phase := roll_offset / CELL_HEIGHT
+		var base := floori(phase)
+		var fraction := phase - float(base)
+		for slot in range(-2, 4):
+			var symbol: String = symbols[posmod(base + slot + reel_index, symbols.size())]
+			var y := size.y / 2.0 - 32.0 + (float(slot) - fraction) * CELL_HEIGHT
+			var alpha := 1.0 if y > 26 and y < size.y - 58 else 0.45
+			_draw_symbol(symbol, Rect2(9, y, size.x - 18, 64), Color(1, 1, 1, alpha))
+		for streak in 5:
+			var streak_y := 18.0 + streak * 32.0 + fmod(roll_offset * 0.42, 16.0)
+			draw_rect(Rect2(14, streak_y, size.x - 28, 3), Color(Ui.GOLD, 0.14 + streak % 2 * 0.10))
+
+	func _draw_symbol(symbol: String, destination: Rect2, tint: Color) -> void:
+		if atlas == null or symbols.is_empty():
+			return
+		var index := symbols.find(symbol)
+		if index < 0:
+			index = 0
+		var column := index % 3
+		var row := index / 3
+		var cell_width := float(atlas.get_width()) / 3.0
+		var cell_height := float(atlas.get_height()) / 2.0
+		var source := Rect2(column * cell_width, row * cell_height, cell_width, cell_height)
+		draw_texture_rect_region(atlas, destination, source, tint, false, true)
+
+
+class AnimatedBackdrop extends Control:
+	var _time := 0.0
+
+	func _ready() -> void:
+		set_process(true)
+
+	func _process(delta: float) -> void:
+		_time += delta
+		queue_redraw()
+
+	func _draw() -> void:
+		for i in 16:
+			var px := fmod(float(i * 97) + _time * (7.0 + i % 4), 570.0) - 15.0
+			var py := fmod(float(i * 67) + sin(_time * 0.7 + i) * 22.0, 990.0)
+			var glow := Color.WHITE if i % 3 else Ui.NEON_MAGENTA
+			draw_circle(Vector2(px, py), 1.6 + i % 3, Color(glow, 0.18))
+		for i in 5:
+			var x := 40.0 + i * 122.0 + sin(_time * 0.45 + i) * 16.0
+			var y := 170.0 + i * 178.0 + cos(_time * 0.38 + i) * 14.0
+			draw_arc(Vector2(x, y), 18.0 + i * 3.0, 0, TAU, 24, Color(Ui.NEON_CYAN, 0.12), 2.0)
+
+
+class ParticleBurst extends Control:
+	var _particles: Array = []
+
+	func emit_burst(origin: Vector2, color: Color, count: int) -> void:
+		_particles.clear()
+		for i in count:
+			var angle := randf_range(-PI, 0.0)
+			if i % 3 == 0:
+				angle = randf_range(0.0, TAU)
+			var speed := randf_range(85.0, 360.0)
+			_particles.append({
+				"position": origin + Vector2(randf_range(-35, 35), randf_range(-25, 25)),
+				"velocity": Vector2(cos(angle), sin(angle)) * speed,
+				"life": randf_range(0.55, 1.25),
+				"max_life": 1.25,
+				"size": randf_range(2.5, 8.0),
+				"color": color.lerp(Ui.NEON_MAGENTA if i % 2 else Ui.GOLD, randf_range(0.0, 0.45)),
+			})
+		set_process(true)
+		queue_redraw()
+
+	func _process(delta: float) -> void:
+		for particle in _particles:
+			particle.position += particle.velocity * delta
+			particle.velocity.y += 420.0 * delta
+			particle.velocity *= 0.985
+			particle.life -= delta
+		_particles = _particles.filter(func(particle: Dictionary) -> bool: return particle.life > 0.0)
+		if _particles.is_empty():
+			set_process(false)
+		queue_redraw()
+
+	func _draw() -> void:
+		for particle in _particles:
+			var alpha := clampf(particle.life / particle.max_life, 0.0, 1.0)
+			var color: Color = particle.color
+			color.a = alpha
+			draw_circle(particle.position, particle.size * alpha, color)
+			draw_line(
+				particle.position,
+				particle.position - particle.velocity.normalized() * particle.size * 2.2,
+				Color(color, alpha * 0.55),
+				maxf(1.0, particle.size * 0.30)
+			)

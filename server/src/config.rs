@@ -1,0 +1,652 @@
+//! Remote config — chargement, versionnage (SHA-256) et validation au boot.
+//!
+//! Règle d'or (GDD §40, ARCH §5) : aucune valeur économique dans le code.
+//! Tout est lu ici depuis `config/`. Le serveur REFUSE de démarrer sur une
+//! config invalide.
+
+use anyhow::{anyhow, bail, Context, Result};
+use serde::{Deserialize, Serialize};
+use serde_json::{json, Value};
+use sha2::{Digest, Sha256};
+use std::collections::BTreeSet;
+use std::fs;
+use std::path::Path;
+
+/// Fichiers de premier niveau attendus dans le répertoire config.
+const TOP_LEVEL_FILES: &[&str] = &[
+    "cards.json",
+    "chests.json",
+    "daily.json",
+    "economy.json",
+    "events.json",
+    "offers.json",
+    "seasons.json",
+    "sets.json",
+    "spin_table.json",
+];
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AdsConfig {
+    pub max_rewarded_ads_per_day: u32,
+    pub reward_per_ad: u32,
+    pub cooldown_ms: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EconomyConfig {
+    pub spin_regen_ms: u64,
+    pub max_free_spins: u32,
+    pub new_player_spins: u32,
+    pub ads_config: AdsConfig,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum OutcomeType {
+    Credits,
+    Chest,
+    Card,
+    None,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Tier {
+    Common,
+    Uncommon,
+    Rare,
+    Epic,
+    Legendary,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SpinOutcome {
+    pub id: String,
+    #[serde(rename = "type")]
+    pub outcome_type: OutcomeType,
+    pub tier: Tier,
+    pub weight: u32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub min: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SpinTable {
+    pub outcomes: Vec<SpinOutcome>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DailyEntry {
+    pub day: u32,
+    pub spins: u32,
+    pub credits: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub chest: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DailyConfig {
+    pub cycle: Vec<DailyEntry>,
+    #[serde(default)]
+    pub missions: Vec<MissionConfig>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Reward {
+    #[serde(default)]
+    pub spins: u32,
+    #[serde(default)]
+    pub credits: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub chest: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MissionConfig {
+    pub mission_id: String,
+    pub name: String,
+    pub action: String,
+    pub target: u64,
+    pub reward: Reward,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CardConfig {
+    pub card_id: String,
+    pub set_id: String,
+    pub name: String,
+    pub rarity: Tier,
+    pub drop_weight: u32,
+    pub image: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetConfig {
+    pub set_id: String,
+    pub name: String,
+    pub cards: Vec<String>,
+    pub completion_spins: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LootWeight {
+    pub rarity: Tier,
+    pub weight: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChestConfig {
+    pub chest_id: String,
+    pub name: String,
+    pub image: String,
+    pub price_credits: u64,
+    pub cards_per_open: u32,
+    pub loot_table: Vec<LootWeight>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EventPointSource {
+    pub action: String,
+    pub points: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EventRewardTier {
+    pub min_rank: u32,
+    pub max_rank: u32,
+    pub reward: Reward,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EventConfig {
+    pub event_id: String,
+    pub name: String,
+    pub starts_at_ms: i64,
+    pub ends_at_ms: i64,
+    pub point_sources: Vec<EventPointSource>,
+    pub reward_tiers: Vec<EventRewardTier>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OfferContent {
+    #[serde(rename = "type")]
+    pub content_type: String,
+    pub amount: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OfferConfig {
+    pub offer_id: String,
+    pub name: String,
+    pub contents: Vec<OfferContent>,
+    pub price_token: String,
+    pub price_u64: u64,
+    pub starts_at_ms: i64,
+    pub ends_at_ms: i64,
+    pub max_per_player: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SeasonTier {
+    pub points: u64,
+    pub free_reward: Reward,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub premium_reward: Option<Reward>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SeasonConfig {
+    pub season_id: String,
+    pub name: String,
+    pub starts_at_ms: i64,
+    pub ends_at_ms: i64,
+    pub tiers: Vec<SeasonTier>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CompletionReward {
+    pub spins: u32,
+    pub credits: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub chest: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DistrictLevel {
+    pub level: u32,
+    pub cost: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub asset: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DistrictElement {
+    pub id: u32,
+    pub name: String,
+    pub levels: Vec<DistrictLevel>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct District {
+    pub id: u32,
+    pub name: String,
+    pub background: String,
+    pub elements: Vec<DistrictElement>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub completion_reward: Option<CompletionReward>,
+}
+
+/// Config complète, validée au boot.
+pub struct RemoteConfig {
+    pub version: String,
+    pub hash: String,
+    pub economy: EconomyConfig,
+    pub spin_table: SpinTable,
+    pub daily: DailyConfig,
+    pub districts: Vec<District>,
+    pub cards: Vec<CardConfig>,
+    pub sets: Vec<SetConfig>,
+    pub chests: Vec<ChestConfig>,
+    pub events: Vec<EventConfig>,
+    pub offers: Vec<OfferConfig>,
+    pub seasons: Vec<SeasonConfig>,
+}
+
+fn get_entry<'a>(entries: &'a [(String, Vec<u8>)], rel: &str) -> Result<&'a [u8]> {
+    entries
+        .iter()
+        .find(|(name, _)| name == rel)
+        .map(|(_, bytes)| bytes.as_slice())
+        .ok_or_else(|| anyhow!("fichier config manquant : {}", rel))
+}
+
+/// Valide qu'un stub plat est soit un tableau JSON, soit un objet avec `items[]`.
+fn parse_flat_stub(name: &str, bytes: &[u8]) -> Result<Value> {
+    let v: Value =
+        serde_json::from_slice(bytes).with_context(|| format!("{} : JSON invalide", name))?;
+    match &v {
+        Value::Array(_) => Ok(v),
+        Value::Object(obj) if obj.get("items").map_or(false, |i| i.is_array()) => Ok(v),
+        _ => bail!(
+            "{} : attendu un tableau JSON ou un objet avec un champ items[]",
+            name
+        ),
+    }
+}
+
+fn parse_items<T: for<'de> Deserialize<'de>>(name: &str, bytes: &[u8]) -> Result<Vec<T>> {
+    let value = parse_flat_stub(name, bytes)?;
+    let items = match value {
+        Value::Array(items) => items,
+        Value::Object(mut obj) => obj
+            .remove("items")
+            .and_then(|v| v.as_array().cloned())
+            .unwrap_or_default(),
+        _ => Vec::new(),
+    };
+    serde_json::from_value(Value::Array(items))
+        .with_context(|| format!("{} : items invalides", name))
+}
+
+impl RemoteConfig {
+    /// Charge + valide la config depuis `dir`. Refuse le boot sur config invalide.
+    pub fn load(dir: &Path) -> Result<Self> {
+        // 1) Inventaire : 8 fichiers de premier niveau + districts/*.json (triés).
+        let mut entries: Vec<(String, Vec<u8>)> = Vec::new();
+        for name in TOP_LEVEL_FILES {
+            let p = dir.join(name);
+            let bytes = fs::read(&p).with_context(|| format!("lecture {}", p.display()))?;
+            entries.push((name.to_string(), bytes));
+        }
+        let districts_dir = dir.join("districts");
+        let mut district_names: Vec<String> = fs::read_dir(&districts_dir)
+            .with_context(|| format!("lecture {}", districts_dir.display()))?
+            .filter_map(|e| e.ok())
+            .map(|e| e.file_name().to_string_lossy().into_owned())
+            .filter(|n| n.ends_with(".json"))
+            .collect();
+        district_names.sort();
+        for name in district_names {
+            let p = districts_dir.join(&name);
+            let bytes = fs::read(&p).with_context(|| format!("lecture {}", p.display()))?;
+            entries.push((format!("districts/{}", name), bytes));
+        }
+        entries.sort_by(|a, b| a.0.cmp(&b.0));
+
+        // 2) Versioning : SHA-256 sur (relpath + \0 + bytes) triés.
+        let mut hasher = Sha256::new();
+        for (rel, bytes) in &entries {
+            hasher.update(rel.as_bytes());
+            hasher.update(b"\0");
+            hasher.update(bytes);
+        }
+        let digest = hasher.finalize();
+        let hash: String = digest.iter().map(|b| format!("{:02x}", b)).collect();
+        let version = hash[..16].to_string();
+
+        // 3) Parse typé.
+        let economy: EconomyConfig = serde_json::from_slice(get_entry(&entries, "economy.json")?)
+            .context("economy.json invalide")?;
+        let spin_table: SpinTable = serde_json::from_slice(get_entry(&entries, "spin_table.json")?)
+            .context("spin_table.json invalide")?;
+        let daily: DailyConfig = serde_json::from_slice(get_entry(&entries, "daily.json")?)
+            .context("daily.json invalide")?;
+        let districts: Vec<District> = entries
+            .iter()
+            .filter(|(name, _)| name.starts_with("districts/"))
+            .map(|(name, bytes)| {
+                serde_json::from_slice::<District>(bytes)
+                    .with_context(|| format!("{} : district invalide", name))
+            })
+            .collect::<Result<Vec<_>>>()?;
+        let cards = parse_items("cards.json", get_entry(&entries, "cards.json")?)?;
+        let sets = parse_items("sets.json", get_entry(&entries, "sets.json")?)?;
+        let chests = parse_items("chests.json", get_entry(&entries, "chests.json")?)?;
+        let events = parse_items("events.json", get_entry(&entries, "events.json")?)?;
+        let offers = parse_items("offers.json", get_entry(&entries, "offers.json")?)?;
+        let seasons = parse_items("seasons.json", get_entry(&entries, "seasons.json")?)?;
+
+        let cfg = RemoteConfig {
+            version,
+            hash,
+            economy,
+            spin_table,
+            daily,
+            districts,
+            cards,
+            sets,
+            chests,
+            events,
+            offers,
+            seasons,
+        };
+
+        // 4) Validation (règles d'équilibre minimales au boot).
+        cfg.validate()?;
+        Ok(cfg)
+    }
+
+    fn validate(&self) -> Result<()> {
+        let mut problems: Vec<String> = Vec::new();
+
+        if self.economy.spin_regen_ms < 1000 {
+            problems.push(format!(
+                "economy.spinRegenMs {} < 1000 (regen trop rapide)",
+                self.economy.spin_regen_ms
+            ));
+        }
+        if self.economy.max_free_spins == 0 {
+            problems.push("economy.maxFreeSpins doit être > 0".to_string());
+        }
+
+        let mut seen_ids = BTreeSet::new();
+        for o in &self.spin_table.outcomes {
+            if o.weight == 0 {
+                problems.push(format!("spin_table.{} : weight doit être > 0", o.id));
+            }
+            if !seen_ids.insert(o.id.clone()) {
+                problems.push(format!("spin_table : id '{}' en double", o.id));
+            }
+            if o.outcome_type == OutcomeType::Credits {
+                match (o.min, o.max) {
+                    (Some(min), Some(max)) if min <= max => {}
+                    _ => problems.push(format!(
+                        "spin_table.{} : un outcome credits exige min/max avec 0 <= min <= max",
+                        o.id
+                    )),
+                }
+            }
+        }
+        if self.spin_table.outcomes.is_empty() {
+            problems.push("spin_table.outcomes est vide".to_string());
+        }
+
+        let mut days = BTreeSet::new();
+        if self.daily.cycle.is_empty() {
+            problems.push("daily.cycle est vide".to_string());
+        }
+        for d in &self.daily.cycle {
+            if d.day == 0 {
+                problems.push("daily.cycle : day doit être >= 1".to_string());
+            }
+            if !days.insert(d.day) {
+                problems.push(format!("daily.cycle : jour {} en double", d.day));
+            }
+        }
+        let mut mission_ids = BTreeSet::new();
+        for m in &self.daily.missions {
+            if m.target == 0 || !mission_ids.insert(&m.mission_id) {
+                problems.push(format!("mission invalide ou en double : {}", m.mission_id));
+            }
+        }
+
+        let mut district_ids = BTreeSet::new();
+        if self.districts.is_empty() {
+            problems.push("aucun district trouvé dans config/districts/".to_string());
+        }
+        for d in &self.districts {
+            if !district_ids.insert(d.id) {
+                problems.push(format!("districts : id {} en double", d.id));
+            }
+            if d.elements.is_empty() {
+                problems.push(format!("district {} : éléments vides", d.id));
+            }
+            let mut elem_ids = BTreeSet::new();
+            for e in &d.elements {
+                if !elem_ids.insert(e.id) {
+                    problems.push(format!("district {} : élément id {} en double", d.id, e.id));
+                }
+                let mut levels = BTreeSet::new();
+                for l in &e.levels {
+                    if !levels.insert(l.level) {
+                        problems.push(format!(
+                            "district {} / élément {} : niveau {} en double",
+                            d.id, e.id, l.level
+                        ));
+                    }
+                }
+                let max = e.levels.iter().map(|l| l.level).max().unwrap_or(0);
+                if !(0..=max).all(|level| e.levels.iter().any(|l| l.level == level)) {
+                    problems.push(format!(
+                        "district {} / élément {} : niveaux non contigus",
+                        d.id, e.id
+                    ));
+                }
+            }
+        }
+
+        let card_ids: BTreeSet<&str> = self.cards.iter().map(|c| c.card_id.as_str()).collect();
+        if card_ids.len() != self.cards.len() {
+            problems.push("cards : cardId en double".to_string());
+        }
+        let set_ids: BTreeSet<&str> = self.sets.iter().map(|s| s.set_id.as_str()).collect();
+        if set_ids.len() != self.sets.len() {
+            problems.push("sets : setId en double".to_string());
+        }
+        for card in &self.cards {
+            if !set_ids.contains(card.set_id.as_str()) || card.drop_weight == 0 {
+                problems.push(format!("carte {} : set inconnu ou poids nul", card.card_id));
+            }
+        }
+        for set in &self.sets {
+            for card in &set.cards {
+                if !card_ids.contains(card.as_str()) {
+                    problems.push(format!("set {} : carte inconnue {}", set.set_id, card));
+                }
+            }
+        }
+        let chest_ids: BTreeSet<&str> = self.chests.iter().map(|c| c.chest_id.as_str()).collect();
+        if chest_ids.len() != self.chests.len() {
+            problems.push("chests : chestId en double".to_string());
+        }
+        for chest in &self.chests {
+            if chest.cards_per_open == 0
+                || chest.loot_table.iter().map(|l| l.weight).sum::<u32>() == 0
+            {
+                problems.push(format!("chest {} : loot table invalide", chest.chest_id));
+            }
+            for loot in &chest.loot_table {
+                if !self.cards.iter().any(|card| card.rarity == loot.rarity) {
+                    problems.push(format!(
+                        "chest {} : aucune carte pour la rareté {:?}",
+                        chest.chest_id, loot.rarity
+                    ));
+                }
+            }
+        }
+        for daily in &self.daily.cycle {
+            if daily
+                .chest
+                .as_deref()
+                .map_or(false, |id| !chest_ids.contains(id))
+            {
+                problems.push(format!("daily jour {} : coffre inconnu", daily.day));
+            }
+        }
+        for mission in &self.daily.missions {
+            if mission
+                .reward
+                .chest
+                .as_deref()
+                .map_or(false, |id| !chest_ids.contains(id))
+            {
+                problems.push(format!("mission {} : coffre inconnu", mission.mission_id));
+            }
+        }
+        for district in &self.districts {
+            if district
+                .completion_reward
+                .as_ref()
+                .and_then(|r| r.chest.as_deref())
+                .map_or(false, |id| !chest_ids.contains(id))
+            {
+                problems.push(format!(
+                    "district {} : coffre de récompense inconnu",
+                    district.id
+                ));
+            }
+        }
+        let event_ids: BTreeSet<&str> = self.events.iter().map(|e| e.event_id.as_str()).collect();
+        if event_ids.len() != self.events.len() {
+            problems.push("events : eventId en double".to_string());
+        }
+        for event in &self.events {
+            if event.starts_at_ms >= event.ends_at_ms {
+                problems.push(format!("event {} : fenêtre invalide", event.event_id));
+            }
+            for tier in &event.reward_tiers {
+                if tier.min_rank == 0
+                    || tier.min_rank > tier.max_rank
+                    || tier
+                        .reward
+                        .chest
+                        .as_deref()
+                        .map_or(false, |id| !chest_ids.contains(id))
+                {
+                    problems.push(format!("event {} : palier invalide", event.event_id));
+                }
+            }
+        }
+        let season_ids: BTreeSet<&str> =
+            self.seasons.iter().map(|s| s.season_id.as_str()).collect();
+        if season_ids.len() != self.seasons.len() {
+            problems.push("seasons : seasonId en double".to_string());
+        }
+        for season in &self.seasons {
+            if season.starts_at_ms >= season.ends_at_ms || season.tiers.is_empty() {
+                problems.push(format!(
+                    "season {} : fenêtre/paliers invalides",
+                    season.season_id
+                ));
+            }
+        }
+        let offer_ids: BTreeSet<&str> = self.offers.iter().map(|o| o.offer_id.as_str()).collect();
+        if offer_ids.len() != self.offers.len() {
+            problems.push("offers : offerId en double".to_string());
+        }
+        for offer in &self.offers {
+            if offer.starts_at_ms >= offer.ends_at_ms || offer.max_per_player == 0 {
+                problems.push(format!(
+                    "offer {} : fenêtre/limite invalide",
+                    offer.offer_id
+                ));
+            }
+            for content in &offer.contents {
+                match content.content_type.as_str() {
+                    "spins" | "credits" => {}
+                    "chest"
+                        if content
+                            .id
+                            .as_deref()
+                            .map_or(false, |id| self.chests.iter().any(|c| c.chest_id == id)) => {}
+                    "season_premium"
+                        if content
+                            .id
+                            .as_deref()
+                            .map_or(false, |id| self.seasons.iter().any(|s| s.season_id == id)) => {
+                    }
+                    _ => problems.push(format!("offer {} : contenu invalide", offer.offer_id)),
+                }
+            }
+        }
+
+        if !problems.is_empty() {
+            bail!("config invalide :\n - {}", problems.join("\n - "));
+        }
+        Ok(())
+    }
+
+    /// Payload servi par GET /config.
+    pub fn payload(&self) -> Value {
+        json!({
+            "economy": self.economy,
+            "spinTable": self.spin_table,
+            "daily": self.daily,
+            "districts": self.districts,
+            "cards": self.cards,
+            "sets": self.sets,
+            "chests": self.chests,
+            "events": self.events,
+            "offers": self.offers,
+            "seasons": self.seasons,
+        })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn bundled_config_is_valid() {
+        let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../config");
+        let cfg = RemoteConfig::load(&path).expect("la config livrée doit rester valide");
+        assert!(!cfg.spin_table.outcomes.is_empty());
+        assert!(!cfg.districts.is_empty());
+    }
+}

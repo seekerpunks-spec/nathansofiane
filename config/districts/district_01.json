@@ -1,0 +1,64 @@
+{
+  "note": "PROVISIONAL — District 1 'Neon Slums' (données M2 : la logique d'upgrades arrive avec M2, les données sont prêtes dès M1).",
+  "id": 1,
+  "name": "Neon Slums",
+  "background": "districts/district_01_bg",
+  "elements": [
+    {
+      "id": 1, "name": "Apartment",
+      "levels": [
+        { "level": 0, "cost": 0,       "asset": "district_01_apartment_lv0" },
+        { "level": 1, "cost": 100000,  "asset": "district_01_apartment_lv1" },
+        { "level": 2, "cost": 350000,  "asset": "district_01_apartment_lv2" },
+        { "level": 3, "cost": 1000000, "asset": "district_01_apartment_lv3" },
+        { "level": 4, "cost": 3000000, "asset": "district_01_apartment_lv4" },
+        { "level": 5, "cost": 8000000, "asset": "district_01_apartment_lv5" }
+      ]
+    },
+    {
+      "id": 2, "name": "Terminal",
+      "levels": [
+        { "level": 0, "cost": 0,       "asset": "district_01_terminal_lv0" },
+        { "level": 1, "cost": 80000,   "asset": "district_01_terminal_lv1" },
+        { "level": 2, "cost": 300000,  "asset": "district_01_terminal_lv2" },
+        { "level": 3, "cost": 900000,  "asset": "district_01_terminal_lv3" },
+        { "level": 4, "cost": 2500000, "asset": "district_01_terminal_lv4" },
+        { "level": 5, "cost": 7000000, "asset": "district_01_terminal_lv5" }
+      ]
+    },
+    {
+      "id": 3, "name": "Energy Station",
+      "levels": [
+        { "level": 0, "cost": 0,       "asset": "district_01_energy_lv0" },
+        { "level": 1, "cost": 120000,  "asset": "district_01_energy_lv1" },
+        { "level": 2, "cost": 400000,  "asset": "district_01_energy_lv2" },
+        { "level": 3, "cost": 1200000, "asset": "district_01_energy_lv3" },
+        { "level": 4, "cost": 3500000, "asset": "district_01_energy_lv4" },
+        { "level": 5, "cost": 9000000, "asset": "district_01_energy_lv5" }
+      ]
+    },
+    {
+      "id": 4, "name": "Bodega",
+      "levels": [
+        { "level": 0, "cost": 0,       "asset": "district_01_bodega_lv0" },
+        { "level": 1, "cost": 90000,   "asset": "district_01_bodega_lv1" },
+        { "level": 2, "cost": 320000,  "asset": "district_01_bodega_lv2" },
+        { "level": 3, "cost": 950000,  "asset": "district_01_bodega_lv3" },
+        { "level": 4, "cost": 2800000, "asset": "district_01_bodega_lv4" },
+        { "level": 5, "cost": 7500000, "asset": "district_01_bodega_lv5" }
+      ]
+    },
+    {
+      "id": 5, "name": "Antenna",
+      "levels": [
+        { "level": 0, "cost": 0,       "asset": "district_01_antenna_lv0" },
+        { "level": 1, "cost": 150000,  "asset": "district_01_antenna_lv1" },
+        { "level": 2, "cost": 450000,  "asset": "district_01_antenna_lv2" },
+        { "level": 3, "cost": 1300000, "asset": "district_01_antenna_lv3" },
+        { "level": 4, "cost": 3800000, "asset": "district_01_antenna_lv4" },
+        { "level": 5, "cost": 10000000,"asset": "district_01_antenna_lv5" }
+      ]
+    }
+  ],
+  "completionReward": { "spins": 500, "credits": 2000000, "chest": "neon" }
+}

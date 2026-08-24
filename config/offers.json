@@ -1,0 +1,23 @@
+{
+  "items": [
+    {
+      "offerId": "welcome_signal", "name": "Welcome Signal",
+      "contents": [
+        { "type": "spins", "amount": 500 }, { "type": "credits", "amount": 5000000 }, { "type": "chest", "id": "neon", "amount": 2 }
+      ],
+      "priceToken": "SKR", "priceU64": 1000000,
+      "startsAtMs": 1787328000000, "endsAtMs": 1822348800000,
+      "maxPerPlayer": 1
+    },
+    {
+      "offerId": "neon_genesis_pass", "name": "Neon Genesis Pass",
+      "contents": [
+        { "type": "season_premium", "id": "neon_genesis", "amount": 1 },
+        { "type": "spins", "amount": 250 }
+      ],
+      "priceToken": "SKR", "priceU64": 2500000,
+      "startsAtMs": 1787328000000, "endsAtMs": 1790812800000,
+      "maxPerPlayer": 1
+    }
+  ]
+}

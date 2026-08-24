@@ -1,0 +1,6 @@
+{
+  "items": [
+    { "setId": "hacker_tools", "name": "Hacker Tools", "cards": ["ghost_terminal", "data_spike", "neural_key", "quantum_rig"], "completionSpins": 1000 },
+    { "setId": "seeker_tech", "name": "Seeker Tech", "cards": ["secure_chip", "neon_antenna", "mobile_node", "seed_vault"], "completionSpins": 2500 }
+  ]
+}

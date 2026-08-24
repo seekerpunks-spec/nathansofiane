@@ -1,0 +1,16 @@
+{
+  "items": [
+    {
+      "eventId": "neon_rush_r17", "name": "Neon Rush",
+      "startsAtMs": 1787328000000, "endsAtMs": 1790812800000,
+      "pointSources": [
+        { "action": "spin", "points": 10 }, { "action": "upgrade", "points": 50 }, { "action": "chest_open", "points": 100 }
+      ],
+      "rewardTiers": [
+        { "minRank": 1, "maxRank": 1, "reward": { "spins": 1000, "credits": 5000000, "chest": "elite" } },
+        { "minRank": 2, "maxRank": 3, "reward": { "spins": 500, "credits": 2500000, "chest": "neon" } },
+        { "minRank": 4, "maxRank": 10, "reward": { "spins": 250, "credits": 1000000, "chest": "basic" } }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "items": [
+    { "chestId": "basic", "name": "Basic Cache", "image": "res://assets/generated/chests/basic_cache.png", "priceCredits": 250000, "cardsPerOpen": 2, "lootTable": [
+      { "rarity": "common", "weight": 7600 }, { "rarity": "uncommon", "weight": 1800 }, { "rarity": "rare", "weight": 550 }, { "rarity": "epic", "weight": 50 }
+    ] },
+    { "chestId": "neon", "name": "Neon Cache", "image": "res://assets/generated/chests/neon_cache.png", "priceCredits": 1000000, "cardsPerOpen": 3, "lootTable": [
+      { "rarity": "common", "weight": 4800 }, { "rarity": "uncommon", "weight": 3000 }, { "rarity": "rare", "weight": 1700 }, { "rarity": "epic", "weight": 450 }, { "rarity": "legendary", "weight": 50 }
+    ] },
+    { "chestId": "elite", "name": "Black ICE Vault", "image": "res://assets/generated/chests/black_ice_vault.png", "priceCredits": 5000000, "cardsPerOpen": 5, "lootTable": [
+      { "rarity": "uncommon", "weight": 4000 }, { "rarity": "rare", "weight": 4000 }, { "rarity": "epic", "weight": 1750 }, { "rarity": "legendary", "weight": 250 }
+    ] }
+  ]
+}

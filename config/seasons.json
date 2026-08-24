@@ -1,0 +1,16 @@
+{
+  "note": "Saison data-driven. Les dates se modifient par remote config.",
+  "items": [
+    {
+      "seasonId": "neon_genesis",
+      "name": "Neon Genesis",
+      "startsAtMs": 1787328000000,
+      "endsAtMs": 1790812800000,
+      "tiers": [
+        { "points": 100, "freeReward": { "spins": 25, "credits": 100000 }, "premiumReward": { "spins": 75, "credits": 300000 } },
+        { "points": 500, "freeReward": { "spins": 75, "credits": 500000, "chest": "basic" }, "premiumReward": { "spins": 200, "credits": 1000000, "chest": "neon" } },
+        { "points": 1500, "freeReward": { "spins": 200, "credits": 1500000, "chest": "neon" }, "premiumReward": { "spins": 500, "credits": 4000000, "chest": "elite" } }
+      ]
+    }
+  ]
+}

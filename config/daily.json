@@ -1,0 +1,17 @@
+{
+  "note": "PROVISIONAL — daily rewards (cycle de 7 jours, ensuite boucle). Récompenses : spins, crédits, coffres (coffres activés en M3).",
+  "cycle": [
+    { "day": 1, "spins": 50,  "credits": 0,      "chest": null },
+    { "day": 2, "spins": 75,  "credits": 200000, "chest": null },
+    { "day": 3, "spins": 100, "credits": 0,      "chest": null },
+    { "day": 4, "spins": 0,   "credits": 0,      "chest": "basic" },
+    { "day": 5, "spins": 150, "credits": 500000, "chest": null },
+    { "day": 6, "spins": 200, "credits": 0,      "chest": "neon" },
+    { "day": 7, "spins": 500, "credits": 1000000,"chest": "neon" }
+  ],
+  "missions": [
+    { "missionId": "use_spins", "name": "Use 10 Spins", "action": "spin", "target": 10, "reward": { "spins": 20, "credits": 100000 } },
+    { "missionId": "upgrade_grid", "name": "Upgrade 2 Structures", "action": "upgrade", "target": 2, "reward": { "spins": 35, "credits": 250000 } },
+    { "missionId": "open_cache", "name": "Open a Cache", "action": "chest_open", "target": 1, "reward": { "spins": 50, "credits": 0, "chest": "basic" } }
+  ]
+}
