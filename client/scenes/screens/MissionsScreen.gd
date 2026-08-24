@@ -324,7 +324,7 @@ func _mutate(path: String, body: Dictionary, event_name: String) -> void:
 		var props := body.duplicate()
 		props.erase("requestId")
 		if typeof(response.data) == TYPE_DICTIONARY:
-			for key in ["rank", "cohortId", "milestoneIndex", "points", "teamId", "teamPoints", "contributionPoints", "achievementId", "progress", "target", "day", "streak", "missionId", "seasonId", "tier", "premium"]:
+			for key in ["rank", "cohortId", "milestoneIndex", "points", "teamId", "teamPoints", "contributionPoints", "achievementId", "progress", "target", "day", "streak", "entitlementBonusSpins", "missionId", "seasonId", "tier", "premium"]:
 				if response.data.has(key):
 					props[key] = response.data[key]
 		Events.track(event_name, props)

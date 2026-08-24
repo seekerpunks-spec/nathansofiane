@@ -19,6 +19,7 @@ const TOP_LEVEL_FILES: &[&str] = &[
     "chests.json",
     "daily.json",
     "economy.json",
+    "entitlements.json",
     "events.json",
     "offers.json",
     "progression.json",
@@ -220,6 +221,26 @@ pub struct AchievementConfig {
     pub action: String,
     pub target: u64,
     pub reward: Reward,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EntitlementPerks {
+    #[serde(default)]
+    pub daily_spin_bonus: u32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub badge_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EntitlementConfig {
+    pub entitlement_id: String,
+    pub name: String,
+    pub enabled: bool,
+    pub collection_address: String,
+    pub verification_ttl_ms: u64,
+    pub perks: EntitlementPerks,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -460,6 +481,7 @@ pub struct RemoteConfig {
     pub progression: ProgressionConfig,
     pub daily: DailyConfig,
     pub achievements: Vec<AchievementConfig>,
+    pub entitlements: Vec<EntitlementConfig>,
     pub districts: Vec<District>,
     pub cards: Vec<CardConfig>,
     pub sets: Vec<SetConfig>,
@@ -561,6 +583,10 @@ impl RemoteConfig {
             "achievements.json",
             get_entry(&entries, "achievements.json")?,
         )?;
+        let entitlements = parse_items(
+            "entitlements.json",
+            get_entry(&entries, "entitlements.json")?,
+        )?;
         let districts: Vec<District> = entries
             .iter()
             .filter(|(name, _)| name.starts_with("districts/"))
@@ -585,6 +611,7 @@ impl RemoteConfig {
             progression,
             daily,
             achievements,
+            entitlements,
             districts,
             cards,
             sets,
@@ -829,6 +856,36 @@ impl RemoteConfig {
                     achievement.achievement_id
                 ));
             }
+        }
+        let mut entitlement_ids = BTreeSet::new();
+        let mut total_daily_spin_bonus = 0u32;
+        for entitlement in &self.entitlements {
+            total_daily_spin_bonus =
+                total_daily_spin_bonus.saturating_add(entitlement.perks.daily_spin_bonus);
+            if !entitlement_ids.insert(entitlement.entitlement_id.as_str())
+                || entitlement.entitlement_id.trim().is_empty()
+                || entitlement.entitlement_id.len() > 64
+                || entitlement.name.trim().is_empty()
+                || entitlement.name.len() > 64
+                || entitlement.collection_address.trim().is_empty()
+                || entitlement.collection_address.len() > 96
+                || entitlement.verification_ttl_ms < 300_000
+                || entitlement.verification_ttl_ms > 604_800_000
+                || entitlement.perks.daily_spin_bonus > 1_000
+                || entitlement
+                    .perks
+                    .badge_id
+                    .as_deref()
+                    .is_some_and(|badge| badge.trim().is_empty() || badge.len() > 32)
+            {
+                problems.push(format!(
+                    "entitlement {} : définition invalide",
+                    entitlement.entitlement_id
+                ));
+            }
+        }
+        if total_daily_spin_bonus > 2_000 {
+            problems.push("entitlements : bonus daily cumulé trop élevé".to_string());
         }
         let mut bonus_outcome_ids = BTreeSet::new();
         let bonus_total_weight: u64 = self
@@ -1231,6 +1288,7 @@ impl RemoteConfig {
             "progression": self.progression,
             "daily": self.daily,
             "achievements": self.achievements,
+            "entitlements": self.entitlements,
             "districts": self.districts,
             "cards": self.cards,
             "sets": self.sets,

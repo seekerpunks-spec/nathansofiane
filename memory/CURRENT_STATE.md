@@ -45,6 +45,9 @@
 - Sept achievements permanents cumulent les actions autoritaires dans
   `player_action_totals`, accordent leurs rewards une fois et ajoutent 10 points
   Network Power configurables par achievement réclamé.
+- Entitlements NFT centralisés et fail-closed : aucune route d'ownership client,
+  activation + TTL + provider requis côté serveur, expiration automatique et
+  bonus daily spins uniquement. La collection OG reste désactivée par défaut.
 
 ## Produit livré
 
@@ -76,7 +79,7 @@
 
 - Modules R17 : `game`, `district`, `collection`, `engagement`, `commerce`.
 - Migrations additives `0002_progression_liveops.sql` à
-  `0014_achievement_progression.sql`.
+  `0015_entitlements.sql`.
 - Idempotence par action, transactions, audit économique, horloge serveur,
   rate-limit et nettoyage périodique.
 - Mode release protégé : refus de `DEV_AUTH`, secret JWT fort, CORS allowlist,
@@ -119,6 +122,9 @@
 - Intégration achievements : spin ×10 progresse simultanément les contrats 10 et
   100 ; deux claims concurrents du premier accordent une seule fois +25 spins et
   +100 000 CR, le second est refusé avant son seuil et Network Power gagne 10.
+- Intégration entitlements : état sans preuve = zéro perk ; une ownership active
+  écrite via le point d'entrée provider obtient le bonus configuré, puis retombe
+  automatiquement à zéro dès que son TTL PostgreSQL est expiré.
 - Économie réauditée : 277 605 CR équivalents/spin, 9,4 % de spins vides,
   districts estimés à 233,5 puis 501,8 spins. `cargo clippy -D warnings` vert.
 - `cargo build --release` : OK.

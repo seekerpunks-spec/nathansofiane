@@ -53,6 +53,7 @@
 | T31 | L'écran Store consomme uniquement `GET /offers`; âge du compte, spins, district, événement et inactivité sont évalués serveur puis revérifiés sous verrou lors de l'achat | Empêche le client d'afficher/forcer une offre inéligible et garde toute règle commerciale hors de l'UI ; le provider réel reste requis en production |
 | T32 | L'événement coopératif est une extension optionnelle du moteur d'événements existant ; score d'équipe et contribution suivent les mêmes `pointSources`, le claim est personnel et unique sur `(eventId, milestoneIndex, address)` indépendamment de l'équipe | Évite un second moteur liveops, empêche le leech sans contribution et ferme le double-claim par changement d'équipe |
 | T33 | Les achievements permanents réutilisent `progress_action_tx`, stockent un total par action et ne créditent la récompense qu'au claim ; chaque claim contribue à Network Power via un poids configurable | Une source cumulative suffit à plusieurs paliers, reste extensible sans nouvelle table par objectif et maintient le score global autoritaire |
+| T34 | Les perks NFT passent exclusivement par des entitlements serveur actifs et non expirés ; aucun endpoint client d'ownership, définition OG désactivée, TTL remote-config et bonus limité au daily login | Le système est prêt pour un provider futur sans implémenter le wallet, échoue fermé en cas de panne/transfert et ne crée aucun rendement financier |
 
 ## Noms / brandings (à verrouiller — O1 GDD)
 - Jeu : **CyberSeeker** (provisoire, utilisé partout pour l'instant).

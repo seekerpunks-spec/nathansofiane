@@ -107,3 +107,6 @@ func seasons() -> Array:
 
 func daily() -> Dictionary:
 	return raw.get("daily", {})
+
+func entitlements() -> Array:
+	return raw.get("entitlements", [])

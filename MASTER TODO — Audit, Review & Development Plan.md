@@ -1009,6 +1009,13 @@ entitlements:
 
 Les valeurs doivent être configurables.
 
+Statut R24 : **architecture locale implémentée, provider externe volontairement
+non branché**. Les définitions et perks sont remote-config ; la table serveur
+exige vérificateur, référence d'ownership, dates de vérification et expiration.
+Aucune route client ne peut déclarer un NFT. Seules les lignes actives, non
+expirées et correspondant à une définition activée produisent un entitlement.
+La définition OG livrée est désactivée jusqu'au choix d'une collection vérifiée.
+
 ---
 
 # 33. OWNERSHIP CHANGES
@@ -1022,6 +1029,12 @@ Si le NFT arrive :
 les perks deviennent actifs.
 
 Ne pas avoir besoin de redéployer l'application.
+
+Le point d'entrée interne du futur provider fait un upsert `owned=true/false`
+avec TTL dérivé de la config. Un transfert retire donc le perk au prochain check,
+et toute panne prolongée du provider expire automatiquement le droit (fail-closed).
+Le seul perk câblé à ce stade est un bonus de spins sur le daily login ; aucun
+rendement, cash-out ou bénéfice financier n'est créé.
 
 ---
 

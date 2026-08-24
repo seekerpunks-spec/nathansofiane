@@ -18,6 +18,7 @@ mod config;
 mod db;
 mod district;
 mod engagement;
+pub mod entitlements;
 mod env;
 mod error;
 mod friends;
@@ -334,6 +335,7 @@ async fn get_state(
     let today = now.date_naive();
     let daily_bonus = engagement::daily_bonus_for_state(&state, &address, today).await?;
     let achievements = engagement::achievements_for_state(&state, &address).await?;
+    let entitlements = entitlements::for_state(&state, &address).await?;
     let mission_rows: Vec<(String, i64, bool)> = sqlx::query_as(
         "SELECT mission_id,progress,claimed FROM mission_progress WHERE address=$1 AND mission_day=$2",
     ).bind(&address).bind(today).fetch_all(state.db.pool()).await?;
@@ -405,6 +407,7 @@ async fn get_state(
         "dailyAvailable": row.last_daily_claim != Some(today),
         "dailyBonus": daily_bonus,
         "achievements": achievements,
+        "entitlements": entitlements,
         "missions": missions,
         "events": events,
         "teamEvents": team_events,

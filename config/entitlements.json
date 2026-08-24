@@ -1,0 +1,15 @@
+{
+  "items": [
+    {
+      "entitlementId": "cyberseeker_og_holder",
+      "name": "CyberSeeker OG Holder",
+      "enabled": false,
+      "collectionAddress": "CONFIGURE_VERIFIED_SOLANA_COLLECTION_BEFORE_ENABLING",
+      "verificationTtlMs": 86400000,
+      "perks": {
+        "dailySpinBonus": 50,
+        "badgeId": "OG_HOLDER"
+      }
+    }
+  ]
+}

@@ -3,6 +3,7 @@
 use crate::auth::Addr;
 use crate::config::{DailyBonusOutcome, Reward};
 use crate::db::Db;
+use crate::entitlements;
 use crate::error::ApiError;
 use crate::game;
 use crate::progression;
@@ -302,8 +303,13 @@ pub async fn claim_daily(
     };
     let index = ((streak - 1) as usize) % state.config.daily.cycle.len();
     let entry = &state.config.daily.cycle[index];
+    let entitlement_perks =
+        entitlements::effective_perks_tx(&mut tx, &addr.0, &state.config).await?;
     let reward = Reward {
-        spins: entry.spins,
+        spins: entry
+            .spins
+            .checked_add(entitlement_perks.daily_spin_bonus)
+            .ok_or_else(|| ApiError::Internal(anyhow!("daily entitlement bonus overflow")))?,
         credits: entry.credits,
         chest: entry.chest.clone(),
     };
@@ -319,7 +325,9 @@ pub async fn claim_daily(
             .bind(&addr.0)
             .fetch_one(&mut *tx)
             .await?;
-    let response = json!({"day": entry.day, "streak": streak, "reward": reward, "spins": balances.0, "credits": balances.1, "serverTimeMs": Utc::now().timestamp_millis()});
+    let response = json!({"day": entry.day, "streak": streak, "reward": reward,
+        "entitlementBonusSpins":entitlement_perks.daily_spin_bonus,
+        "spins": balances.0, "credits": balances.1, "serverTimeMs": Utc::now().timestamp_millis()});
     Db::audit_tx(
         &mut tx,
         &addr.0,

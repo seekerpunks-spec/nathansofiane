@@ -94,5 +94,7 @@
       protégés contre les changements d'équipe.
 - [x] Achievements permanents data-driven, progression cumulative, rewards
       idempotentes et contribution configurable à Network Power.
+- [x] Entitlements NFT fail-closed, TTL serveur et bonus daily centralisé ;
+      collection et provider restent désactivés jusqu'à configuration externe.
 - [ ] Autres systèmes restants du MASTER TODO.
 - [ ] Design et Wallet Adapter différés explicitement pour ce lot.
