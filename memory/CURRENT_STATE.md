@@ -23,10 +23,16 @@
   484,5 spins), 6 scènes Godot et intégration PostgreSQL auto-claim/claim manuel/
   replay/cohorte/verrouillage District 2, complétion unique de Neon Slums puis
   premier upgrade autorisé dans Chrome Heights.
-- Funnel analytics complet : 25 événements cœur + 13 sociaux, batches idempotents,
+- Funnel analytics complet : 25 événements cœur + 22 sociaux, batches idempotents,
   props bornées/validées et progression événementielle incluse dans `/spin`.
 - Tous les rangs 1–50 d'une cohorte reçoivent un palier ; le claim final est
   exposé dans l'écran Missions après expiration.
+- Crews légers : création payée, recherche, join/leave, owner/transfert/kick,
+  capacité et classement de Network Power data-driven.
+- Échanges directs 1-pour-1 entre amis : doublons uniquement, conservation d'un
+  exemplaire, raretés configurables, expiration, historique et résolution atomique.
+- Les outcomes Carte/Coffre donnent désormais N exemplaires à ×N ; les quantités
+  d'inventaire sont en `BIGINT` et les additions commerce sont vérifiées.
 
 ## Produit livré
 
@@ -58,7 +64,7 @@
 
 - Modules R17 : `game`, `district`, `collection`, `engagement`, `commerce`.
 - Migrations additives `0002_progression_liveops.sql` à
-  `0006_social_encounters.sql`.
+  `0009_inventory_bigint.sql`.
 - Idempotence par action, transactions, audit économique, horloge serveur,
   rate-limit et nettoyage périodique.
 - Mode release protégé : refus de `DEV_AUTH`, secret JWT fort, CORS allowlist,
@@ -68,8 +74,8 @@
 
 - `tools/economy_check.ps1` : OK, 277 605 CR équivalents/spin, 9,4 % vides,
   233,5 spins pour District 1 et 501,8 pour District 2.
-- `cargo test --locked` : 13/13 ; `cargo clippy --locked -- -D warnings` : OK.
-- `tools/analytics_check.ps1` : 38/38 événements présents.
+- `cargo test --locked` : 15/15 ; `cargo clippy --locked -- -D warnings` : OK.
+- `tools/analytics_check.ps1` : 47/47 événements présents.
 - Intégration analytics PostgreSQL : batch 25 accepté, replay dédupliqué, props
   invalides refusées et progression de spin renvoyée avec cohorte.
 - Slot social complet : outcomes Attack/Raid/Shield/Chest/Card, Signal Jam,
@@ -86,6 +92,9 @@
 - Intégration PostgreSQL à deux joueurs : invitation simultanée rejouée à
   l'identique, acceptation symétrique, score/rang exacts, cible amie consommée
   par Signal Jam et droit de revanche validé depuis le journal reçu.
+- Intégration crews/trading à deux joueurs : join concurrent rejoué à l'identique,
+  transfert d'owner aller-retour, leaderboard exact, Carte ×4 = quatre copies et
+  acceptation concurrente d'un swap avec deltas stricts `-1/+1` des deux côtés.
 - Économie réauditée : 277 605 CR équivalents/spin, 9,4 % de spins vides,
   districts estimés à 233,5 puis 501,8 spins. `cargo clippy -D warnings` vert.
 - `cargo build --release` : OK.

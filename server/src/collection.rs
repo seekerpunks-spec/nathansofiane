@@ -70,35 +70,47 @@ pub async fn grant_spin_chest_tx(
     tx: &mut Transaction<'_, Postgres>,
     address: &str,
     chest_id: &str,
+    amount: u32,
 ) -> Result<Value, ApiError> {
-    let qty: i32 = sqlx::query_scalar(
-        "INSERT INTO player_chests(address,chest_id,qty) VALUES($1,$2,1) \
-         ON CONFLICT(address,chest_id) DO UPDATE SET qty=player_chests.qty+1 RETURNING qty",
+    let amount = i64::from(amount);
+    let qty: Option<i64> = sqlx::query_scalar(
+        "INSERT INTO player_chests(address,chest_id,qty) VALUES($1,$2,$3) \
+         ON CONFLICT(address,chest_id) DO UPDATE SET qty=player_chests.qty+EXCLUDED.qty \
+         WHERE player_chests.qty <= 9223372036854775807-EXCLUDED.qty RETURNING qty",
     )
     .bind(address)
     .bind(chest_id)
-    .fetch_one(&mut **tx)
+    .bind(amount)
+    .fetch_optional(&mut **tx)
     .await?;
-    Ok(json!({"chestId":chest_id,"quantity":qty}))
+    let qty =
+        qty.ok_or_else(|| ApiError::Internal(anyhow!("overflow économique: spin.chestInventory")))?;
+    Ok(json!({"chestId":chest_id,"quantity":qty,"quantityAdded":amount}))
 }
 
 pub async fn grant_spin_card_tx(
     tx: &mut Transaction<'_, Postgres>,
     address: &str,
     cards: &[CardConfig],
+    amount: u32,
 ) -> Result<Value, ApiError> {
     let card = pick_weighted(cards, |candidate| candidate.drop_weight)
         .ok_or_else(|| ApiError::Internal(anyhow!("aucune carte tirable")))?;
-    let qty: i32 = sqlx::query_scalar(
-        "INSERT INTO player_cards(address,card_id,qty) VALUES($1,$2,1) \
-         ON CONFLICT(address,card_id) DO UPDATE SET qty=player_cards.qty+1 RETURNING qty",
+    let amount = i64::from(amount);
+    let qty: Option<i64> = sqlx::query_scalar(
+        "INSERT INTO player_cards(address,card_id,qty) VALUES($1,$2,$3) \
+         ON CONFLICT(address,card_id) DO UPDATE SET qty=player_cards.qty+EXCLUDED.qty \
+         WHERE player_cards.qty <= 9223372036854775807-EXCLUDED.qty RETURNING qty",
     )
     .bind(address)
     .bind(&card.card_id)
-    .fetch_one(&mut **tx)
+    .bind(amount)
+    .fetch_optional(&mut **tx)
     .await?;
+    let qty =
+        qty.ok_or_else(|| ApiError::Internal(anyhow!("overflow économique: spin.cardInventory")))?;
     Ok(
-        json!({"cardId":card.card_id,"setId":card.set_id,"name":card.name,"rarity":card.rarity,"quantity":qty,"duplicate":qty>1}),
+        json!({"cardId":card.card_id,"setId":card.set_id,"name":card.name,"rarity":card.rarity,"quantity":qty,"quantityAdded":amount,"duplicate":qty>amount}),
     )
 }
 
@@ -139,8 +151,20 @@ pub async fn buy_chest(
         .bind(&addr.0)
         .execute(&mut *tx)
         .await?;
-    sqlx::query("INSERT INTO player_chests(address,chest_id,qty) VALUES($1,$2,1) ON CONFLICT(address,chest_id) DO UPDATE SET qty=player_chests.qty+1")
-        .bind(&addr.0).bind(&chest.chest_id).execute(&mut *tx).await?;
+    let quantity: Option<i64> = sqlx::query_scalar(
+        "INSERT INTO player_chests(address,chest_id,qty) VALUES($1,$2,1) \
+         ON CONFLICT(address,chest_id) DO UPDATE SET qty=player_chests.qty+1 \
+         WHERE player_chests.qty < 9223372036854775807 RETURNING qty",
+    )
+    .bind(&addr.0)
+    .bind(&chest.chest_id)
+    .fetch_optional(&mut *tx)
+    .await?;
+    if quantity.is_none() {
+        return Err(ApiError::Internal(anyhow!(
+            "overflow économique: chest.inventory"
+        )));
+    }
     let before = json!({"credits": player.credits});
     let after = json!({"credits": credits, "chestId": chest.chest_id, "qtyDelta": 1});
     Db::audit_tx(&mut tx, &addr.0, "chest_buy", &before, &after, Some(&rid)).await?;
@@ -177,7 +201,7 @@ pub async fn open_chest(
         tx.rollback().await?;
         return Ok(Json(v));
     }
-    let qty: i32 = sqlx::query_scalar(
+    let qty: i64 = sqlx::query_scalar(
         "SELECT qty FROM player_chests WHERE address=$1 AND chest_id=$2 FOR UPDATE",
     )
     .bind(&addr.0)
@@ -198,9 +222,18 @@ pub async fn open_chest(
     for _ in 0..chest.cards_per_open {
         let card = draw_card(chest, &state.config.cards)
             .ok_or_else(|| ApiError::Internal(anyhow!("loot table sans carte compatible")))?;
-        let new_qty: i32 = sqlx::query_scalar(
-            "INSERT INTO player_cards(address,card_id,qty) VALUES($1,$2,1) ON CONFLICT(address,card_id) DO UPDATE SET qty=player_cards.qty+1 RETURNING qty",
-        ).bind(&addr.0).bind(&card.card_id).fetch_one(&mut *tx).await?;
+        let new_qty: Option<i64> = sqlx::query_scalar(
+            "INSERT INTO player_cards(address,card_id,qty) VALUES($1,$2,1) \
+             ON CONFLICT(address,card_id) DO UPDATE SET qty=player_cards.qty+1 \
+             WHERE player_cards.qty < 9223372036854775807 RETURNING qty",
+        )
+        .bind(&addr.0)
+        .bind(&card.card_id)
+        .fetch_optional(&mut *tx)
+        .await?;
+        let new_qty = new_qty.ok_or_else(|| {
+            ApiError::Internal(anyhow!("overflow économique: chest.cardInventory"))
+        })?;
         drops.push(json!({"cardId": card.card_id, "setId": card.set_id, "name": card.name, "rarity": card.rarity, "qty": new_qty, "duplicate": new_qty > 1}));
     }
     let _progress =

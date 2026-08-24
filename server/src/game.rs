@@ -87,14 +87,20 @@ pub async fn grant_reward_tx(
         .execute(&mut **tx)
         .await?;
     if let Some(chest) = &reward.chest {
-        sqlx::query(
+        let quantity: Option<i64> = sqlx::query_scalar(
             "INSERT INTO player_chests(address, chest_id, qty) VALUES ($1,$2,1) \
-             ON CONFLICT(address,chest_id) DO UPDATE SET qty = player_chests.qty + 1",
+             ON CONFLICT(address,chest_id) DO UPDATE SET qty = player_chests.qty + 1 \
+             WHERE player_chests.qty < 9223372036854775807 RETURNING qty",
         )
         .bind(address)
         .bind(chest)
-        .execute(&mut **tx)
+        .fetch_optional(&mut **tx)
         .await?;
+        if quantity.is_none() {
+            return Err(ApiError::Internal(anyhow!(
+                "overflow économique: reward.chestInventory"
+            )));
+        }
     }
     Ok(())
 }

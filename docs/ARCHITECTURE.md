@@ -78,6 +78,10 @@ serveur.
 - `collection.rs` : achat/ouverture de coffres, loot pondéré, cartes et sets.
 - `engagement.rs` : daily, missions, événements, leaderboard PostgreSQL et saison.
 - `commerce.rs` : reçus de pub, limites, offres et preuve d'achat par provider.
+- `social.rs` : Signal Jam, Ghost Vault, Firewalls, dégâts et réparations.
+- `progression.rs`, `friends.rs` : Network Power, profils, amis, ciblage et revanche.
+- `teams.rs` : roster, propriété, capacité et classement des crews.
+- `trading.rs` : offres carte-contre-carte, réservations de doublons et transfert atomique.
 - `game.rs` : helpers communs d'idempotence, récompense et tirage.
 - `config.rs` : désérialisation typée, validation et distribution hashée.
 - `state.rs` : agrégation de l'état complet du joueur.
@@ -113,6 +117,12 @@ un cache de classement distribué.
 - `POST /ad/reward`
 - `POST /purchase/verify`
 - `POST /analytics`
+- `GET|POST /profile`, `GET /players/search`, `GET /friends`
+- `POST /friends/request|accept|decline|remove`, `POST /social/target`
+- `GET /progression/leaderboard`
+- `GET /teams`, `POST /teams/create|join|leave|kick|transfer`,
+  `GET /teams/leaderboard`
+- `GET /trades`, `POST /trades/create|accept|decline|cancel`
 
 Chaque mutation économique porte un `requestId`. La clé d'idempotence est aussi
 scopée par action afin qu'un même identifiant ne puisse pas rejouer une réponse
@@ -124,6 +134,9 @@ d'un autre endpoint.
 achats, idempotence, audit et analytics. `0002_progression_liveops.sql` ajoute les
 tables de rétention. `0003_core_integrity.sql` impose les soldes/quantités
 positifs et les références joueur sur les tables économiques historiques.
+Les migrations `0006` à `0009` ajoutent les rencontres sociales, profils,
+Network Power, amis, équipes, échanges de cartes et inventaires `BIGINT` adaptés
+au multiplicateur maximal ×100K.
 
 Toutes les mutations d'économie sont atomiques : verrou joueur, validation,
 écriture d'état, audit et mémorisation de la réponse idempotente partagent la
@@ -138,6 +151,8 @@ même transaction.
 - `cards.json`, `sets.json`, `chests.json` : collection et loot.
 - `daily.json` : cycle et missions quotidiennes.
 - `events.json`, `seasons.json`, `offers.json` : live-ops et commerce.
+- `progression.json`, `social.json` : score global, Attack/Raid/Firewalls,
+  équipes et règles d'échange.
 
 Le serveur refuse le démarrage si les identifiants, poids, références, dates,
 coûts, récompenses ou fenêtres de contenu sont incohérents.

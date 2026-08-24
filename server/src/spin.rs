@@ -220,12 +220,14 @@ async fn perform_spin(
                 .reward_id
                 .as_deref()
                 .ok_or_else(|| ApiError::Internal(anyhow!("spin chest sans rewardId")))?;
-            feature_reward =
-                Some(collection::grant_spin_chest_tx(&mut tx, address, chest_id).await?);
+            feature_reward = Some(
+                collection::grant_spin_chest_tx(&mut tx, address, chest_id, multiplier).await?,
+            );
         }
         OutcomeType::Card => {
-            feature_reward =
-                Some(collection::grant_spin_card_tx(&mut tx, address, &config.cards).await?);
+            feature_reward = Some(
+                collection::grant_spin_card_tx(&mut tx, address, &config.cards, multiplier).await?,
+            );
         }
         OutcomeType::Credits | OutcomeType::None => {}
     }

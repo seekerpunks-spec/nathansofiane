@@ -90,9 +90,16 @@ pub async fn reward_ad(
         tx.rollback().await?;
         return Err(ApiError::AlreadyClaimed);
     }
-    let spins = player.spins + cfg.reward_per_ad as i32;
+    let reward_spins = i32::try_from(cfg.reward_per_ad)
+        .map_err(|_| ApiError::Internal(anyhow!("overflow économique: ad.rewardSpins")))?;
+    let spins = player
+        .spins
+        .checked_add(reward_spins)
+        .ok_or_else(|| ApiError::Internal(anyhow!("overflow économique: ad.playerSpins")))?;
+    let ads_watched_today = i32::try_from(count + 1)
+        .map_err(|_| ApiError::Internal(anyhow!("overflow économique: ad.dailyCount")))?;
     sqlx::query("UPDATE player_state SET spins=$1,ads_watched_today=$2,ads_claimed_date=$3 WHERE address=$4")
-        .bind(spins).bind((count + 1) as i32).bind(today).bind(&addr.0).execute(&mut *tx).await?;
+        .bind(spins).bind(ads_watched_today).bind(today).bind(&addr.0).execute(&mut *tx).await?;
     let response = json!({"rewardSpins": cfg.reward_per_ad, "spins": spins, "adsWatchedToday": count+1, "adsRemaining": cfg.max_rewarded_ads_per_day as i64-count-1, "serverTimeMs": Utc::now().timestamp_millis()});
     Db::audit_tx(
         &mut tx,
@@ -158,23 +165,49 @@ pub async fn verify_purchase(
             "limite de l'offre atteinte".to_string(),
         ));
     }
+    let paid_amount = game::checked_u64_to_i64(body.amount_u64, "purchase.amount")?;
     let purchase_id: i64 = sqlx::query_scalar(
         "INSERT INTO purchases(address,offer_id,tx_signature,token_mint,amount_u64,status) VALUES($1,$2,$3,$4,$5,'credited') RETURNING id",
-    ).bind(&addr.0).bind(&offer.offer_id).bind(&body.tx_signature).bind(&body.token_mint).bind(body.amount_u64 as i64)
+    ).bind(&addr.0).bind(&offer.offer_id).bind(&body.tx_signature).bind(&body.token_mint).bind(paid_amount)
      .fetch_one(&mut *tx).await.map_err(|e| if matches!(&e, sqlx::Error::Database(db) if db.is_unique_violation()) { ApiError::AlreadyClaimed } else { ApiError::Db(e) })?;
     let mut spins_add = 0i32;
     let mut credits_add = 0i64;
     for content in &offer.contents {
         match content.content_type.as_str() {
-            "spins" => spins_add += content.amount as i32,
-            "credits" => credits_add += content.amount as i64,
+            "spins" => {
+                let amount = i32::try_from(content.amount)
+                    .map_err(|_| ApiError::Internal(anyhow!("overflow économique: offer.spins")))?;
+                spins_add = spins_add.checked_add(amount).ok_or_else(|| {
+                    ApiError::Internal(anyhow!("overflow économique: offer.totalSpins"))
+                })?;
+            }
+            "credits" => {
+                let amount = game::checked_u64_to_i64(content.amount, "offer.credits")?;
+                credits_add = credits_add.checked_add(amount).ok_or_else(|| {
+                    ApiError::Internal(anyhow!("overflow économique: offer.totalCredits"))
+                })?;
+            }
             "chest" => {
                 let chest = content
                     .id
                     .as_deref()
                     .ok_or_else(|| ApiError::Internal(anyhow!("offre chest sans id")))?;
-                sqlx::query("INSERT INTO player_chests(address,chest_id,qty) VALUES($1,$2,$3) ON CONFLICT(address,chest_id) DO UPDATE SET qty=player_chests.qty+EXCLUDED.qty")
-                    .bind(&addr.0).bind(chest).bind(content.amount as i32).execute(&mut *tx).await?;
+                let amount = game::checked_u64_to_i64(content.amount, "offer.chestQuantity")?;
+                let quantity: Option<i64> = sqlx::query_scalar(
+                    "INSERT INTO player_chests(address,chest_id,qty) VALUES($1,$2,$3) \
+                     ON CONFLICT(address,chest_id) DO UPDATE SET qty=player_chests.qty+EXCLUDED.qty \
+                     WHERE player_chests.qty <= 9223372036854775807-EXCLUDED.qty RETURNING qty",
+                )
+                .bind(&addr.0)
+                .bind(chest)
+                .bind(amount)
+                .fetch_optional(&mut *tx)
+                .await?;
+                if quantity.is_none() {
+                    return Err(ApiError::Internal(anyhow!(
+                        "overflow économique: offer.chestInventory"
+                    )));
+                }
             }
             "season_premium" => {
                 let season = content
@@ -187,9 +220,17 @@ pub async fn verify_purchase(
             _ => return Err(ApiError::Internal(anyhow!("contenu d'offre inconnu"))),
         }
     }
-    sqlx::query("UPDATE player_state SET spins=spins+$1,credits=credits+$2 WHERE address=$3")
-        .bind(spins_add)
-        .bind(credits_add)
+    let final_spins = player
+        .spins
+        .checked_add(spins_add)
+        .ok_or_else(|| ApiError::Internal(anyhow!("overflow économique: offer.playerSpins")))?;
+    let final_credits = player
+        .credits
+        .checked_add(credits_add)
+        .ok_or_else(|| ApiError::Internal(anyhow!("overflow économique: offer.playerCredits")))?;
+    sqlx::query("UPDATE player_state SET spins=$1,credits=$2 WHERE address=$3")
+        .bind(final_spins)
+        .bind(final_credits)
         .bind(&addr.0)
         .execute(&mut *tx)
         .await?;
@@ -199,7 +240,7 @@ pub async fn verify_purchase(
         .bind(purchase_id)
         .execute(&mut *tx)
         .await?;
-    let response = json!({"offerId":offer.offer_id,"purchaseId":purchase_id,"contents":offer.contents,"spins":player.spins+spins_add,"credits":player.credits+credits_add,"serverTimeMs":now_ms});
+    let response = json!({"offerId":offer.offer_id,"purchaseId":purchase_id,"contents":offer.contents,"spins":final_spins,"credits":final_credits,"serverTimeMs":now_ms});
     Db::audit_tx(
         &mut tx,
         &addr.0,

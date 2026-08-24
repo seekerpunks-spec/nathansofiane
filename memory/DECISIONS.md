@@ -13,7 +13,7 @@
 | D6 | **0 budget** — outils gratuits, free-tier cloud, art original via imagegen intégré et SVG/code natif |
 | D7 | **Qualité exigée haute** : bon jeu, juice/art/équilibrage soignés — pas un prototype moche |
 | D8 | **Pas une copie de Coin Master** : noms, personnages, écrans, collections, brandings originaux |
-| D9 | Pas de marketplace / cash-out / trading / NFT par carte en MVP (GDD §24, confirmé) |
+| D9 | Pas de marketplace, cash-out ou NFT par carte. Le refus historique de tout trading est remplacé par D11/T29 pour autoriser uniquement le swap social non financier de doublons. |
 | D10 | Carte blanche donnée aux agents IA pour builder ("carte blanche", "GO") |
 | D11 | Exécuter tout le MASTER TODO avec une boucle fidèle aux sensations Coin Master mais contenu original ; design et wallet natif différés temporairement |
 
@@ -48,6 +48,7 @@
 | T26 | Les 25 événements funnel sont vérifiés statiquement ; les batches analytics ont un `batchId` stable et sont dédupliqués en PostgreSQL | Les retries réseau ne gonflent pas les métriques et les données sont bornées avant insertion |
 | T27 | Paire sociale = Signal Jam (dégât réparable, Firewall auto) + Ghost Vault (six nœuds, trace, cash-out), cible rival ou NEON CORP fallback | Deux sensations distinctes, quelques secondes, scaling multiplicateur, interaction sociale et économie contrôlée sans copier les mini-jeux de Coin Master |
 | T28 | Score global `Network Power` dérivé de quatre composantes configurables ; identité sociale par code ami, sans exposer l'adresse complète ; ciblage ami/revanche consommé au prochain Signal Jam | Évite la dérive d'un compteur client, fournit prestige/matchmaking, garde le social léger et empêche le ciblage arbitraire de joueurs |
+| T29 | Crews limités à 50, sans chat/donation au premier lot ; échange direct 1-pour-1 réservé aux amis et aux doublons, un exemplaire toujours conservé, raretés data-driven avec légendaires verrouillées | Reproduit les leviers de coopération/collection attendus sans créer marketplace, transfert libre de richesse, modération lourde ou exposition SKR |
 
 ## Noms / brandings (à verrouiller — O1 GDD)
 - Jeu : **CyberSeeker** (provisoire, utilisé partout pour l'instant).

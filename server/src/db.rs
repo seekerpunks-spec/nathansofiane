@@ -188,7 +188,7 @@ impl Db {
 
     /// Cartes possédées (vide en M1, rempli en M3).
     pub async fn fetch_cards(&self, address: &str) -> Result<Vec<Value>> {
-        let rows: Vec<(String, i32)> = sqlx::query_as(
+        let rows: Vec<(String, i64)> = sqlx::query_as(
             "SELECT card_id, qty FROM player_cards WHERE address = $1 ORDER BY card_id",
         )
         .bind(address)
@@ -202,7 +202,7 @@ impl Db {
 
     /// Coffres possédés non ouverts (vide en M1, rempli en M3).
     pub async fn fetch_chests(&self, address: &str) -> Result<Vec<Value>> {
-        let rows: Vec<(String, i32)> = sqlx::query_as(
+        let rows: Vec<(String, i64)> = sqlx::query_as(
             "SELECT chest_id, qty FROM player_chests WHERE address = $1 AND qty > 0 \
              ORDER BY chest_id",
         )

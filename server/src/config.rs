@@ -117,8 +117,29 @@ pub struct SocialConfig {
     pub encounter_ttl_ms: u64,
     pub target_preference_ttl_ms: u64,
     pub revenge_window_ms: u64,
+    pub teams: TeamConfig,
+    pub trading: TradingConfig,
     pub attack: AttackConfig,
     pub raid: RaidConfig,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TeamConfig {
+    pub max_members: u32,
+    pub create_cost_credits: u64,
+    pub search_limit: u32,
+    pub leaderboard_limit: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TradingConfig {
+    pub offer_ttl_ms: u64,
+    pub max_pending_per_player: u32,
+    pub min_quantity_to_trade: u32,
+    pub history_limit: u32,
+    pub tradeable_rarities: Vec<Tier>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -600,6 +621,32 @@ impl RemoteConfig {
             || self.social.target_preference_ttl_ms > 604_800_000
             || self.social.revenge_window_ms < 3_600_000
             || self.social.revenge_window_ms > 2_592_000_000
+            || self.social.teams.max_members < 2
+            || self.social.teams.max_members > 100
+            || self.social.teams.create_cost_credits > i64::MAX as u64
+            || self.social.teams.search_limit == 0
+            || self.social.teams.search_limit > 50
+            || self.social.teams.leaderboard_limit == 0
+            || self.social.teams.leaderboard_limit > 100
+            || self.social.trading.offer_ttl_ms < 60_000
+            || self.social.trading.offer_ttl_ms > 604_800_000
+            || self.social.trading.max_pending_per_player == 0
+            || self.social.trading.max_pending_per_player > 20
+            || self.social.trading.min_quantity_to_trade < 2
+            || self.social.trading.min_quantity_to_trade > 100
+            || self.social.trading.history_limit == 0
+            || self.social.trading.history_limit > 100
+            || self.social.trading.tradeable_rarities.is_empty()
+            || self.social.trading.tradeable_rarities.len() > 5
+            || self
+                .social
+                .trading
+                .tradeable_rarities
+                .iter()
+                .enumerate()
+                .any(|(index, rarity)| {
+                    self.social.trading.tradeable_rarities[index + 1..].contains(rarity)
+                })
             || self.social.attack.repair_cost_bps == 0
             || self.social.attack.repair_cost_bps > 10_000
             || self.social.raid.node_count < 4

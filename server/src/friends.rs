@@ -57,7 +57,7 @@ fn valid_display_name(raw: &str) -> Option<String> {
     Some(name.to_string())
 }
 
-async fn address_from_code_tx(
+pub(crate) async fn address_from_code_tx(
     tx: &mut Transaction<'_, Postgres>,
     friend_code: &str,
 ) -> Result<String, ApiError> {
@@ -68,7 +68,7 @@ async fn address_from_code_tx(
         .ok_or(ApiError::NotFound)
 }
 
-async fn lock_profiles_tx(
+pub(crate) async fn lock_profiles_tx(
     tx: &mut Transaction<'_, Postgres>,
     first: &str,
     second: &str,
@@ -86,7 +86,7 @@ async fn lock_profiles_tx(
     Ok(())
 }
 
-async fn are_friends_tx(
+pub(crate) async fn are_friends_tx(
     tx: &mut Transaction<'_, Postgres>,
     first: &str,
     second: &str,

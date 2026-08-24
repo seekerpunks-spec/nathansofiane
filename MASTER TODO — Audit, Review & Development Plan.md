@@ -652,7 +652,8 @@ Ne pas transformer le jeu en réseau social.
 
 # 20. CARD TRADING — FUTURE READY
 
-Architecture uniquement pour l'instant.
+Statut R24 : **implémenté en version sociale non financière** après la directive
+utilisateur d'exécuter le MASTER TODO.
 
 Possibilité future :
 
@@ -668,27 +669,32 @@ PAS de cash-out.
 
 PAS de marketplace.
 
-Ne pas implémenter avant validation produit.
+- [x] échange direct 1 carte contre 1 carte entre amis ;
+- [x] uniquement des doublons, avec conservation obligatoire d'un exemplaire ;
+- [x] raretés échangeables data-driven, légendaires verrouillées actuellement ;
+- [x] offres expirables, réservations implicites et plafond de pending ;
+- [x] acceptation/refus/annulation idempotents et transfert atomique ;
+- [x] historique et UI fonctionnelle dans Seeker Network ;
+- [x] tests PostgreSQL de concurrence et quantités exactes.
+
+Toujours aucun SKR, cash-out, NFT par carte ou marketplace.
 
 ---
 
 # PHASE 9 — TEAMS / CLANS
 
-PAS priorité MVP.
+Statut R24 : **socle léger implémenté** pour compléter la boucle sociale, sans
+ajouter la complexité d'un réseau social complet :
 
-Mais prévoir architecture compatible plus tard avec :
-
-- teams ;
-- team leaderboard ;
-- cooperative events ;
-- chat limité ;
-- donations.
-
-Ne pas construire maintenant sauf si déjà largement avancé.
-
-Si déjà implémenté :
-
-faire review.
+- [x] création payée côté serveur, code et nom uniques ;
+- [x] recherche, join/leave, capacité data-driven ;
+- [x] owner, transfert et exclusion ;
+- [x] score d'équipe dérivé de Network Power et leaderboard `DENSE_RANK` ;
+- [x] UI mobile fonctionnelle et analytics ;
+- [x] revue concurrence : join simultané rejoué sans membre dupliqué.
+- [ ] cooperative events — lot ultérieur ;
+- [ ] chat limité — différé, modération requise ;
+- [ ] donations — non retenues à ce stade, l'échange 1-pour-1 évite les abus.
 
 ---
 
@@ -700,13 +706,13 @@ TRÈS IMPORTANT.
 
 # 21. DAILY LOGIN
 
-- [ ] Daily reward.
-- [ ] Streak.
-- [ ] Server timestamps.
-- [ ] No device-time exploit.
-- [ ] Reward config.
-- [ ] UI claim.
-- [ ] Duplicate protection.
+- [x] Daily reward.
+- [x] Streak.
+- [x] Server timestamps.
+- [x] No device-time exploit.
+- [x] Reward config.
+- [x] UI claim.
+- [x] Duplicate protection.
 
 ---
 

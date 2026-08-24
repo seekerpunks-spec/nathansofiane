@@ -27,6 +27,8 @@ mod rate_limit;
 mod social;
 mod spin;
 mod state;
+mod teams;
+mod trading;
 
 use crate::error::ApiError;
 use crate::state::AppState;
@@ -176,6 +178,18 @@ async fn main() -> anyhow::Result<()> {
         .route("/friends/remove", post(friends::remove_friend))
         .route("/social/target", post(friends::select_target))
         .route("/progression/leaderboard", get(progression::leaderboard))
+        .route("/teams", get(teams::list))
+        .route("/teams/create", post(teams::create))
+        .route("/teams/join", post(teams::join))
+        .route("/teams/leave", post(teams::leave))
+        .route("/teams/kick", post(teams::kick))
+        .route("/teams/transfer", post(teams::transfer))
+        .route("/teams/leaderboard", get(teams::leaderboard))
+        .route("/trades", get(trading::list))
+        .route("/trades/create", post(trading::create))
+        .route("/trades/accept", post(trading::accept))
+        .route("/trades/decline", post(trading::decline))
+        .route("/trades/cancel", post(trading::cancel))
         .route("/spin", post(spin::spin))
         .route("/district/upgrade", post(district::upgrade))
         .route("/district/repair", post(social::repair))

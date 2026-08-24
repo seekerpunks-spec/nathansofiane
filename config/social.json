@@ -4,6 +4,19 @@
   "encounterTtlMs": 600000,
   "targetPreferenceTtlMs": 86400000,
   "revengeWindowMs": 604800000,
+  "teams": {
+    "maxMembers": 50,
+    "createCostCredits": 500000,
+    "searchLimit": 20,
+    "leaderboardLimit": 50
+  },
+  "trading": {
+    "offerTtlMs": 86400000,
+    "maxPendingPerPlayer": 5,
+    "minQuantityToTrade": 2,
+    "historyLimit": 30,
+    "tradeableRarities": ["common", "uncommon", "rare", "epic"]
+  },
   "attack": {
     "baseRewardCredits": 250000,
     "blockedRewardCredits": 50000,

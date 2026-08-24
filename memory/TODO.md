@@ -53,5 +53,7 @@ itérations intermédiaires utilisent uniquement Godot desktop, captures et test
 - [x] Funnel analytics complet et vérifié de bout en bout.
 - [x] Attack, Raid et défense originaux dans une boucle sociale type Coin Master.
 - [x] Network Power, profils, amis, classement, ciblage ami et revanche.
-- [ ] Équipes, trading et systèmes restants du MASTER TODO.
+- [x] Crews, leaderboard d'équipe et échanges directs de doublons entre amis.
+- [ ] Achievements, daily bonus distinct, événements coopératifs et systèmes
+      restants du MASTER TODO.
 - [ ] Design et Wallet Adapter explicitement différés par l'utilisateur.

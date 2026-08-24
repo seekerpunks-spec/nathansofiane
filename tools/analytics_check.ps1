@@ -38,7 +38,16 @@ $expected = @(
     "friend_request_sent",
     "friend_request_accepted",
     "friend_request_declined",
-    "social_target_selected"
+    "social_target_selected",
+    "team_created",
+    "team_joined",
+    "team_left",
+    "team_owner_transferred",
+    "team_member_kicked",
+    "trade_created",
+    "trade_accepted",
+    "trade_declined",
+    "trade_cancelled"
 )
 
 $sources = Get-ChildItem -LiteralPath (Join-Path $workspace "client") -Filter "*.gd" -Recurse |

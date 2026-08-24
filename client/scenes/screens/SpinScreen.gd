@@ -53,6 +53,10 @@ var _tracked_social_starts: Dictionary = {}
 var _network_snapshot: Dictionary = {}
 var _network_leaderboard: Dictionary = {}
 var _network_results: Array = []
+var _team_snapshot: Dictionary = {}
+var _team_leaderboard: Dictionary = {}
+var _team_results: Array = []
+var _trades_snapshot: Dictionary = {}
 var _network_message := ""
 
 
@@ -860,8 +864,15 @@ func _show_network_loading() -> void:
 func _fetch_network_data() -> void:
 	var friends_response := await Net.protected_request("GET", "/friends")
 	var leaderboard_response := await Net.protected_request("GET", "/progression/leaderboard")
+	var teams_response := await Net.protected_request("GET", "/teams")
+	var team_leaderboard_response := await Net.protected_request("GET", "/teams/leaderboard")
+	var trades_response := await Net.protected_request("GET", "/trades")
 	_network_snapshot = friends_response.data if friends_response.ok and typeof(friends_response.data) == TYPE_DICTIONARY else {}
 	_network_leaderboard = leaderboard_response.data if leaderboard_response.ok and typeof(leaderboard_response.data) == TYPE_DICTIONARY else {}
+	_team_snapshot = teams_response.data if teams_response.ok and typeof(teams_response.data) == TYPE_DICTIONARY else {}
+	_team_results = _team_snapshot.get("results", [])
+	_team_leaderboard = team_leaderboard_response.data if team_leaderboard_response.ok and typeof(team_leaderboard_response.data) == TYPE_DICTIONARY else {}
+	_trades_snapshot = trades_response.data if trades_response.ok and typeof(trades_response.data) == TYPE_DICTIONARY else {}
 
 
 func _render_network() -> void:
@@ -895,6 +906,8 @@ func _render_network() -> void:
 	_build_network_requests(content)
 	_build_network_friends(content)
 	_build_network_revenge(content)
+	_build_network_team(content)
+	_build_network_trades(content)
 	_build_network_leaderboard(content)
 	scroll.add_child(content)
 	shell.add_child(scroll)
@@ -1022,6 +1035,146 @@ func _build_network_revenge(parent: VBoxContainer) -> void:
 		parent.add_child(row)
 
 
+func _build_network_team(parent: VBoxContainer) -> void:
+	_network_section(parent, "CREW")
+	var team_rules: Dictionary = Config.social().get("teams", {})
+	var max_members := int(team_rules.get("maxMembers", 50))
+	var create_cost := int(team_rules.get("createCostCredits", 0))
+	var own: Variant = _team_snapshot.get("ownTeam", null)
+	if typeof(own) == TYPE_DICTIONARY:
+		var team: Dictionary = own
+		parent.add_child(Ui.label("%s  •  %s" % [str(team.get("name", "Crew")), str(team.get("teamCode", ""))], 16, Ui.NEON_CYAN))
+		parent.add_child(Ui.label("%d MEMBERS  •  %s PWR" % [team.get("members", []).size(), Ui.compact(int(team.get("score", 0)))], 13, Ui.TEXT_DIM))
+		var is_owner := str(team.get("role", "member")) == "owner"
+		for member in team.get("members", []):
+			if typeof(member) != TYPE_DICTIONARY:
+				continue
+			var member_row := HBoxContainer.new()
+			var role_suffix := "  •  OWNER" if str(member.get("role", "member")) == "owner" else ""
+			var member_label := Ui.label("%s  •  %s PWR%s" % [str(member.get("displayName", "Runner")), Ui.compact(int(member.get("score", 0))), role_suffix], 12, Ui.TEXT)
+			member_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+			member_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			member_row.add_child(member_label)
+			if is_owner and str(member.get("role", "member")) != "owner":
+				var transfer := Ui.button("LEAD", Ui.NEON_CYAN, true)
+				transfer.pressed.connect(_network_team_member_action.bind("/teams/transfer", str(member.get("playerId", "")), "team_owner_transferred"))
+				member_row.add_child(transfer)
+				var kick := Ui.button("KICK", Ui.NEON_MAGENTA, true)
+				kick.pressed.connect(_network_team_member_action.bind("/teams/kick", str(member.get("playerId", "")), "team_member_kicked"))
+				member_row.add_child(kick)
+			parent.add_child(member_row)
+		var leave := Ui.button("DISBAND" if is_owner and team.get("members", []).size() == 1 else "LEAVE CREW", Ui.NEON_MAGENTA, true)
+		leave.disabled = is_owner and team.get("members", []).size() > 1
+		leave.pressed.connect(_network_team_leave)
+		parent.add_child(leave)
+	else:
+		var create_row := HBoxContainer.new()
+		var team_name := LineEdit.new()
+		team_name.placeholder_text = "Crew name (%s CR)" % Ui.compact(create_cost)
+		team_name.max_length = 24
+		team_name.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		create_row.add_child(team_name)
+		var create := Ui.button("CREATE", Ui.NEON_CYAN)
+		create.pressed.connect(_network_team_create.bind(team_name))
+		create_row.add_child(create)
+		parent.add_child(create_row)
+		var search_row := HBoxContainer.new()
+		var team_query := LineEdit.new()
+		team_query.placeholder_text = "Crew name or NET-code"
+		team_query.max_length = 24
+		team_query.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		search_row.add_child(team_query)
+		var search := Ui.button("FIND", Ui.NEON_CYAN)
+		search.pressed.connect(_network_team_search.bind(team_query))
+		search_row.add_child(search)
+		parent.add_child(search_row)
+		for result in _team_results.slice(0, mini(10, _team_results.size())):
+			if typeof(result) != TYPE_DICTIONARY:
+				continue
+			var result_row := HBoxContainer.new()
+			var result_label := Ui.label("%s  •  %d/%d  •  %s PWR" % [str(result.get("name", "Crew")), int(result.get("memberCount", 0)), max_members, Ui.compact(int(result.get("score", 0)))], 12, Ui.TEXT)
+			result_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+			result_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			result_row.add_child(result_label)
+			var join := Ui.button("JOIN", Ui.GREEN)
+			join.disabled = bool(result.get("full", false))
+			join.pressed.connect(_network_team_join.bind(str(result.get("teamCode", ""))))
+			result_row.add_child(join)
+			parent.add_child(result_row)
+	var team_entries: Array = _team_leaderboard.get("entries", [])
+	if not team_entries.is_empty():
+		parent.add_child(Ui.label("TOP CREWS", 13, Ui.GOLD))
+		for entry in team_entries.slice(0, mini(5, team_entries.size())):
+			if typeof(entry) == TYPE_DICTIONARY:
+				parent.add_child(Ui.label("#%d  %s  •  %s PWR" % [int(entry.get("rank", 0)), str(entry.get("name", "Crew")), Ui.compact(int(entry.get("score", 0)))], 12, Ui.TEXT_DIM))
+
+
+func _build_network_trades(parent: VBoxContainer) -> void:
+	_network_section(parent, "CARD SWAPS")
+	var incoming: Array = _trades_snapshot.get("incoming", [])
+	var outgoing: Array = _trades_snapshot.get("outgoing", [])
+	for trade in incoming:
+		if typeof(trade) != TYPE_DICTIONARY or str(trade.get("status", "")) != "pending":
+			continue
+		var row := VBoxContainer.new()
+		row.add_child(Ui.label("%s OFFERS %s  •  WANTS %s" % [str(trade.get("counterpartyDisplayName", "Runner")), str(trade.get("offeredCardName", "Card")), str(trade.get("requestedCardName", "Card"))], 12, Ui.TEXT))
+		var actions := HBoxContainer.new()
+		var accept := Ui.button("ACCEPT", Ui.GREEN)
+		accept.pressed.connect(_network_trade_action.bind("/trades/accept", str(trade.get("tradeId", "")), "trade_accepted", true))
+		actions.add_child(accept)
+		var decline := Ui.button("DECLINE", Ui.NEON_MAGENTA, true)
+		decline.pressed.connect(_network_trade_action.bind("/trades/decline", str(trade.get("tradeId", "")), "trade_declined", false))
+		actions.add_child(decline)
+		row.add_child(actions)
+		parent.add_child(row)
+	for trade in outgoing:
+		if typeof(trade) != TYPE_DICTIONARY or str(trade.get("status", "")) != "pending":
+			continue
+		var row := HBoxContainer.new()
+		var label := Ui.label("TO %s  •  %s → %s" % [str(trade.get("counterpartyDisplayName", "Runner")), str(trade.get("offeredCardName", "Card")), str(trade.get("requestedCardName", "Card"))], 12, Ui.TEXT)
+		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+		label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.add_child(label)
+		var cancel := Ui.button("CANCEL", Ui.NEON_MAGENTA, true)
+		cancel.pressed.connect(_network_trade_action.bind("/trades/cancel", str(trade.get("tradeId", "")), "trade_cancelled", false))
+		row.add_child(cancel)
+		parent.add_child(row)
+	var friends: Array = _network_snapshot.get("friends", [])
+	var rules: Dictionary = _trades_snapshot.get("rules", {})
+	var minimum := int(rules.get("minQuantity", 2))
+	var tradeable: Array = rules.get("tradeableRarities", [])
+	var duplicates: Array = []
+	for owned in Store.state.get("cards", []):
+		if typeof(owned) == TYPE_DICTIONARY and int(owned.get("qty", 0)) >= minimum:
+			for card in Config.cards():
+				if typeof(card) == TYPE_DICTIONARY and str(card.get("cardId", "")) == str(owned.get("cardId", "")) and tradeable.has(str(card.get("rarity", ""))):
+					duplicates.append(card)
+					break
+	if friends.is_empty() or duplicates.is_empty():
+		parent.add_child(Ui.label("Ajoute un ami et garde au moins un doublon échangeable.", 12, Ui.TEXT_DIM))
+		return
+	var friend_menu := OptionButton.new()
+	for friend in friends:
+		if typeof(friend) == TYPE_DICTIONARY:
+			friend_menu.add_item(str(friend.get("displayName", "Runner")))
+			friend_menu.set_item_metadata(friend_menu.item_count - 1, str(friend.get("playerId", "")))
+	parent.add_child(friend_menu)
+	var offered_menu := OptionButton.new()
+	for card in duplicates:
+		offered_menu.add_item("GIVE  •  " + str(card.get("name", "Card")))
+		offered_menu.set_item_metadata(offered_menu.item_count - 1, str(card.get("cardId", "")))
+	parent.add_child(offered_menu)
+	var requested_menu := OptionButton.new()
+	for card in Config.cards():
+		if typeof(card) == TYPE_DICTIONARY and tradeable.has(str(card.get("rarity", ""))):
+			requested_menu.add_item("GET  •  " + str(card.get("name", "Card")))
+			requested_menu.set_item_metadata(requested_menu.item_count - 1, str(card.get("cardId", "")))
+	parent.add_child(requested_menu)
+	var propose := Ui.button("PROPOSE 1-FOR-1 SWAP", Ui.NEON_CYAN)
+	propose.pressed.connect(_network_trade_create.bind(friend_menu, offered_menu, requested_menu))
+	parent.add_child(propose)
+
+
 func _build_network_leaderboard(parent: VBoxContainer) -> void:
 	_network_section(parent, "GLOBAL NETWORK")
 	parent.add_child(Ui.label("YOUR RANK  •  #%d" % int(_network_leaderboard.get("playerRank", 0)), 14, Ui.NEON_CYAN))
@@ -1031,6 +1184,120 @@ func _build_network_leaderboard(parent: VBoxContainer) -> void:
 			var line := Ui.label("#%d  %s  •  %s PWR" % [int(entry.get("rank", 0)), str(entry.get("displayName", "Runner")), Ui.compact(int(entry.get("score", 0)))], 13, Ui.TEXT_DIM)
 			line.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 			parent.add_child(line)
+
+
+func _network_team_create(input: LineEdit) -> void:
+	if _social_busy or input.text.strip_edges().length() < 3:
+		return
+	_social_busy = true
+	var rid := Net.request_id()
+	var response := await Net.protected_request("POST", "/teams/create", {"name": input.text, "requestId": rid}, rid)
+	if response.ok and typeof(response.data) == TYPE_DICTIONARY:
+		Events.track("team_created", {"teamCode": response.data.get("teamCode", "")})
+		Store.apply_mutation(response.data)
+	_network_message = "CREW CREATED" if response.ok else "CREW CREATION REFUSED"
+	await _fetch_network_data()
+	_social_busy = false
+	_render_network()
+
+
+func _network_team_search(input: LineEdit) -> void:
+	if _social_busy:
+		return
+	_social_busy = true
+	var response := await Net.protected_request("GET", "/teams?q=" + input.text.strip_edges().uri_encode())
+	if response.ok and typeof(response.data) == TYPE_DICTIONARY:
+		_team_snapshot = response.data
+		_team_results = response.data.get("results", [])
+		_network_message = ""
+	else:
+		_network_message = "CREW SEARCH FAILED"
+	_social_busy = false
+	_render_network()
+
+
+func _network_team_join(team_code: String) -> void:
+	if _social_busy:
+		return
+	_social_busy = true
+	var rid := Net.request_id()
+	var response := await Net.protected_request("POST", "/teams/join", {"teamCode": team_code, "requestId": rid}, rid)
+	if response.ok:
+		Events.track("team_joined", {"teamCode": team_code})
+	_network_message = "CREW JOINED" if response.ok else "JOIN REFUSED"
+	await _fetch_network_data()
+	_social_busy = false
+	_render_network()
+
+
+func _network_team_leave() -> void:
+	if _social_busy:
+		return
+	_social_busy = true
+	var rid := Net.request_id()
+	var response := await Net.protected_request("POST", "/teams/leave", {"requestId": rid}, rid)
+	if response.ok:
+		Events.track("team_left", {"teamDeleted": response.data.get("teamDeleted", false) if typeof(response.data) == TYPE_DICTIONARY else false})
+	_network_message = "CREW LEFT" if response.ok else "TRANSFER LEADERSHIP FIRST"
+	await _fetch_network_data()
+	_social_busy = false
+	_render_network()
+
+
+func _network_team_member_action(path: String, player_id: String, event_name: String) -> void:
+	if _social_busy:
+		return
+	_social_busy = true
+	var rid := Net.request_id()
+	var response := await Net.protected_request("POST", path, {"friendCode": player_id, "requestId": rid}, rid)
+	if response.ok:
+		Events.track(event_name, {"playerId": player_id})
+	_network_message = "CREW UPDATED" if response.ok else "CREW ACTION REFUSED"
+	await _fetch_network_data()
+	_social_busy = false
+	_render_network()
+
+
+func _network_trade_create(friend_menu: OptionButton, offered_menu: OptionButton, requested_menu: OptionButton) -> void:
+	if _social_busy or friend_menu.item_count == 0 or offered_menu.item_count == 0 or requested_menu.item_count == 0:
+		return
+	var recipient := str(friend_menu.get_item_metadata(friend_menu.selected))
+	var offered := str(offered_menu.get_item_metadata(offered_menu.selected))
+	var requested := str(requested_menu.get_item_metadata(requested_menu.selected))
+	if offered == requested:
+		_network_message = "CHOOSE TWO DIFFERENT CARDS"
+		_render_network()
+		return
+	_social_busy = true
+	var rid := Net.request_id()
+	var response := await Net.protected_request("POST", "/trades/create", {
+		"recipientFriendCode": recipient, "offeredCardId": offered,
+		"requestedCardId": requested, "requestId": rid
+	}, rid)
+	if response.ok:
+		Events.track("trade_created", {"recipientPlayerId": recipient, "offeredCardId": offered, "requestedCardId": requested})
+	_network_message = "SWAP PROPOSED" if response.ok else "DUPLICATE NOT AVAILABLE"
+	await _fetch_network_data()
+	_social_busy = false
+	_render_network()
+
+
+func _network_trade_action(path: String, trade_id: String, event_name: String, sync_state: bool) -> void:
+	if _social_busy:
+		return
+	_social_busy = true
+	var rid := Net.request_id()
+	var response := await Net.protected_request("POST", path, {"tradeId": trade_id, "requestId": rid}, rid)
+	if response.ok:
+		Events.track(event_name, {"tradeId": trade_id})
+		if sync_state:
+			var state_response := await Net.protected_request("GET", "/state")
+			if state_response.ok and typeof(state_response.data) == TYPE_DICTIONARY:
+				Store.apply_state(state_response.data)
+	_network_message = "SWAP UPDATED" if response.ok else "SWAP NO LONGER AVAILABLE"
+	await _fetch_network_data()
+	_social_busy = false
+	_render_network()
 
 
 func _network_search(query: LineEdit) -> void:

@@ -40,6 +40,15 @@ calculé par le client.
 - `POST /social/target {friendCode,source,requestId}` — `friend` ou `revenge`,
   consommé par le prochain Signal Jam.
 - `GET /progression/leaderboard`
+- `GET /teams?q=...`, `GET /teams/leaderboard`
+- `POST /teams/create {name,requestId}`
+- `POST /teams/join {teamCode,requestId}`
+- `POST /teams/leave {requestId}`
+- `POST /teams/kick|transfer {friendCode,requestId}`
+- `GET /trades` — incoming/outgoing, noms de cartes et règles actives.
+- `POST /trades/create {recipientFriendCode,offeredCardId,requestedCardId,requestId}`
+- `POST /trades/accept|decline|cancel {tradeId,requestId}` — échange direct
+  atomique entre amis ; chaque joueur conserve au moins un exemplaire.
 - `POST /chest/buy {chestId,requestId}`
 - `POST /chest/open {chestId,requestId}`
 - `POST /set/claim {setId,requestId}`
