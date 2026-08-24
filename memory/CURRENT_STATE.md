@@ -33,6 +33,8 @@
   exemplaire, raretés configurables, expiration, historique et résolution atomique.
 - Les outcomes Carte/Coffre donnent désormais N exemplaires à ×N ; les quantités
   d'inventaire sont en `BIGINT` et les additions commerce sont vérifiées.
+- Signal Cache quotidien : récompense pondérée serveur distincte du streak,
+  claim atomique/idempotent, disponibilité issue du jour serveur et UI Missions.
 
 ## Produit livré
 
@@ -64,7 +66,7 @@
 
 - Modules R17 : `game`, `district`, `collection`, `engagement`, `commerce`.
 - Migrations additives `0002_progression_liveops.sql` à
-  `0009_inventory_bigint.sql`.
+  `0010_daily_signal_cache.sql`.
 - Idempotence par action, transactions, audit économique, horloge serveur,
   rate-limit et nettoyage périodique.
 - Mode release protégé : refus de `DEV_AUTH`, secret JWT fort, CORS allowlist,
@@ -74,8 +76,8 @@
 
 - `tools/economy_check.ps1` : OK, 277 605 CR équivalents/spin, 9,4 % vides,
   233,5 spins pour District 1 et 501,8 pour District 2.
-- `cargo test --locked` : 15/15 ; `cargo clippy --locked -- -D warnings` : OK.
-- `tools/analytics_check.ps1` : 47/47 événements présents.
+- `cargo test --locked` : 16/16 ; `cargo clippy --locked -- -D warnings` : OK.
+- `tools/analytics_check.ps1` : 48/48 événements présents.
 - Intégration analytics PostgreSQL : batch 25 accepté, replay dédupliqué, props
   invalides refusées et progression de spin renvoyée avec cohorte.
 - Slot social complet : outcomes Attack/Raid/Shield/Chest/Card, Signal Jam,
@@ -95,6 +97,8 @@
 - Intégration crews/trading à deux joueurs : join concurrent rejoué à l'identique,
   transfert d'owner aller-retour, leaderboard exact, Carte ×4 = quatre copies et
   acceptation concurrente d'un swap avec deltas stricts `-1/+1` des deux côtés.
+- Intégration Signal Cache : deux claims concurrents renvoient la même réponse,
+  un seul gain est appliqué et la disponibilité du jour devient fausse.
 - Économie réauditée : 277 605 CR équivalents/spin, 9,4 % de spins vides,
   districts estimés à 233,5 puis 501,8 spins. `cargo clippy -D warnings` vert.
 - `cargo build --release` : OK.

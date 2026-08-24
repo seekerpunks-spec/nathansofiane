@@ -728,6 +728,11 @@ Choisir UNE première mécanique simple.
 
 Ne pas créer trois systèmes identiques.
 
+Statut R24 : **Signal Cache implémenté**. Un tirage quotidien distinct de la
+série de connexion choisit côté serveur une récompense pondérée (spins, crédits
+ou coffre). Config, horloge, RNG système, claim idempotent, audit, UI et analytics
+sont couverts ; aucune roue graphique supplémentaire n'est créée.
+
 ---
 
 # 23. DAILY MISSIONS
@@ -894,11 +899,11 @@ Watch ad
 receive reward
 ```
 
-- [ ] Daily cap.
-- [ ] Cooldown.
-- [ ] Server reward validation where possible.
-- [ ] Failure handling.
-- [ ] No reward before successful completion.
+- [x] Daily cap.
+- [x] Cooldown.
+- [x] Server reward validation where possible.
+- [x] Failure handling.
+- [x] No reward before successful completion.
 
 ---
 
@@ -1094,8 +1099,8 @@ purchase_started
 purchase_complete
 ```
 
-Statut R24 : les 25 événements ci-dessus, les 8 événements Attack/Raid/réparation
-et 5 événements profil/amis, soit 38 événements, sont instrumentés et couverts
+Statut R24 : les 25 événements ci-dessus et 23 événements rétention/social,
+soit 48 événements, sont instrumentés et couverts
 par la gate `tools/analytics_check.ps1`. Les batches sont bornés, validés et
 dédupliqués côté serveur par `batchId` lors des retries réseau.
 

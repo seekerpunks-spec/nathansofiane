@@ -187,8 +187,26 @@ pub struct DailyEntry {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DailyConfig {
     pub cycle: Vec<DailyEntry>,
+    pub bonus: DailyBonusConfig,
     #[serde(default)]
     pub missions: Vec<MissionConfig>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DailyBonusConfig {
+    pub bonus_id: String,
+    pub name: String,
+    pub outcomes: Vec<DailyBonusOutcome>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DailyBonusOutcome {
+    pub outcome_id: String,
+    pub name: String,
+    pub weight: u32,
+    pub reward: Reward,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -724,6 +742,35 @@ impl RemoteConfig {
                 ));
             }
         }
+        let mut bonus_outcome_ids = BTreeSet::new();
+        let bonus_total_weight: u64 = self
+            .daily
+            .bonus
+            .outcomes
+            .iter()
+            .map(|outcome| u64::from(outcome.weight))
+            .sum();
+        if self.daily.bonus.bonus_id.trim().is_empty()
+            || self.daily.bonus.name.trim().is_empty()
+            || self.daily.bonus.outcomes.is_empty()
+            || bonus_total_weight == 0
+            || bonus_total_weight > u64::from(u32::MAX)
+        {
+            problems.push("daily.bonus : identité/outcomes/poids invalides".to_string());
+        }
+        for outcome in &self.daily.bonus.outcomes {
+            if outcome.outcome_id.trim().is_empty()
+                || outcome.name.trim().is_empty()
+                || outcome.weight == 0
+                || !bonus_outcome_ids.insert(outcome.outcome_id.as_str())
+                || !reward_fits_storage(&outcome.reward)
+            {
+                problems.push(format!(
+                    "daily.bonus outcome invalide : {}",
+                    outcome.outcome_id
+                ));
+            }
+        }
         let mut mission_ids = BTreeSet::new();
         for m in &self.daily.missions {
             if m.target == 0 || !mission_ids.insert(&m.mission_id) {
@@ -884,6 +931,19 @@ impl RemoteConfig {
                 .is_some_and(|id| !chest_ids.contains(id))
             {
                 problems.push(format!("mission {} : coffre inconnu", mission.mission_id));
+            }
+        }
+        for outcome in &self.daily.bonus.outcomes {
+            if outcome
+                .reward
+                .chest
+                .as_deref()
+                .is_some_and(|id| !chest_ids.contains(id))
+            {
+                problems.push(format!(
+                    "daily bonus {} : coffre inconnu",
+                    outcome.outcome_id
+                ));
             }
         }
         for district in &self.districts {

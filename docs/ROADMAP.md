@@ -30,6 +30,7 @@
 ## P3 — Rétention
 
 - [x] Bonus quotidien autoritaire.
+- [x] Signal Cache quotidien pondéré, distinct de la série de connexion.
 - [x] Missions quotidiennes simples et progression événementielle.
 - [x] Classement d'événement et paliers de récompense.
 - [x] Écrans Missions/Événement et compteurs horloge serveur.
@@ -83,10 +84,10 @@
 - [x] Deux districts séquentiels, prérequis de déblocage et transition client.
 - [x] Milestones événementiels auto/manuels, claims idempotents et cohortes de
       leaderboard avec égalités `DENSE_RANK`.
-- [x] Funnel analytics complet, gate 47 événements et batches idempotents.
+- [x] Funnel analytics complet, gate 48 événements et batches idempotents.
 - [x] Signal Jam, Ghost Vault, Firewalls et réparations autoritaires.
 - [x] Network Power, profils, amis, classement, ciblage ami et revanche.
 - [x] Crews, classement d'équipe et trading social 1-pour-1 sans SKR.
-- [ ] Achievements, daily bonus simple, événement coopératif et autres systèmes
+- [ ] Achievements, événement coopératif et autres systèmes
       restants du MASTER TODO.
 - [ ] Design et Wallet Adapter différés explicitement pour ce lot.

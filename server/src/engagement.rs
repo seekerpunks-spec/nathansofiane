@@ -1,7 +1,7 @@
 //! Bonus quotidien, missions, événements, classement et saison.
 
 use crate::auth::Addr;
-use crate::config::Reward;
+use crate::config::{DailyBonusOutcome, Reward};
 use crate::db::Db;
 use crate::error::ApiError;
 use crate::game;
@@ -11,6 +11,7 @@ use axum::extract::{Extension, Path, State};
 use axum::http::HeaderMap;
 use axum::Json;
 use chrono::{Duration, Utc};
+use rand::Rng;
 use serde::Deserialize;
 use serde_json::{json, Value};
 
@@ -38,6 +39,120 @@ pub struct SeasonClaimReq {
     premium: bool,
     #[serde(default)]
     request_id: Option<String>,
+}
+
+fn bonus_index_for_roll(outcomes: &[DailyBonusOutcome], mut roll: u32) -> Option<usize> {
+    for (index, outcome) in outcomes.iter().enumerate() {
+        if roll < outcome.weight {
+            return Some(index);
+        }
+        roll = roll.checked_sub(outcome.weight)?;
+    }
+    None
+}
+
+pub async fn daily_bonus_for_state(
+    state: &AppState,
+    address: &str,
+    today: chrono::NaiveDate,
+) -> Result<Value, ApiError> {
+    let bonus = &state.config.daily.bonus;
+    let claimed_outcome: Option<String> = sqlx::query_scalar(
+        "SELECT outcome_id FROM daily_bonus_claims WHERE address=$1 AND bonus_id=$2 AND claim_day=$3",
+    )
+    .bind(address)
+    .bind(&bonus.bonus_id)
+    .bind(today)
+    .fetch_optional(state.db.pool())
+    .await?;
+    Ok(json!({
+        "bonusId":bonus.bonus_id,
+        "name":bonus.name,
+        "available":claimed_outcome.is_none(),
+        "claimedOutcomeId":claimed_outcome,
+    }))
+}
+
+pub async fn claim_daily_bonus(
+    State(state): State<AppState>,
+    Extension(addr): Extension<Addr>,
+    headers: HeaderMap,
+    Json(body): Json<ClaimReq>,
+) -> Result<Json<Value>, ApiError> {
+    let rid = game::request_id(&headers, body.request_id.as_deref())?;
+    let key = game::idem_key("daily_bonus_claim", &addr.0, &rid);
+    if let Some(value) = state.db.fetch_idempotent(&key).await? {
+        return Ok(Json(value));
+    }
+    let bonus = &state.config.daily.bonus;
+    let total_weight = bonus
+        .outcomes
+        .iter()
+        .try_fold(0u32, |total, outcome| total.checked_add(outcome.weight))
+        .ok_or_else(|| ApiError::Internal(anyhow!("daily bonus weight overflow")))?;
+    let roll = rand::rngs::OsRng.gen_range(0..total_weight);
+    let outcome = bonus
+        .outcomes
+        .get(
+            bonus_index_for_roll(&bonus.outcomes, roll)
+                .ok_or_else(|| ApiError::Internal(anyhow!("daily bonus outcome absent")))?,
+        )
+        .ok_or_else(|| ApiError::Internal(anyhow!("daily bonus outcome invalide")))?;
+    let mut tx = state.db.begin().await?;
+    let player = state
+        .db
+        .fetch_state_locked(&mut tx, &addr.0)
+        .await?
+        .ok_or_else(|| ApiError::Internal(anyhow!("player_state absent")))?;
+    if let Some(value) = state.db.fetch_idempotent_locked(&mut tx, &key).await? {
+        tx.rollback().await?;
+        return Ok(Json(value));
+    }
+    let today = Utc::now().date_naive();
+    let already_claimed: bool = sqlx::query_scalar(
+        "SELECT EXISTS(SELECT 1 FROM daily_bonus_claims WHERE address=$1 AND bonus_id=$2 AND claim_day=$3)",
+    )
+    .bind(&addr.0)
+    .bind(&bonus.bonus_id)
+    .bind(today)
+    .fetch_one(&mut *tx)
+    .await?;
+    if already_claimed {
+        tx.rollback().await?;
+        return Err(ApiError::AlreadyClaimed);
+    }
+    sqlx::query(
+        "INSERT INTO daily_bonus_claims(address,bonus_id,claim_day,outcome_id) VALUES($1,$2,$3,$4)",
+    )
+    .bind(&addr.0)
+    .bind(&bonus.bonus_id)
+    .bind(today)
+    .bind(&outcome.outcome_id)
+    .execute(&mut *tx)
+    .await?;
+    game::grant_reward_tx(&mut tx, &addr.0, &outcome.reward).await?;
+    let balances: (i32, i64) =
+        sqlx::query_as("SELECT spins,credits FROM player_state WHERE address=$1")
+            .bind(&addr.0)
+            .fetch_one(&mut *tx)
+            .await?;
+    let response = json!({
+        "bonusId":bonus.bonus_id,"name":bonus.name,
+        "outcomeId":outcome.outcome_id,"outcomeName":outcome.name,"reward":outcome.reward,
+        "spins":balances.0,"credits":balances.1,"serverTimeMs":Utc::now().timestamp_millis(),
+    });
+    Db::audit_tx(
+        &mut tx,
+        &addr.0,
+        "daily_bonus_claim",
+        &json!({"spins":player.spins,"credits":player.credits}),
+        &response,
+        Some(&rid),
+    )
+    .await?;
+    state.db.store_idempotent(&mut tx, &key, &response).await?;
+    tx.commit().await?;
+    Ok(Json(response))
 }
 
 pub async fn claim_daily(
@@ -471,4 +586,33 @@ pub async fn claim_season(
     state.db.store_idempotent(&mut tx, &key, &response).await?;
     tx.commit().await?;
     Ok(Json(response))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn outcome(id: &str, weight: u32) -> DailyBonusOutcome {
+        DailyBonusOutcome {
+            outcome_id: id.to_string(),
+            name: id.to_string(),
+            weight,
+            reward: Reward {
+                spins: 0,
+                credits: 0,
+                chest: None,
+            },
+        }
+    }
+
+    #[test]
+    fn daily_bonus_weight_boundaries_are_exact() {
+        let outcomes = vec![outcome("a", 2), outcome("b", 3), outcome("c", 1)];
+        assert_eq!(bonus_index_for_roll(&outcomes, 0), Some(0));
+        assert_eq!(bonus_index_for_roll(&outcomes, 1), Some(0));
+        assert_eq!(bonus_index_for_roll(&outcomes, 2), Some(1));
+        assert_eq!(bonus_index_for_roll(&outcomes, 4), Some(1));
+        assert_eq!(bonus_index_for_roll(&outcomes, 5), Some(2));
+        assert_eq!(bonus_index_for_roll(&outcomes, 6), None);
+    }
 }

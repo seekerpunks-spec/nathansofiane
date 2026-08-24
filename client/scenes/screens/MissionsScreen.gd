@@ -43,6 +43,17 @@ func _refresh() -> void:
 	daily_box.add_child(daily_btn)
 	daily.add_child(daily_box)
 	_content.add_child(daily)
+	var bonus: Dictionary = Store.state.get("dailyBonus", {})
+	var bonus_panel := Ui.panel(Ui.PANEL_HI, Ui.NEON_CYAN)
+	var bonus_box := VBoxContainer.new()
+	bonus_box.add_child(Ui.label(str(bonus.get("name", "SIGNAL CACHE")).to_upper(), 18, Ui.NEON_CYAN))
+	bonus_box.add_child(Ui.label("Un signal gratuit par jour • récompense tirée côté serveur", 12, Ui.TEXT_DIM))
+	var bonus_btn := Ui.button("OUVRIR LE SIGNAL CACHE", Ui.NEON_CYAN)
+	bonus_btn.disabled = _busy or not bool(bonus.get("available", false))
+	bonus_btn.pressed.connect(_claim_daily_bonus)
+	bonus_box.add_child(bonus_btn)
+	bonus_panel.add_child(bonus_box)
+	_content.add_child(bonus_panel)
 
 	_content.add_child(Ui.section_title("MISSIONS DU JOUR", Ui.NEON_CYAN))
 	var reveal_index := 0
@@ -180,6 +191,9 @@ func _season_config(id: String) -> Dictionary:
 
 func _claim_daily() -> void:
 	await _mutate("/daily/claim", {}, "daily_claim")
+
+func _claim_daily_bonus() -> void:
+	await _mutate("/daily/bonus/claim", {}, "daily_bonus_claim")
 
 func _claim_mission(mission_id: String) -> void:
 	await _mutate("/mission/claim", {"missionId": mission_id}, "mission_claim")

@@ -134,9 +134,9 @@ d'un autre endpoint.
 achats, idempotence, audit et analytics. `0002_progression_liveops.sql` ajoute les
 tables de rétention. `0003_core_integrity.sql` impose les soldes/quantités
 positifs et les références joueur sur les tables économiques historiques.
-Les migrations `0006` à `0009` ajoutent les rencontres sociales, profils,
+Les migrations `0006` à `0010` ajoutent les rencontres sociales, profils,
 Network Power, amis, équipes, échanges de cartes et inventaires `BIGINT` adaptés
-au multiplicateur maximal ×100K.
+au multiplicateur maximal ×100K, puis le claim quotidien Signal Cache.
 
 Toutes les mutations d'économie sont atomiques : verrou joueur, validation,
 écriture d'état, audit et mémorisation de la réponse idempotente partagent la
@@ -149,7 +149,7 @@ même transaction.
 - `spin_table.json` : outcomes et poids.
 - `districts/district_01.json` : éléments, niveaux, coûts et récompense finale.
 - `cards.json`, `sets.json`, `chests.json` : collection et loot.
-- `daily.json` : cycle et missions quotidiennes.
+- `daily.json` : cycle, Signal Cache pondéré et missions quotidiennes.
 - `events.json`, `seasons.json`, `offers.json` : live-ops et commerce.
 - `progression.json`, `social.json` : score global, Attack/Raid/Firewalls,
   équipes et règles d'échange.

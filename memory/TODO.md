@@ -54,6 +54,7 @@ itérations intermédiaires utilisent uniquement Godot desktop, captures et test
 - [x] Attack, Raid et défense originaux dans une boucle sociale type Coin Master.
 - [x] Network Power, profils, amis, classement, ciblage ami et revanche.
 - [x] Crews, leaderboard d'équipe et échanges directs de doublons entre amis.
-- [ ] Achievements, daily bonus distinct, événements coopératifs et systèmes
+- [x] Signal Cache quotidien, RNG pondéré et anti-double-claim.
+- [ ] Achievements, événements coopératifs et systèmes
       restants du MASTER TODO.
 - [ ] Design et Wallet Adapter explicitement différés par l'utilisateur.

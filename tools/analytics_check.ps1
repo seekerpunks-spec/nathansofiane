@@ -17,6 +17,7 @@ $expected = @(
     "duplicate_card",
     "set_completed",
     "daily_claim",
+    "daily_bonus_claim",
     "event_progress",
     "milestone_claim",
     "leaderboard_join",

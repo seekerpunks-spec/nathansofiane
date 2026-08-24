@@ -53,6 +53,8 @@ calculé par le client.
 - `POST /chest/open {chestId,requestId}`
 - `POST /set/claim {setId,requestId}`
 - `POST /daily/claim {requestId}`
+- `POST /daily/bonus/claim {requestId}` — Signal Cache pondéré, une fois par
+  jour serveur ; résultat et récompense mémorisés atomiquement.
 - `POST /mission/claim {missionId,requestId}`
 - `POST /events/:event_id/milestones/:milestone_index/claim {requestId}`
 - `POST /events/:event_id/claim {requestId}`

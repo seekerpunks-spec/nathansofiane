@@ -9,6 +9,16 @@
     { "day": 6, "spins": 200, "credits": 0,      "chest": "neon" },
     { "day": 7, "spins": 500, "credits": 1000000,"chest": "neon" }
   ],
+  "bonus": {
+    "bonusId": "signal_cache_v1",
+    "name": "Signal Cache",
+    "outcomes": [
+      { "outcomeId": "spin_burst", "name": "Spin Burst", "weight": 5000, "reward": { "spins": 50 } },
+      { "outcomeId": "credit_packet", "name": "Credit Packet", "weight": 3000, "reward": { "credits": 300000 } },
+      { "outcomeId": "basic_cache", "name": "Basic Cache", "weight": 1500, "reward": { "chest": "basic" } },
+      { "outcomeId": "neon_cache", "name": "Neon Cache", "weight": 500, "reward": { "chest": "neon" } }
+    ]
+  },
   "missions": [
     { "missionId": "use_spins", "name": "Use 10 Spins", "action": "spin", "target": 10, "reward": { "spins": 20, "credits": 100000 } },
     { "missionId": "upgrade_grid", "name": "Upgrade 2 Structures", "action": "upgrade", "target": 2, "reward": { "spins": 35, "credits": 250000 } },
