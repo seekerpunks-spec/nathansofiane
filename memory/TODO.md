@@ -55,6 +55,7 @@ itérations intermédiaires utilisent uniquement Godot desktop, captures et test
 - [x] Network Power, profils, amis, classement, ciblage ami et revanche.
 - [x] Crews, leaderboard d'équipe et échanges directs de doublons entre amis.
 - [x] Signal Cache quotidien, RNG pondéré et anti-double-claim.
+- [x] Catalogue d'offres autoritaire et éligibilités commerciales data-driven.
 - [ ] Achievements, événements coopératifs et systèmes
       restants du MASTER TODO.
 - [ ] Design et Wallet Adapter explicitement différés par l'utilisateur.

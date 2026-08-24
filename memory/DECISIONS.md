@@ -50,6 +50,7 @@
 | T28 | Score global `Network Power` dérivé de quatre composantes configurables ; identité sociale par code ami, sans exposer l'adresse complète ; ciblage ami/revanche consommé au prochain Signal Jam | Évite la dérive d'un compteur client, fournit prestige/matchmaking, garde le social léger et empêche le ciblage arbitraire de joueurs |
 | T29 | Crews limités à 50, sans chat/donation au premier lot ; échange direct 1-pour-1 réservé aux amis et aux doublons, un exemplaire toujours conservé, raretés data-driven avec légendaires verrouillées | Reproduit les leviers de coopération/collection attendus sans créer marketplace, transfert libre de richesse, modération lourde ou exposition SKR |
 | T30 | Le seul bonus quotidien additionnel est `Signal Cache` : un claim pondéré serveur par jour, séparé du streak, sans seconde roue visuelle | Ajoute une raison de retour courte et contrôlable par config sans multiplier les systèmes redondants ni rouvrir le design |
+| T31 | L'écran Store consomme uniquement `GET /offers`; âge du compte, spins, district, événement et inactivité sont évalués serveur puis revérifiés sous verrou lors de l'achat | Empêche le client d'afficher/forcer une offre inéligible et garde toute règle commerciale hors de l'UI ; le provider réel reste requis en production |
 
 ## Noms / brandings (à verrouiller — O1 GDD)
 - Jeu : **CyberSeeker** (provisoire, utilisé partout pour l'instant).

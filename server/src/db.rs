@@ -78,7 +78,9 @@ impl Db {
             .await?;
             tracing::info!(address, new_player_spins, "nouveau joueur créé");
         } else {
-            sqlx::query("UPDATE players SET last_seen_at = now() WHERE address = $1")
+            sqlx::query(
+                "UPDATE players SET previous_seen_at=last_seen_at,last_seen_at=now() WHERE address=$1",
+            )
                 .bind(address)
                 .execute(&mut *tx)
                 .await?;

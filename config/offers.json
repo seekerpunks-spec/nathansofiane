@@ -2,22 +2,73 @@
   "items": [
     {
       "offerId": "welcome_signal", "name": "Welcome Signal",
+      "kind": "starter",
       "contents": [
         { "type": "spins", "amount": 500 }, { "type": "credits", "amount": 5000000 }, { "type": "chest", "id": "neon", "amount": 2 }
       ],
       "priceToken": "SKR", "priceU64": 1000000,
       "startsAtMs": 1787328000000, "endsAtMs": 1822348800000,
-      "maxPerPlayer": 1
+      "maxPerPlayer": 1,
+      "eligibility": { "maxAccountAgeMs": 604800000 }
+    },
+    {
+      "offerId": "emergency_uplink", "name": "Emergency Uplink",
+      "kind": "spin_pack",
+      "contents": [
+        { "type": "spins", "amount": 1000 }, { "type": "credits", "amount": 2000000 }
+      ],
+      "priceToken": "SKR", "priceU64": 1500000,
+      "startsAtMs": 1787328000000, "endsAtMs": 1822348800000,
+      "maxPerPlayer": 10,
+      "eligibility": { "maxSpins": 0 }
+    },
+    {
+      "offerId": "chrome_accelerator", "name": "Chrome Accelerator",
+      "kind": "progression",
+      "contents": [
+        { "type": "spins", "amount": 1500 }, { "type": "credits", "amount": 10000000 },
+        { "type": "chest", "id": "neon", "amount": 2 }
+      ],
+      "priceToken": "SKR", "priceU64": 4000000,
+      "startsAtMs": 1787328000000, "endsAtMs": 1822348800000,
+      "maxPerPlayer": 5,
+      "eligibility": { "minDistrictIndex": 1 }
+    },
+    {
+      "offerId": "neon_rush_bundle", "name": "Neon Rush Bundle",
+      "kind": "event",
+      "contents": [
+        { "type": "spins", "amount": 800 }, { "type": "credits", "amount": 6000000 },
+        { "type": "chest", "id": "elite", "amount": 1 }
+      ],
+      "priceToken": "SKR", "priceU64": 3000000,
+      "startsAtMs": 1787328000000, "endsAtMs": 1822348800000,
+      "maxPerPlayer": 3,
+      "eligibility": { "requiresEventId": "neon_rush_r17" }
+    },
+    {
+      "offerId": "return_signal", "name": "Return Signal",
+      "kind": "returning",
+      "contents": [
+        { "type": "spins", "amount": 600 }, { "type": "credits", "amount": 4000000 },
+        { "type": "chest", "id": "basic", "amount": 2 }
+      ],
+      "priceToken": "SKR", "priceU64": 2000000,
+      "startsAtMs": 1787328000000, "endsAtMs": 1822348800000,
+      "maxPerPlayer": 5,
+      "eligibility": { "minInactivityMs": 259200000 }
     },
     {
       "offerId": "neon_genesis_pass", "name": "Neon Genesis Pass",
+      "kind": "season_pass",
       "contents": [
         { "type": "season_premium", "id": "neon_genesis", "amount": 1 },
         { "type": "spins", "amount": 250 }
       ],
       "priceToken": "SKR", "priceU64": 2500000,
       "startsAtMs": 1787328000000, "endsAtMs": 1790812800000,
-      "maxPerPlayer": 1
+      "maxPerPlayer": 1,
+      "eligibility": { "requiresEventId": "neon_rush_r17" }
     }
   ]
 }

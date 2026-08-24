@@ -2,6 +2,7 @@
 
 use crate::config::{RemoteConfig, Reward};
 use crate::error::ApiError;
+use crate::spin;
 use anyhow::anyhow;
 use axum::http::HeaderMap;
 use chrono::{NaiveDate, Utc};
@@ -67,22 +68,28 @@ pub async fn grant_reward_tx(
     tx: &mut Transaction<'_, Postgres>,
     address: &str,
     reward: &Reward,
+    config: &RemoteConfig,
 ) -> Result<(), ApiError> {
-    let current: (i32, i64) =
-        sqlx::query_as("SELECT spins,credits FROM player_state WHERE address=$1 FOR UPDATE")
-            .bind(address)
-            .fetch_one(&mut **tx)
-            .await?;
+    let current: (i32, i64, Option<chrono::DateTime<Utc>>) = sqlx::query_as(
+        "SELECT spins,credits,last_spin_at FROM player_state WHERE address=$1 FOR UPDATE",
+    )
+    .bind(address)
+    .fetch_one(&mut **tx)
+    .await?;
+    let now = Utc::now();
+    let regen = spin::regen_state(current.2, now, current.0, config);
     let spins_delta = i32::try_from(reward.spins)
         .map_err(|_| ApiError::Internal(anyhow!("overflow économique: reward.spins")))?;
-    let spins = current
-        .0
+    let spins = regen
+        .spins
         .checked_add(spins_delta)
         .ok_or_else(|| ApiError::Internal(anyhow!("overflow économique: player.spins")))?;
     let credits = checked_add_credits(current.1, reward.credits, "reward.credits")?;
-    sqlx::query("UPDATE player_state SET spins=$1,credits=$2 WHERE address=$3")
+    let regen_anchor = regen.anchor.or(current.2).unwrap_or(now);
+    sqlx::query("UPDATE player_state SET spins=$1,credits=$2,last_spin_at=$3 WHERE address=$4")
         .bind(spins)
         .bind(credits)
+        .bind(regen_anchor)
         .bind(address)
         .execute(&mut **tx)
         .await?;
@@ -217,7 +224,7 @@ pub async fn progress_action_tx(
                 .await?
                 .rows_affected();
                 if inserted == 1 {
-                    grant_reward_tx(tx, address, &milestone.reward).await?;
+                    grant_reward_tx(tx, address, &milestone.reward, config).await?;
                     auto_milestones_claimed.push(index as u32);
                 }
             }
@@ -270,5 +277,54 @@ mod tests {
         );
         assert!(checked_scale(i64::MAX as u64, 2, "test").is_err());
         assert!(checked_add_credits(i64::MAX, 1, "test").is_err());
+    }
+
+    #[tokio::test]
+    async fn postgres_reward_preserves_unpersisted_regen() -> anyhow::Result<()> {
+        let Ok(database_url) = std::env::var("CYBERSEEKER_TEST_DATABASE_URL") else {
+            return Ok(());
+        };
+        let config = crate::config::RemoteConfig::load(
+            &std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../config"),
+        )?;
+        let pool = sqlx::PgPool::connect(&database_url).await?;
+        let mut tx = pool.begin().await?;
+        let address = format!("qa-regen-{}", uuid::Uuid::new_v4());
+        let interval = i64::try_from(config.economy.spin_regen_ms)?;
+        let last = Utc::now() - chrono::Duration::milliseconds(interval * 2 + 1_000);
+        sqlx::query("INSERT INTO players(address) VALUES($1)")
+            .bind(&address)
+            .execute(&mut *tx)
+            .await?;
+        sqlx::query(
+            "INSERT INTO player_state(address,spins,credits,last_spin_at) VALUES($1,0,0,$2)",
+        )
+        .bind(&address)
+        .bind(last)
+        .execute(&mut *tx)
+        .await?;
+        grant_reward_tx(
+            &mut tx,
+            &address,
+            &Reward {
+                spins: 5,
+                credits: 0,
+                chest: None,
+            },
+            &config,
+        )
+        .await?;
+        let persisted: (i32, chrono::DateTime<Utc>) =
+            sqlx::query_as("SELECT spins,last_spin_at FROM player_state WHERE address=$1")
+                .bind(&address)
+                .fetch_one(&mut *tx)
+                .await?;
+        assert_eq!(persisted.0, 7);
+        assert_eq!(
+            persisted.1.timestamp_millis(),
+            (last + chrono::Duration::milliseconds(interval * 2)).timestamp_millis()
+        );
+        tx.rollback().await?;
+        Ok(())
     }
 }

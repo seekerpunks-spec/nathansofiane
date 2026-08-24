@@ -39,6 +39,8 @@
 
 - [x] Publicité récompensée via adaptateur, simulée seulement en dev.
 - [x] Offres data-driven, limites par joueur et expiration serveur.
+- [x] Catalogue serveur et éligibilités starter, spins vides, progression,
+      événement et retour joueur, revalidées dans l'achat.
 - [x] Vérification de paiement verrouillée par provider ; aucun crédit sur
       déclaration du client.
 - [x] Season pass data-driven minimal.

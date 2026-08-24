@@ -130,7 +130,7 @@ pub async fn claim_daily_bonus(
     .bind(&outcome.outcome_id)
     .execute(&mut *tx)
     .await?;
-    game::grant_reward_tx(&mut tx, &addr.0, &outcome.reward).await?;
+    game::grant_reward_tx(&mut tx, &addr.0, &outcome.reward, &state.config).await?;
     let balances: (i32, i64) =
         sqlx::query_as("SELECT spins,credits FROM player_state WHERE address=$1")
             .bind(&addr.0)
@@ -199,7 +199,7 @@ pub async fn claim_daily(
         .bind(&addr.0)
         .execute(&mut *tx)
         .await?;
-    game::grant_reward_tx(&mut tx, &addr.0, &reward).await?;
+    game::grant_reward_tx(&mut tx, &addr.0, &reward, &state.config).await?;
     let balances: (i32, i64) =
         sqlx::query_as("SELECT spins,credits FROM player_state WHERE address=$1")
             .bind(&addr.0)
@@ -265,7 +265,7 @@ pub async fn claim_mission(
     }
     sqlx::query("UPDATE mission_progress SET claimed=true WHERE address=$1 AND mission_id=$2 AND mission_day=$3")
         .bind(&addr.0).bind(&mission.mission_id).bind(today).execute(&mut *tx).await?;
-    game::grant_reward_tx(&mut tx, &addr.0, &mission.reward).await?;
+    game::grant_reward_tx(&mut tx, &addr.0, &mission.reward, &state.config).await?;
     let balances: (i32, i64) =
         sqlx::query_as("SELECT spins,credits FROM player_state WHERE address=$1")
             .bind(&addr.0)
@@ -396,7 +396,7 @@ pub async fn claim_event_milestone(
         tx.rollback().await?;
         return Err(ApiError::AlreadyClaimed);
     }
-    game::grant_reward_tx(&mut tx, &addr.0, &milestone.reward).await?;
+    game::grant_reward_tx(&mut tx, &addr.0, &milestone.reward, &state.config).await?;
     let balances: (i32, i64) =
         sqlx::query_as("SELECT spins,credits FROM player_state WHERE address=$1")
             .bind(&addr.0)
@@ -481,7 +481,7 @@ pub async fn claim_event(
         .bind(&addr.0)
         .execute(&mut *tx)
         .await?;
-    game::grant_reward_tx(&mut tx, &addr.0, &tier.reward).await?;
+    game::grant_reward_tx(&mut tx, &addr.0, &tier.reward, &state.config).await?;
     let balances: (i32, i64) =
         sqlx::query_as("SELECT spins,credits FROM player_state WHERE address=$1")
             .bind(&addr.0)
@@ -567,7 +567,7 @@ pub async fn claim_season(
     };
     sqlx::query(&format!("UPDATE season_progress SET {column}={column} || jsonb_build_array($1::int) WHERE address=$2 AND season_id=$3"))
         .bind(body.tier as i32).bind(&addr.0).bind(&season.season_id).execute(&mut *tx).await?;
-    game::grant_reward_tx(&mut tx, &addr.0, reward).await?;
+    game::grant_reward_tx(&mut tx, &addr.0, reward, &state.config).await?;
     let balances: (i32, i64) =
         sqlx::query_as("SELECT spins,credits FROM player_state WHERE address=$1")
             .bind(&addr.0)

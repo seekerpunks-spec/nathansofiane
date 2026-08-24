@@ -213,6 +213,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/events/:event_id/claim", post(engagement::claim_event))
         .route("/season/claim", post(engagement::claim_season))
         .route("/ad/reward", post(commerce::reward_ad))
+        .route("/offers", get(commerce::list_offers))
         .route("/purchase/verify", post(commerce::verify_purchase))
         .route("/analytics", post(analytics))
         .layer(middleware::from_fn_with_state(Arc::clone(&state), guard))

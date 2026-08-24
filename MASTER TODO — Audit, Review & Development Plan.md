@@ -855,6 +855,10 @@ Les achats doivent être vérifiés côté backend.
 
 Ne jamais créditer seulement sur déclaration du client.
 
+Statut R24 : packs de spins décrits par `contents`, prix, fenêtre, limite et
+éligibilité. Le catalogue `GET /offers` est calculé côté serveur et l'achat
+revalide les mêmes règles sous verrou. Le provider réel reste obligatoire hors dev.
+
 ---
 
 # 28. STARTER OFFER
@@ -866,6 +870,9 @@ one-time purchase
 new player eligibility
 expiration window
 ```
+
+Statut R24 : `welcome_signal` est limité à un achat et aux sept premiers jours
+du compte, indépendamment de l'horloge du client.
 
 ---
 
@@ -884,6 +891,11 @@ IMPORTANT :
 Les offres doivent être pilotables par données.
 
 Ne pas enfouir les règles commerciales dans les composants UI.
+
+Statut R24 : règles génériques supportées pour âge du compte, spins maximum,
+district minimum/maximum, événement actif et durée d'inactivité. Les offres
+Emergency Uplink, Chrome Accelerator, Neon Rush Bundle et Return Signal exercent
+ces déclencheurs ; l'UI ne lit plus directement la liste brute de config.
 
 ---
 
@@ -922,6 +934,9 @@ seasonEnd
 tiers
 rewards
 ```
+
+Statut R24 : tracks free/premium, points, fenêtres, tiers et claims idempotents
+sont data-driven. L'achat premium reste derrière le même provider vérifié.
 
 ---
 

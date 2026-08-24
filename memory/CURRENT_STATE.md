@@ -35,6 +35,10 @@
   d'inventaire sont en `BIGINT` et les additions commerce sont vérifiées.
 - Signal Cache quotidien : récompense pondérée serveur distincte du streak,
   claim atomique/idempotent, disponibilité issue du jour serveur et UI Missions.
+- Catalogue commercial autoritaire : starter, spins vides, progression, événement
+  et retour joueur sont filtrés puis revalidés sous verrou au moment de l'achat.
+- Tous les grants de spins conservent désormais la regen gratuite non persistée ;
+  achats et pubs relisent aussi l'idempotence sous verrou avant l'éligibilité.
 
 ## Produit livré
 
@@ -66,7 +70,7 @@
 
 - Modules R17 : `game`, `district`, `collection`, `engagement`, `commerce`.
 - Migrations additives `0002_progression_liveops.sql` à
-  `0010_daily_signal_cache.sql`.
+  `0011_offer_eligibility.sql`.
 - Idempotence par action, transactions, audit économique, horloge serveur,
   rate-limit et nettoyage périodique.
 - Mode release protégé : refus de `DEV_AUTH`, secret JWT fort, CORS allowlist,
@@ -76,7 +80,7 @@
 
 - `tools/economy_check.ps1` : OK, 277 605 CR équivalents/spin, 9,4 % vides,
   233,5 spins pour District 1 et 501,8 pour District 2.
-- `cargo test --locked` : 16/16 ; `cargo clippy --locked -- -D warnings` : OK.
+- `cargo test --locked` : 18/18 ; `cargo clippy --locked -- -D warnings` : OK.
 - `tools/analytics_check.ps1` : 48/48 événements présents.
 - Intégration analytics PostgreSQL : batch 25 accepté, replay dédupliqué, props
   invalides refusées et progression de spin renvoyée avec cohorte.
@@ -99,6 +103,9 @@
   acceptation concurrente d'un swap avec deltas stricts `-1/+1` des deux côtés.
 - Intégration Signal Cache : deux claims concurrents renvoient la même réponse,
   un seul gain est appliqué et la disponibilité du jour devient fausse.
+- Intégration offres : pack Emergency absent/refusé avec spins, visible à zéro,
+  achat concurrent rejoué en deux HTTP 200 pour un seul crédit ; même gate pour
+  pub récompensée. Test PostgreSQL dédié : 2 spins régénérés + reward 5 = 7.
 - Économie réauditée : 277 605 CR équivalents/spin, 9,4 % de spins vides,
   districts estimés à 233,5 puis 501,8 spins. `cargo clippy -D warnings` vert.
 - `cargo build --release` : OK.

@@ -7,6 +7,7 @@ var _content: VBoxContainer
 var _busy := false
 var _ad_offer_tracked := false
 var _tracked_offer_views: Dictionary = {}
+var _eligible_offers: Array = []
 
 func _ready() -> void:
 	var body := Ui.screen_body()
@@ -23,6 +24,16 @@ func _ready() -> void:
 	add_child(body)
 	Store.state_changed.connect(_refresh)
 	_refresh()
+	_load_offers.call_deferred()
+
+func _load_offers() -> void:
+	var response := await Net.protected_request("GET", "/offers")
+	if response.ok and typeof(response.data) == TYPE_DICTIONARY:
+		_eligible_offers = response.data.get("items", [])
+		Store.set_clock(int(response.data.get("serverTimeMs", 0)))
+	else:
+		_eligible_offers = []
+	_refresh()
 
 func _refresh() -> void:
 	if _content == null:
@@ -35,8 +46,8 @@ func _refresh() -> void:
 	Ui.reveal(free_card)
 	_content.add_child(Ui.section_title("OFFRES LIMITÉES", Ui.NEON_MAGENTA))
 	var any_offer := false
-	for offer in Config.offers():
-		if typeof(offer) == TYPE_DICTIONARY and Store.now_ms() >= int(offer.get("startsAtMs", 0)) and Store.now_ms() < int(offer.get("endsAtMs", 0)):
+	for offer in _eligible_offers:
+		if typeof(offer) == TYPE_DICTIONARY:
 			var card := _offer_card(offer)
 			_content.add_child(card)
 			Ui.reveal(card, 0.05 if not any_offer else 0.10)
@@ -86,6 +97,7 @@ func _offer_card(offer: Dictionary) -> PanelContainer:
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 8)
 	box.add_child(Ui.label(str(offer.get("name", "Offer")).to_upper(), 23, Ui.NEON_MAGENTA))
+	box.add_child(Ui.label("%s  •  %d RESTANT(S)" % [str(offer.get("kind", "limited")).to_upper(), int(offer.get("remainingPurchases", 0))], 11, Ui.TEXT_DIM))
 	var lines := ""
 	for content in offer.get("contents", []):
 		var typ := str(content.get("type", "reward")).to_upper()
@@ -146,6 +158,7 @@ func _finish_mutation(response: Dictionary, event_name: String, props: Dictionar
 		var state_response := await Net.protected_request("GET", "/state")
 		if state_response.ok:
 			Store.apply_state(state_response.data)
+		await _load_offers()
 	else:
 		Sfx.error()
 		Haptics.error()

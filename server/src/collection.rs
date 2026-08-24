@@ -302,7 +302,7 @@ pub async fn claim_set(
         credits: 0,
         chest: None,
     };
-    game::grant_reward_tx(&mut tx, &addr.0, &reward).await?;
+    game::grant_reward_tx(&mut tx, &addr.0, &reward, &state.config).await?;
     let global_progression = progression::refresh_score_tx(&mut tx, &addr.0, &state.config).await?;
     let response = json!({"setId": set.set_id, "reward": reward, "spins": player.spins + set.completion_spins as i32, "globalProgression":progression::score_json(global_progression,&state.config), "serverTimeMs": chrono::Utc::now().timestamp_millis()});
     Db::audit_tx(

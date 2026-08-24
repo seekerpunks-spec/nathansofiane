@@ -77,7 +77,8 @@ serveur.
 - `district.rs` : coûts autoritaires, niveaux et complétion anti double-claim.
 - `collection.rs` : achat/ouverture de coffres, loot pondéré, cartes et sets.
 - `engagement.rs` : daily, missions, événements, leaderboard PostgreSQL et saison.
-- `commerce.rs` : reçus de pub, limites, offres et preuve d'achat par provider.
+- `commerce.rs` : reçus de pub, catalogue d'offres éligibles, limites et preuve
+  d'achat par provider.
 - `social.rs` : Signal Jam, Ghost Vault, Firewalls, dégâts et réparations.
 - `progression.rs`, `friends.rs` : Network Power, profils, amis, ciblage et revanche.
 - `teams.rs` : roster, propriété, capacité et classement des crews.
@@ -116,6 +117,7 @@ un cache de classement distribué.
 - `POST /season/claim`
 - `POST /ad/reward`
 - `POST /purchase/verify`
+- `GET /offers`
 - `POST /analytics`
 - `GET|POST /profile`, `GET /players/search`, `GET /friends`
 - `POST /friends/request|accept|decline|remove`, `POST /social/target`
@@ -134,9 +136,10 @@ d'un autre endpoint.
 achats, idempotence, audit et analytics. `0002_progression_liveops.sql` ajoute les
 tables de rétention. `0003_core_integrity.sql` impose les soldes/quantités
 positifs et les références joueur sur les tables économiques historiques.
-Les migrations `0006` à `0010` ajoutent les rencontres sociales, profils,
+Les migrations `0006` à `0011` ajoutent les rencontres sociales, profils,
 Network Power, amis, équipes, échanges de cartes et inventaires `BIGINT` adaptés
-au multiplicateur maximal ×100K, puis le claim quotidien Signal Cache.
+au multiplicateur maximal ×100K, le Signal Cache et la session précédente utile
+aux offres de retour.
 
 Toutes les mutations d'économie sont atomiques : verrou joueur, validation,
 écriture d'état, audit et mémorisation de la réponse idempotente partagent la

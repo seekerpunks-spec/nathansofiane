@@ -328,12 +328,32 @@ pub struct OfferContent {
 pub struct OfferConfig {
     pub offer_id: String,
     pub name: String,
+    pub kind: String,
     pub contents: Vec<OfferContent>,
     pub price_token: String,
     pub price_u64: u64,
     pub starts_at_ms: i64,
     pub ends_at_ms: i64,
     pub max_per_player: u32,
+    #[serde(default)]
+    pub eligibility: OfferEligibility,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OfferEligibility {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_account_age_ms: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub min_district_index: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_district_index: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_spins: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub requires_event_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub min_inactivity_ms: Option<u64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1046,9 +1066,37 @@ impl RemoteConfig {
             problems.push("offers : offerId en double".to_string());
         }
         for offer in &self.offers {
-            if offer.starts_at_ms >= offer.ends_at_ms || offer.max_per_player == 0 {
+            if offer.starts_at_ms >= offer.ends_at_ms
+                || offer.max_per_player == 0
+                || !matches!(
+                    offer.kind.as_str(),
+                    "starter" | "spin_pack" | "progression" | "event" | "returning" | "season_pass"
+                )
+                || offer
+                    .eligibility
+                    .max_account_age_ms
+                    .is_some_and(|value| value < 60_000 || value > i64::MAX as u64)
+                || offer
+                    .eligibility
+                    .min_inactivity_ms
+                    .is_some_and(|value| value < 60_000 || value > i64::MAX as u64)
+                || offer
+                    .eligibility
+                    .max_spins
+                    .is_some_and(|value| value > i32::MAX as u32)
+                || offer
+                    .eligibility
+                    .min_district_index
+                    .zip(offer.eligibility.max_district_index)
+                    .is_some_and(|(minimum, maximum)| minimum > maximum)
+                || offer
+                    .eligibility
+                    .requires_event_id
+                    .as_deref()
+                    .is_some_and(|id| !event_ids.contains(id))
+            {
                 problems.push(format!(
-                    "offer {} : fenêtre/limite invalide",
+                    "offer {} : type/fenêtre/limite/éligibilité invalide",
                     offer.offer_id
                 ));
             }

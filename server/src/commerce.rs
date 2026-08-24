@@ -5,6 +5,7 @@
 //! publicitaire/paiement n'est pas raccordé : jamais de confiance au client.
 
 use crate::auth::Addr;
+use crate::config::{OfferConfig, OfferEligibility};
 use crate::db::Db;
 use crate::error::ApiError;
 use crate::game;
@@ -36,6 +37,118 @@ pub struct PurchaseReq {
     request_id: Option<String>,
 }
 
+fn eligibility_matches(
+    eligibility: &OfferEligibility,
+    now_ms: i64,
+    spins: i32,
+    district_index: i32,
+    created_at_ms: i64,
+    previous_seen_at_ms: Option<i64>,
+    required_event_active: bool,
+) -> bool {
+    let account_age_ms = now_ms.saturating_sub(created_at_ms);
+    if eligibility
+        .max_account_age_ms
+        .and_then(|value| i64::try_from(value).ok())
+        .is_some_and(|maximum| account_age_ms > maximum)
+    {
+        return false;
+    }
+    if eligibility
+        .min_district_index
+        .is_some_and(|minimum| i64::from(district_index) < i64::from(minimum))
+        || eligibility
+            .max_district_index
+            .is_some_and(|maximum| i64::from(district_index) > i64::from(maximum))
+        || eligibility
+            .max_spins
+            .is_some_and(|maximum| i64::from(spins) > i64::from(maximum))
+        || eligibility.requires_event_id.is_some() && !required_event_active
+    {
+        return false;
+    }
+    if let Some(required) = eligibility.min_inactivity_ms {
+        let Some(previous) = previous_seen_at_ms else {
+            return false;
+        };
+        let Ok(required) = i64::try_from(required) else {
+            return false;
+        };
+        if now_ms.saturating_sub(previous) < required {
+            return false;
+        }
+    }
+    true
+}
+
+fn required_event_active(offer: &OfferConfig, state: &AppState, now_ms: i64) -> bool {
+    let Some(event_id) = offer.eligibility.requires_event_id.as_deref() else {
+        return true;
+    };
+    state.config.events.iter().any(|event| {
+        event.event_id == event_id && event.starts_at_ms <= now_ms && now_ms < event.ends_at_ms
+    })
+}
+
+pub async fn list_offers(
+    State(state): State<AppState>,
+    Extension(addr): Extension<Addr>,
+) -> Result<Json<Value>, ApiError> {
+    let player = state
+        .db
+        .fetch_state(&addr.0)
+        .await?
+        .ok_or(ApiError::NotFound)?;
+    let identity: (chrono::DateTime<Utc>, Option<chrono::DateTime<Utc>>) =
+        sqlx::query_as("SELECT created_at,previous_seen_at FROM players WHERE address=$1")
+            .bind(&addr.0)
+            .fetch_one(state.db.pool())
+            .await?;
+    let claims: Vec<(String, i64)> = sqlx::query_as(
+        "SELECT offer_id,COUNT(*)::bigint FROM player_offer_claims WHERE address=$1 GROUP BY offer_id",
+    )
+    .bind(&addr.0)
+    .fetch_all(state.db.pool())
+    .await?;
+    let now = Utc::now();
+    let now_ms = now.timestamp_millis();
+    let regen = crate::spin::regen_state(player.last_spin_at, now, player.spins, &state.config);
+    let offers: Vec<Value> = state
+        .config
+        .offers
+        .iter()
+        .filter_map(|offer| {
+            let claimed = claims
+                .iter()
+                .find(|(offer_id, _)| offer_id == &offer.offer_id)
+                .map(|row| row.1)
+                .unwrap_or(0);
+            let remaining = i64::from(offer.max_per_player).saturating_sub(claimed);
+            let eligible = offer.starts_at_ms <= now_ms
+                && now_ms < offer.ends_at_ms
+                && remaining > 0
+                && eligibility_matches(
+                    &offer.eligibility,
+                    now_ms,
+                    regen.spins,
+                    player.district_index,
+                    identity.0.timestamp_millis(),
+                    identity.1.map(|value| value.timestamp_millis()),
+                    required_event_active(offer, &state, now_ms),
+                );
+            eligible.then(|| {
+                json!({
+                    "offerId":offer.offer_id,"name":offer.name,"kind":offer.kind,
+                    "contents":offer.contents,"priceToken":offer.price_token,"priceU64":offer.price_u64,
+                    "startsAtMs":offer.starts_at_ms,"endsAtMs":offer.ends_at_ms,
+                    "remainingPurchases":remaining,
+                })
+            })
+        })
+        .collect();
+    Ok(Json(json!({"items":offers,"serverTimeMs":now_ms})))
+}
+
 pub async fn reward_ad(
     State(state): State<AppState>,
     Extension(addr): Extension<Addr>,
@@ -62,6 +175,10 @@ pub async fn reward_ad(
         .fetch_state_locked(&mut tx, &addr.0)
         .await?
         .ok_or_else(|| ApiError::Internal(anyhow!("player_state absent")))?;
+    if let Some(value) = state.db.fetch_idempotent_locked(&mut tx, &key).await? {
+        tx.rollback().await?;
+        return Ok(Json(value));
+    }
     let today = Utc::now().date_naive();
     let count: i64 = sqlx::query_scalar(
         "SELECT COUNT(*) FROM ad_reward_claims WHERE address=$1 AND reward_day=$2",
@@ -90,16 +207,19 @@ pub async fn reward_ad(
         tx.rollback().await?;
         return Err(ApiError::AlreadyClaimed);
     }
+    let now = Utc::now();
+    let regen = crate::spin::regen_state(player.last_spin_at, now, player.spins, &state.config);
     let reward_spins = i32::try_from(cfg.reward_per_ad)
         .map_err(|_| ApiError::Internal(anyhow!("overflow économique: ad.rewardSpins")))?;
-    let spins = player
+    let spins = regen
         .spins
         .checked_add(reward_spins)
         .ok_or_else(|| ApiError::Internal(anyhow!("overflow économique: ad.playerSpins")))?;
     let ads_watched_today = i32::try_from(count + 1)
         .map_err(|_| ApiError::Internal(anyhow!("overflow économique: ad.dailyCount")))?;
-    sqlx::query("UPDATE player_state SET spins=$1,ads_watched_today=$2,ads_claimed_date=$3 WHERE address=$4")
-        .bind(spins).bind(ads_watched_today).bind(today).bind(&addr.0).execute(&mut *tx).await?;
+    let regen_anchor = regen.anchor.or(player.last_spin_at).unwrap_or(now);
+    sqlx::query("UPDATE player_state SET spins=$1,last_spin_at=$2,ads_watched_today=$3,ads_claimed_date=$4 WHERE address=$5")
+        .bind(spins).bind(regen_anchor).bind(ads_watched_today).bind(today).bind(&addr.0).execute(&mut *tx).await?;
     let response = json!({"rewardSpins": cfg.reward_per_ad, "spins": spins, "adsWatchedToday": count+1, "adsRemaining": cfg.max_rewarded_ads_per_day as i64-count-1, "serverTimeMs": Utc::now().timestamp_millis()});
     Db::audit_tx(
         &mut tx,
@@ -137,21 +257,29 @@ pub async fn verify_purchase(
         .iter()
         .find(|o| o.offer_id == body.offer_id)
         .ok_or(ApiError::NotFound)?;
-    let now_ms = Utc::now().timestamp_millis();
-    if now_ms < offer.starts_at_ms || now_ms >= offer.ends_at_ms {
-        return Err(ApiError::Unavailable("offre expirée".to_string()));
-    }
-    if body.token_mint != offer.price_token || body.amount_u64 != offer.price_u64 {
-        return Err(ApiError::BadRequest(
-            "preuve de paiement non conforme".to_string(),
-        ));
-    }
     let mut tx = state.db.begin().await?;
     let player = state
         .db
         .fetch_state_locked(&mut tx, &addr.0)
         .await?
         .ok_or_else(|| ApiError::Internal(anyhow!("player_state absent")))?;
+    if let Some(value) = state.db.fetch_idempotent_locked(&mut tx, &key).await? {
+        tx.rollback().await?;
+        return Ok(Json(value));
+    }
+    let now = Utc::now();
+    let now_ms = now.timestamp_millis();
+    if now_ms < offer.starts_at_ms || now_ms >= offer.ends_at_ms {
+        tx.rollback().await?;
+        return Err(ApiError::Unavailable("offre expirée".to_string()));
+    }
+    if body.token_mint != offer.price_token || body.amount_u64 != offer.price_u64 {
+        tx.rollback().await?;
+        return Err(ApiError::BadRequest(
+            "preuve de paiement non conforme".to_string(),
+        ));
+    }
+    let regen = crate::spin::regen_state(player.last_spin_at, now, player.spins, &state.config);
     let count: i64 = sqlx::query_scalar(
         "SELECT COUNT(*) FROM player_offer_claims WHERE address=$1 AND offer_id=$2",
     )
@@ -159,6 +287,24 @@ pub async fn verify_purchase(
     .bind(&offer.offer_id)
     .fetch_one(&mut *tx)
     .await?;
+    let identity: (chrono::DateTime<Utc>, Option<chrono::DateTime<Utc>>) = sqlx::query_as(
+        "SELECT created_at,previous_seen_at FROM players WHERE address=$1 FOR UPDATE",
+    )
+    .bind(&addr.0)
+    .fetch_one(&mut *tx)
+    .await?;
+    if !eligibility_matches(
+        &offer.eligibility,
+        now_ms,
+        regen.spins,
+        player.district_index,
+        identity.0.timestamp_millis(),
+        identity.1.map(|value| value.timestamp_millis()),
+        required_event_active(offer, &state, now_ms),
+    ) {
+        tx.rollback().await?;
+        return Err(ApiError::Unavailable("offre non éligible".to_string()));
+    }
     if count >= offer.max_per_player as i64 {
         tx.rollback().await?;
         return Err(ApiError::Unavailable(
@@ -220,7 +366,7 @@ pub async fn verify_purchase(
             _ => return Err(ApiError::Internal(anyhow!("contenu d'offre inconnu"))),
         }
     }
-    let final_spins = player
+    let final_spins = regen
         .spins
         .checked_add(spins_add)
         .ok_or_else(|| ApiError::Internal(anyhow!("overflow économique: offer.playerSpins")))?;
@@ -228,9 +374,11 @@ pub async fn verify_purchase(
         .credits
         .checked_add(credits_add)
         .ok_or_else(|| ApiError::Internal(anyhow!("overflow économique: offer.playerCredits")))?;
-    sqlx::query("UPDATE player_state SET spins=$1,credits=$2 WHERE address=$3")
+    let regen_anchor = regen.anchor.or(player.last_spin_at).unwrap_or(now);
+    sqlx::query("UPDATE player_state SET spins=$1,credits=$2,last_spin_at=$3 WHERE address=$4")
         .bind(final_spins)
         .bind(final_credits)
+        .bind(regen_anchor)
         .bind(&addr.0)
         .execute(&mut *tx)
         .await?;
@@ -253,4 +401,66 @@ pub async fn verify_purchase(
     state.db.store_idempotent(&mut tx, &key, &response).await?;
     tx.commit().await?;
     Ok(Json(response))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn offer_eligibility_is_server_derived() {
+        let mut eligibility = OfferEligibility {
+            max_account_age_ms: Some(7_000),
+            max_spins: Some(0),
+            ..OfferEligibility::default()
+        };
+        assert!(eligibility_matches(
+            &eligibility,
+            10_000,
+            0,
+            0,
+            5_000,
+            None,
+            true
+        ));
+        assert!(!eligibility_matches(
+            &eligibility,
+            13_000,
+            0,
+            0,
+            5_000,
+            None,
+            true
+        ));
+        assert!(!eligibility_matches(
+            &eligibility,
+            10_000,
+            1,
+            0,
+            5_000,
+            None,
+            true
+        ));
+        eligibility.max_account_age_ms = None;
+        eligibility.max_spins = None;
+        eligibility.min_inactivity_ms = Some(3_000);
+        assert!(eligibility_matches(
+            &eligibility,
+            10_000,
+            50,
+            1,
+            1_000,
+            Some(6_000),
+            true
+        ));
+        assert!(!eligibility_matches(
+            &eligibility,
+            10_000,
+            50,
+            1,
+            1_000,
+            Some(8_000),
+            true
+        ));
+    }
 }

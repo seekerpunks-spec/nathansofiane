@@ -157,7 +157,7 @@ pub async fn upgrade(
                     credits: reward.credits,
                     chest: reward.chest.clone(),
                 };
-                game::grant_reward_tx(&mut tx, &addr.0, &r).await?;
+                game::grant_reward_tx(&mut tx, &addr.0, &r, &state.config).await?;
                 completion_reward = Some(r);
             }
             sqlx::query("UPDATE player_state SET district_index=GREATEST(district_index,$1) WHERE address=$2")

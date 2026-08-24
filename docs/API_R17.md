@@ -11,6 +11,8 @@ calculé par le client.
 - `GET /config` — configuration complète versionnée SHA-256.
 - `GET /state` — soldes, district, inventaire, daily, missions, événements,
   saison et horloge serveur.
+- `GET /offers` — uniquement les offres actuellement éligibles pour le joueur,
+  avec type, fenêtre et nombre d'achats restants.
 - `GET /events/:event_id/leaderboard` — classement `DENSE_RANK` et rang du
   joueur dans sa cohorte configurable.
 
@@ -61,6 +63,7 @@ calculé par le client.
 - `POST /season/claim {seasonId,tier,premium,requestId}`
 - `POST /ad/reward {receipt,requestId}`
 - `POST /purchase/verify {offerId,txSignature,tokenMint,amountU64,requestId}`
+  — revalide fenêtre, prix, limite et éligibilité sous verrou avant tout crédit.
 - `POST /analytics {batchId,events:[{name,props}]}` — batch ≤ 100, props objet
   ≤ 8 Kio par événement, déduplication atomique par `(address,batchId)`.
 
