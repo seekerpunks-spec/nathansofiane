@@ -2,6 +2,8 @@
   "firewallMaxCharges": 3,
   "shieldOverflowCredits": 75000,
   "encounterTtlMs": 600000,
+  "targetPreferenceTtlMs": 86400000,
+  "revengeWindowMs": 604800000,
   "attack": {
     "baseRewardCredits": 250000,
     "blockedRewardCredits": 50000,

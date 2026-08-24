@@ -50,6 +50,10 @@ var _selected_multiplier := 1
 var _social_overlay: ColorRect
 var _social_busy := false
 var _tracked_social_starts: Dictionary = {}
+var _network_snapshot: Dictionary = {}
+var _network_leaderboard: Dictionary = {}
+var _network_results: Array = []
+var _network_message := ""
 
 
 func _ready() -> void:
@@ -118,11 +122,11 @@ func _build_header() -> void:
 	spins_chip.add_child(_spins_value)
 	add_child(spins_chip)
 
-	var menu := _promo_button("☰", Ui.NEON_MAGENTA)
+	var menu := _promo_button("NET", Ui.NEON_MAGENTA)
 	menu.position = Vector2(458, 12)
 	menu.size = Vector2(68, 56)
 	menu.add_theme_font_size_override("font_size", 25)
-	menu.pressed.connect(func() -> void: navigate_requested.emit("missions"))
+	menu.pressed.connect(_open_network)
 	add_child(menu)
 
 
@@ -404,10 +408,12 @@ func _refresh_hud() -> void:
 		if int(candidate.get("id", 0)) > completed:
 			break
 	if not active_district.is_empty():
+		var network_power := int(Store.state.get("progression", {}).get("score", 0))
 		_district_label.text = (
 			str(active_district.get("name", "NEON SLUMS")).to_upper()
 			+ " · NODE %02d" % int(active_district.get("id", 1))
-			+ " · FIREWALL %d/%d" % [int(Store.state.get("firewallCharges", 0)), int(Store.state.get("firewallMax", 3))]
+			+ " · FW %d/%d" % [int(Store.state.get("firewallCharges", 0)), int(Store.state.get("firewallMax", 3))]
+			+ " · PWR %s" % Ui.compact(network_power)
 		)
 
 
@@ -828,6 +834,262 @@ func _resume_pending_encounter() -> void:
 		_show_social_encounter(pending)
 
 
+func _open_network() -> void:
+	if _social_busy:
+		return
+	_social_busy = true
+	_show_network_loading()
+	await _fetch_network_data()
+	_social_busy = false
+	_render_network()
+
+
+func _show_network_loading() -> void:
+	_clear_social_overlay()
+	_social_busy = true
+	_social_overlay = ColorRect.new()
+	_social_overlay.color = Color(0.015, 0.02, 0.07, 0.97)
+	_social_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	var center := CenterContainer.new()
+	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	center.add_child(Ui.label("SYNCING NETWORK…", 24, Ui.NEON_CYAN))
+	_social_overlay.add_child(center)
+	add_child(_social_overlay)
+
+
+func _fetch_network_data() -> void:
+	var friends_response := await Net.protected_request("GET", "/friends")
+	var leaderboard_response := await Net.protected_request("GET", "/progression/leaderboard")
+	_network_snapshot = friends_response.data if friends_response.ok and typeof(friends_response.data) == TYPE_DICTIONARY else {}
+	_network_leaderboard = leaderboard_response.data if leaderboard_response.ok and typeof(leaderboard_response.data) == TYPE_DICTIONARY else {}
+
+
+func _render_network() -> void:
+	_clear_social_overlay()
+	_social_overlay = ColorRect.new()
+	_social_overlay.color = Color(0.015, 0.02, 0.07, 0.97)
+	_social_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	var center := CenterContainer.new()
+	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	var panel := Ui.panel(Ui.PANEL_HI, Ui.NEON_CYAN)
+	panel.custom_minimum_size = Vector2(500, 820)
+	var shell := VBoxContainer.new()
+	shell.add_theme_constant_override("separation", 10)
+	var title_row := HBoxContainer.new()
+	var title := Ui.label("SEEKER NETWORK", 28, Ui.NEON_CYAN)
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	title_row.add_child(title)
+	var close := Ui.button("✕", Ui.NEON_MAGENTA, true)
+	close.pressed.connect(_clear_social_overlay)
+	title_row.add_child(close)
+	shell.add_child(title_row)
+	var scroll := ScrollContainer.new()
+	scroll.custom_minimum_size = Vector2(460, 720)
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	Ui.style_scroll(scroll, Ui.NEON_CYAN)
+	var content := VBoxContainer.new()
+	content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	content.add_theme_constant_override("separation", 10)
+	_build_network_profile(content)
+	_build_network_search(content)
+	_build_network_requests(content)
+	_build_network_friends(content)
+	_build_network_revenge(content)
+	_build_network_leaderboard(content)
+	scroll.add_child(content)
+	shell.add_child(scroll)
+	panel.add_child(shell)
+	center.add_child(panel)
+	_social_overlay.add_child(center)
+	add_child(_social_overlay)
+
+
+func _network_section(parent: VBoxContainer, title: String) -> void:
+	var label := Ui.label(title, 17, Ui.GOLD)
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	parent.add_child(label)
+
+
+func _build_network_profile(parent: VBoxContainer) -> void:
+	_network_section(parent, "PROFILE")
+	var profile: Dictionary = Store.state.get("profile", {})
+	var progression: Dictionary = Store.state.get("progression", {})
+	parent.add_child(Ui.label("%s  •  %s" % [str(profile.get("playerId", "NO CODE")), str(progression.get("name", "NETWORK POWER")).to_upper()], 13, Ui.TEXT_DIM))
+	parent.add_child(Ui.label("%s PWR  •  DISTRICT %d" % [Ui.compact(int(progression.get("score", 0))), int(profile.get("districtIndex", 0)) + 1], 19, Ui.TEXT))
+	var edit_row := HBoxContainer.new()
+	var name_edit := LineEdit.new()
+	name_edit.text = str(profile.get("displayName", "Runner"))
+	name_edit.max_length = 24
+	name_edit.custom_minimum_size.x = 300
+	name_edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	edit_row.add_child(name_edit)
+	var save := Ui.button("SAVE", Ui.NEON_CYAN)
+	save.pressed.connect(_network_update_profile.bind(name_edit))
+	edit_row.add_child(save)
+	parent.add_child(edit_row)
+	if _network_message != "":
+		parent.add_child(Ui.label(_network_message, 13, Ui.NEON_MAGENTA))
+
+
+func _build_network_search(parent: VBoxContainer) -> void:
+	_network_section(parent, "FIND A PLAYER")
+	var row := HBoxContainer.new()
+	var query := LineEdit.new()
+	query.placeholder_text = "Friend code or name"
+	query.max_length = 24
+	query.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(query)
+	var search := Ui.button("SEARCH", Ui.NEON_CYAN)
+	search.pressed.connect(_network_search.bind(query))
+	row.add_child(search)
+	parent.add_child(row)
+	for result in _network_results:
+		if typeof(result) != TYPE_DICTIONARY:
+			continue
+		var result_row := HBoxContainer.new()
+		var result_label := Ui.label("%s  •  %s PWR" % [str(result.get("displayName", "Runner")), Ui.compact(int(result.get("score", 0)))], 13, Ui.TEXT)
+		result_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+		result_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		result_row.add_child(result_label)
+		var relationship := str(result.get("relationship", "none"))
+		var action := Ui.button("ADD" if relationship == "none" else relationship.to_upper(), Ui.NEON_MAGENTA, relationship != "none")
+		action.disabled = relationship != "none"
+		if relationship == "none":
+			action.pressed.connect(_network_friend_action.bind("/friends/request", str(result.get("playerId", "")), "friend_request_sent"))
+		result_row.add_child(action)
+		parent.add_child(result_row)
+
+
+func _build_network_requests(parent: VBoxContainer) -> void:
+	var incoming: Array = _network_snapshot.get("incoming", [])
+	if incoming.is_empty():
+		return
+	_network_section(parent, "REQUESTS")
+	for request in incoming:
+		if typeof(request) != TYPE_DICTIONARY:
+			continue
+		var row := HBoxContainer.new()
+		var label := Ui.label(str(request.get("displayName", "Runner")), 13, Ui.TEXT)
+		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+		label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.add_child(label)
+		var accept := Ui.button("ACCEPT", Ui.GREEN)
+		accept.pressed.connect(_network_friend_action.bind("/friends/accept", str(request.get("playerId", "")), "friend_request_accepted"))
+		row.add_child(accept)
+		var decline := Ui.button("DECLINE", Ui.NEON_MAGENTA, true)
+		decline.pressed.connect(_network_friend_action.bind("/friends/decline", str(request.get("playerId", "")), "friend_request_declined"))
+		row.add_child(decline)
+		parent.add_child(row)
+
+
+func _build_network_friends(parent: VBoxContainer) -> void:
+	var friends: Array = _network_snapshot.get("friends", [])
+	_network_section(parent, "FRIENDS  •  %d" % friends.size())
+	if friends.is_empty():
+		parent.add_child(Ui.label("Ajoute un joueur avec son code ami.", 13, Ui.TEXT_DIM))
+		return
+	for friend in friends:
+		if typeof(friend) != TYPE_DICTIONARY:
+			continue
+		var row := HBoxContainer.new()
+		var label := Ui.label("%s  •  %s PWR" % [str(friend.get("displayName", "Runner")), Ui.compact(int(friend.get("score", 0)))], 13, Ui.TEXT)
+		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+		label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.add_child(label)
+		var target := Ui.button("TARGET", Ui.NEON_MAGENTA)
+		target.pressed.connect(_network_select_target.bind(str(friend.get("playerId", "")), "friend"))
+		row.add_child(target)
+		parent.add_child(row)
+
+
+func _build_network_revenge(parent: VBoxContainer) -> void:
+	var attacks: Array = _network_snapshot.get("recentAttacks", [])
+	if attacks.is_empty():
+		return
+	_network_section(parent, "RECENT SIGNAL JAMS")
+	for attack in attacks.slice(0, mini(5, attacks.size())):
+		if typeof(attack) != TYPE_DICTIONARY:
+			continue
+		var row := HBoxContainer.new()
+		var label := Ui.label("%s  •  %s" % [str(attack.get("displayName", "Runner")), "BLOCKED" if bool(attack.get("blocked", false)) else "JAMMED"], 13, Ui.TEXT)
+		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+		label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.add_child(label)
+		var revenge := Ui.button("REVENGE", Ui.NEON_MAGENTA)
+		revenge.disabled = not bool(attack.get("canRevenge", false))
+		revenge.pressed.connect(_network_select_target.bind(str(attack.get("playerId", "")), "revenge"))
+		row.add_child(revenge)
+		parent.add_child(row)
+
+
+func _build_network_leaderboard(parent: VBoxContainer) -> void:
+	_network_section(parent, "GLOBAL NETWORK")
+	parent.add_child(Ui.label("YOUR RANK  •  #%d" % int(_network_leaderboard.get("playerRank", 0)), 14, Ui.NEON_CYAN))
+	var entries: Array = _network_leaderboard.get("entries", [])
+	for entry in entries.slice(0, mini(10, entries.size())):
+		if typeof(entry) == TYPE_DICTIONARY:
+			var line := Ui.label("#%d  %s  •  %s PWR" % [int(entry.get("rank", 0)), str(entry.get("displayName", "Runner")), Ui.compact(int(entry.get("score", 0)))], 13, Ui.TEXT_DIM)
+			line.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+			parent.add_child(line)
+
+
+func _network_search(query: LineEdit) -> void:
+	if _social_busy or query.text.strip_edges().length() < 2:
+		return
+	_social_busy = true
+	var response := await Net.protected_request("GET", "/players/search?q=" + query.text.strip_edges().uri_encode())
+	_network_results = response.data.get("results", []) if response.ok and typeof(response.data) == TYPE_DICTIONARY else []
+	_network_message = "" if response.ok else "SEARCH FAILED"
+	_social_busy = false
+	_render_network()
+
+
+func _network_update_profile(input: LineEdit) -> void:
+	if _social_busy:
+		return
+	_social_busy = true
+	var rid := Net.request_id()
+	var response := await Net.protected_request("POST", "/profile", {"displayName": input.text, "requestId": rid}, rid)
+	if response.ok:
+		Events.track("profile_updated")
+		var state_response := await Net.protected_request("GET", "/state")
+		if state_response.ok and typeof(state_response.data) == TYPE_DICTIONARY:
+			Store.apply_state(state_response.data)
+	_network_message = "PROFILE UPDATED" if response.ok else "INVALID PROFILE NAME"
+	await _fetch_network_data()
+	_social_busy = false
+	_render_network()
+
+
+func _network_friend_action(path: String, player_id: String, event_name: String) -> void:
+	if _social_busy:
+		return
+	_social_busy = true
+	var rid := Net.request_id()
+	var response := await Net.protected_request("POST", path, {"friendCode": player_id, "requestId": rid}, rid)
+	if response.ok:
+		Events.track(event_name, {"playerId": player_id})
+	_network_message = "NETWORK UPDATED" if response.ok else "ACTION REFUSED"
+	_network_results.clear()
+	await _fetch_network_data()
+	_social_busy = false
+	_render_network()
+
+
+func _network_select_target(player_id: String, source: String) -> void:
+	if _social_busy:
+		return
+	_social_busy = true
+	var rid := Net.request_id()
+	var response := await Net.protected_request("POST", "/social/target", {"friendCode": player_id, "source": source, "requestId": rid}, rid)
+	if response.ok:
+		Events.track("social_target_selected", {"playerId": player_id, "source": source})
+	_network_message = "TARGET ARMED FOR NEXT SIGNAL JAM" if response.ok else "TARGET NOT AVAILABLE"
+	await _fetch_network_data()
+	_social_busy = false
+	_render_network()
+
+
 func _clear_social_overlay() -> void:
 	if is_instance_valid(_social_overlay):
 		remove_child(_social_overlay)
@@ -905,6 +1167,7 @@ func _resolve_attack(encounter: Dictionary, element_id: int, box: VBoxContainer)
 		var blocked := bool(response.data.get("blocked", false))
 		Events.track("attack_completed", {"encounterId": encounter.get("encounterId", ""), "elementId": element_id, "blocked": blocked, "rewardCredits": response.data.get("rewardCredits", 0)})
 		Events.track("currency_earned", {"currency": "credits", "amount": int(response.data.get("rewardCredits", 0)), "source": "attack"})
+		_social_busy = false
 		box.add_child(Ui.label("BLOCKED BY FIREWALL" if blocked else "NODE JAMMED", 22, Ui.GOLD if blocked else Ui.NEON_MAGENTA))
 		box.add_child(Ui.label("+%s CR" % Ui.compact(int(response.data.get("rewardCredits", 0))), 20, Ui.GOLD))
 		var close := Ui.button("CONTINUE", Ui.NEON_CYAN)
@@ -965,7 +1228,7 @@ func _raid_cashout(encounter: Dictionary, box: VBoxContainer) -> void:
 
 func _show_social_result(message: String, failed: bool) -> void:
 	_clear_social_overlay()
-	_social_busy = true
+	_social_busy = false
 	_social_overlay = ColorRect.new()
 	_social_overlay.color = Color(0.015, 0.02, 0.07, 0.97)
 	_social_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)

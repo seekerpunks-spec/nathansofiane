@@ -76,17 +76,29 @@ impl Db {
             .bind(new_player_spins)
             .execute(&mut *tx)
             .await?;
-            tx.commit().await?;
             tracing::info!(address, new_player_spins, "nouveau joueur créé");
-            Ok(true)
         } else {
             sqlx::query("UPDATE players SET last_seen_at = now() WHERE address = $1")
                 .bind(address)
                 .execute(&mut *tx)
                 .await?;
-            tx.commit().await?;
-            Ok(false)
         }
+        sqlx::query(
+            "INSERT INTO player_profiles(address,display_name,friend_code) \
+             VALUES($1,'Runner-' || upper(substr(md5($1),1,4)),'CYB-' || upper(substr(md5($1),1,12))) \
+             ON CONFLICT(address) DO NOTHING",
+        )
+        .bind(address)
+        .execute(&mut *tx)
+        .await?;
+        sqlx::query(
+            "INSERT INTO progression_scores(address) VALUES($1) ON CONFLICT(address) DO NOTHING",
+        )
+        .bind(address)
+        .execute(&mut *tx)
+        .await?;
+        tx.commit().await?;
+        Ok(inserted == 1)
     }
 
     /// État simple (lecture seule, pas de verrou).

@@ -23,7 +23,7 @@
   484,5 spins), 6 scènes Godot et intégration PostgreSQL auto-claim/claim manuel/
   replay/cohorte/verrouillage District 2, complétion unique de Neon Slums puis
   premier upgrade autorisé dans Chrome Heights.
-- Funnel analytics complet : 25 événements cœur + 8 sociaux, batches idempotents,
+- Funnel analytics complet : 25 événements cœur + 13 sociaux, batches idempotents,
   props bornées/validées et progression événementielle incluse dans `/spin`.
 - Tous les rangs 1–50 d'une cohorte reçoivent un palier ; le claim final est
   exposé dans l'écran Missions après expiration.
@@ -68,8 +68,8 @@
 
 - `tools/economy_check.ps1` : OK, 277 605 CR équivalents/spin, 9,4 % vides,
   233,5 spins pour District 1 et 501,8 pour District 2.
-- `cargo test --locked` : 11/11 ; `cargo clippy --locked -- -D warnings` : OK.
-- `tools/analytics_check.ps1` : 33/33 événements présents.
+- `cargo test --locked` : 13/13 ; `cargo clippy --locked -- -D warnings` : OK.
+- `tools/analytics_check.ps1` : 38/38 événements présents.
 - Intégration analytics PostgreSQL : batch 25 accepté, replay dédupliqué, props
   invalides refusées et progression de spin renvoyée avec cohorte.
 - Slot social complet : outcomes Attack/Raid/Shield/Chest/Card, Signal Jam,
@@ -81,6 +81,11 @@
   `requestId` renvoient deux HTTP 200 strictement identiques pour une mutation ;
   Firewall ×4 donne trois charges et convertit exactement une charge en surplus,
   et un Raid perdu progresse bien mission et événement une seule fois.
+- Network Power data-driven avec détail upgrades/districts/cartes/sets, profil
+  modifiable, code ami, recherche, invitations, liste, classement et revanche.
+- Intégration PostgreSQL à deux joueurs : invitation simultanée rejouée à
+  l'identique, acceptation symétrique, score/rang exacts, cible amie consommée
+  par Signal Jam et droit de revanche validé depuis le journal reçu.
 - Économie réauditée : 277 605 CR équivalents/spin, 9,4 % de spins vides,
   districts estimés à 233,5 puis 501,8 spins. `cargo clippy -D warnings` vert.
 - `cargo build --release` : OK.

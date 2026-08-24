@@ -34,6 +34,12 @@ calculé par le client.
 - `POST /attack/resolve {encounterId,elementId,requestId}`
 - `POST /raid/pick {encounterId,nodeIndex,requestId}`
 - `POST /raid/cashout {encounterId,requestId}`
+- `GET|POST /profile` — profil public minimal / mise à jour du nom.
+- `GET /players/search?q=...`, `GET /friends`
+- `POST /friends/request|accept|decline|remove {friendCode,requestId}`
+- `POST /social/target {friendCode,source,requestId}` — `friend` ou `revenge`,
+  consommé par le prochain Signal Jam.
+- `GET /progression/leaderboard`
 - `POST /chest/buy {chestId,requestId}`
 - `POST /chest/open {chestId,requestId}`
 - `POST /set/claim {setId,requestId}`

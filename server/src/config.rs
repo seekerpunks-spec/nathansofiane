@@ -20,6 +20,7 @@ const TOP_LEVEL_FILES: &[&str] = &[
     "economy.json",
     "events.json",
     "offers.json",
+    "progression.json",
     "seasons.json",
     "sets.json",
     "social.json",
@@ -114,8 +115,43 @@ pub struct SocialConfig {
     pub firewall_max_charges: u32,
     pub shield_overflow_credits: u64,
     pub encounter_ttl_ms: u64,
+    pub target_preference_ttl_ms: u64,
+    pub revenge_window_ms: u64,
     pub attack: AttackConfig,
     pub raid: RaidConfig,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RarityPointsConfig {
+    pub common: u32,
+    pub uncommon: u32,
+    pub rare: u32,
+    pub epic: u32,
+    pub legendary: u32,
+}
+
+impl RarityPointsConfig {
+    pub fn points(&self, tier: Tier) -> u32 {
+        match tier {
+            Tier::Common => self.common,
+            Tier::Uncommon => self.uncommon,
+            Tier::Rare => self.rare,
+            Tier::Epic => self.epic,
+            Tier::Legendary => self.legendary,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProgressionConfig {
+    pub score_name: String,
+    pub upgrade_points: u32,
+    pub district_completion_points: u32,
+    pub set_completion_points: u32,
+    pub rarity_points: RarityPointsConfig,
+    pub global_leaderboard_limit: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -332,6 +368,7 @@ pub struct RemoteConfig {
     pub economy: EconomyConfig,
     pub spin_table: SpinTable,
     pub social: SocialConfig,
+    pub progression: ProgressionConfig,
     pub daily: DailyConfig,
     pub districts: Vec<District>,
     pub cards: Vec<CardConfig>,
@@ -425,6 +462,9 @@ impl RemoteConfig {
             .context("spin_table.json invalide")?;
         let social: SocialConfig = serde_json::from_slice(get_entry(&entries, "social.json")?)
             .context("social.json invalide")?;
+        let progression: ProgressionConfig =
+            serde_json::from_slice(get_entry(&entries, "progression.json")?)
+                .context("progression.json invalide")?;
         let daily: DailyConfig = serde_json::from_slice(get_entry(&entries, "daily.json")?)
             .context("daily.json invalide")?;
         let districts: Vec<District> = entries
@@ -448,6 +488,7 @@ impl RemoteConfig {
             economy,
             spin_table,
             social,
+            progression,
             daily,
             districts,
             cards,
@@ -555,6 +596,10 @@ impl RemoteConfig {
             || self.social.firewall_max_charges > i32::MAX as u32
             || self.social.encounter_ttl_ms < 30_000
             || self.social.encounter_ttl_ms > 86_400_000
+            || self.social.target_preference_ttl_ms < 60_000
+            || self.social.target_preference_ttl_ms > 604_800_000
+            || self.social.revenge_window_ms < 3_600_000
+            || self.social.revenge_window_ms > 2_592_000_000
             || self.social.attack.repair_cost_bps == 0
             || self.social.attack.repair_cost_bps > 10_000
             || self.social.raid.node_count < 4
@@ -592,6 +637,26 @@ impl RemoteConfig {
                 .is_none_or(|value| value > i64::MAX as u64)
         {
             problems.push("social.json : paramètres hors limites".to_string());
+        }
+        let rarity_points = &self.progression.rarity_points;
+        if self.progression.score_name.trim().is_empty()
+            || self.progression.score_name.len() > 32
+            || self.progression.upgrade_points == 0
+            || self.progression.district_completion_points == 0
+            || self.progression.set_completion_points == 0
+            || self.progression.global_leaderboard_limit == 0
+            || self.progression.global_leaderboard_limit > 100
+            || [
+                rarity_points.common,
+                rarity_points.uncommon,
+                rarity_points.rare,
+                rarity_points.epic,
+                rarity_points.legendary,
+            ]
+            .iter()
+            .any(|points| *points == 0 || *points > 10_000)
+        {
+            problems.push("progression.json : paramètres hors limites".to_string());
         }
 
         let mut days = BTreeSet::new();
@@ -913,6 +978,7 @@ impl RemoteConfig {
             "economy": self.economy,
             "spinTable": self.spin_table,
             "social": self.social,
+            "progression": self.progression,
             "daily": self.daily,
             "districts": self.districts,
             "cards": self.cards,

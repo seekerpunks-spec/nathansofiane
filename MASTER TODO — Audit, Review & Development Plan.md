@@ -622,6 +622,10 @@ Utilisations :
 
 Le nom final peut être différent de "Stars".
 
+Statut R24 : `Network Power` agrège upgrades, districts complétés, cartes uniques
+pondérées par rareté et sets complétés. Les poids et la limite de leaderboard
+sont data-driven ; le score est recalculé transactionnellement aux mutations.
+
 ---
 
 # PHASE 8 — SOCIAL
@@ -632,11 +636,15 @@ Le nom final peut être différent de "Stars".
 
 Selon architecture actuelle :
 
-- [ ] profil joueur minimal ;
-- [ ] friend system si pertinent ;
-- [ ] inviter/retrouver joueur ;
-- [ ] voir progression ;
+- [x] profil joueur minimal ;
+- [x] friend system si pertinent ;
+- [x] inviter/retrouver joueur ;
+- [x] voir progression ;
 - [ ] envoyer certaines ressources si design validé.
+
+Statut R24 : code ami stable, recherche bornée, demandes idempotentes,
+accept/refus/suppression, classement global, journal Signal Jam et sélection
+ami/revanche pour le prochain Signal Jam. Aucun transfert de ressource libre.
 
 Ne pas transformer le jeu en réseau social.
 
@@ -1080,8 +1088,8 @@ purchase_started
 purchase_complete
 ```
 
-Statut R24 : les 25 événements ci-dessus et les 8 événements sociaux validés
-(Attack, Raid et réparation), soit 33 événements, sont instrumentés et couverts
+Statut R24 : les 25 événements ci-dessus, les 8 événements Attack/Raid/réparation
+et 5 événements profil/amis, soit 38 événements, sont instrumentés et couverts
 par la gate `tools/analytics_check.ps1`. Les batches sont bornés, validés et
 dédupliqués côté serveur par `batchId` lors des retries réseau.
 

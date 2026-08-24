@@ -18,6 +18,7 @@ use crate::config::{OutcomeType, RemoteConfig};
 use crate::db::Db;
 use crate::error::ApiError;
 use crate::game;
+use crate::progression;
 use crate::social;
 use crate::state::AppState;
 use anyhow::anyhow;
@@ -231,6 +232,11 @@ async fn perform_spin(
 
     let progress =
         game::progress_action_tx(&mut tx, address, "spin", multiplier as i64, config).await?;
+    let global_progression = if outcome.outcome_type == OutcomeType::Card {
+        progression::refresh_score_tx(&mut tx, address, config).await?
+    } else {
+        progression::stored_score_tx(&mut tx, address).await?
+    };
     let final_balances: (i32, i64) =
         sqlx::query_as("SELECT spins,credits FROM player_state WHERE address=$1")
             .bind(address)
@@ -245,6 +251,7 @@ async fn perform_spin(
         "creditsGained": credits_gained,
         "featureReward": feature_reward.clone(),
         "pendingEncounter": pending_encounter.clone(),
+        "globalScore": global_progression.total,
     });
     Db::audit_tx(&mut tx, address, "spin", &before, &after, Some(request_id)).await?;
 
@@ -273,6 +280,7 @@ async fn perform_spin(
         "featureReward": feature_reward,
         "pendingEncounter": pending_encounter,
         "progress": progress,
+        "globalProgression": progression::score_json(global_progression, config),
         "nextSpinAtMs": next_spin_at_ms,
         "serverTimeMs": now.timestamp_millis(),
     });

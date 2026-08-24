@@ -160,7 +160,8 @@ async fn choose_target_tx(
         sqlx::query_scalar(
             "SELECT ps.address FROM player_state ps \
              WHERE ps.address<>$1 AND EXISTS(SELECT 1 FROM district_progress dp \
-                 WHERE dp.address=ps.address AND dp.level>0) \
+                 LEFT JOIN district_damage dd ON dd.address=dp.address AND dd.district_id=dp.district_id AND dd.element_id=dp.element_id \
+                 WHERE dp.address=ps.address AND dp.level>0 AND dd.address IS NULL) \
              ORDER BY ABS(ps.district_index-$2),random() LIMIT 1",
         )
         .bind(attacker)
@@ -169,6 +170,22 @@ async fn choose_target_tx(
         .await?
     };
     Ok(target)
+}
+
+async fn take_preferred_attack_target_tx(
+    tx: &mut Transaction<'_, Postgres>,
+    attacker: &str,
+) -> Result<Option<String>, ApiError> {
+    sqlx::query("DELETE FROM social_target_preferences WHERE attacker=$1 AND expires_at<=now()")
+        .bind(attacker)
+        .execute(&mut **tx)
+        .await?;
+    Ok(sqlx::query_scalar(
+        "DELETE FROM social_target_preferences WHERE attacker=$1 RETURNING target",
+    )
+    .bind(attacker)
+    .fetch_optional(&mut **tx)
+    .await?)
 }
 
 pub async fn create_encounter_tx(
@@ -209,6 +226,8 @@ pub async fn create_encounter_tx(
     let (target, payload) = if kind == "attack" {
         let mut target = if let Some(target) = forced_target {
             Some(target.to_string())
+        } else if let Some(preferred) = take_preferred_attack_target_tx(tx, address).await? {
+            Some(preferred)
         } else {
             choose_target_tx(tx, address, district_index, None).await?
         };

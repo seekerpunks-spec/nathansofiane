@@ -47,6 +47,7 @@
 | T25 | Classements événementiels en cohortes configurables, attribution sérialisée et rang `DENSE_RANK`; milestones configurables auto/manuels et idempotents | Évite un classement mondial illisible, traite correctement les égalités et sécurise chaque récompense |
 | T26 | Les 25 événements funnel sont vérifiés statiquement ; les batches analytics ont un `batchId` stable et sont dédupliqués en PostgreSQL | Les retries réseau ne gonflent pas les métriques et les données sont bornées avant insertion |
 | T27 | Paire sociale = Signal Jam (dégât réparable, Firewall auto) + Ghost Vault (six nœuds, trace, cash-out), cible rival ou NEON CORP fallback | Deux sensations distinctes, quelques secondes, scaling multiplicateur, interaction sociale et économie contrôlée sans copier les mini-jeux de Coin Master |
+| T28 | Score global `Network Power` dérivé de quatre composantes configurables ; identité sociale par code ami, sans exposer l'adresse complète ; ciblage ami/revanche consommé au prochain Signal Jam | Évite la dérive d'un compteur client, fournit prestige/matchmaking, garde le social léger et empêche le ciblage arbitraire de joueurs |
 
 ## Noms / brandings (à verrouiller — O1 GDD)
 - Jeu : **CyberSeeker** (provisoire, utilisé partout pour l'instant).

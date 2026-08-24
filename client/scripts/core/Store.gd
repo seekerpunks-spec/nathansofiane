@@ -63,6 +63,8 @@ func apply_spin(d: Dictionary) -> void:
 		state["nextSpinAtMs"] = d["nextSpinAtMs"]
 	if d.has("pendingEncounter"):
 		state["pendingEncounter"] = d["pendingEncounter"]
+	if d.has("globalProgression"):
+		state["progression"] = d["globalProgression"]
 	var feature: Variant = d.get("featureReward", null)
 	if typeof(feature) == TYPE_DICTIONARY:
 		if feature.has("firewallCharges"):
@@ -110,9 +112,9 @@ func _apply_event_progress(progress_events: Array) -> void:
 func apply_mutation(d: Dictionary) -> void:
 	if typeof(d) != TYPE_DICTIONARY:
 		return
-	for key in ["spins", "credits", "nextSpinAtMs", "districtIndex", "districtProgress", "districtDamage", "firewallCharges", "firewallMax", "pendingEncounter", "cards", "chests", "missions", "events", "seasons", "dailyStreak", "dailyAvailable"]:
+	for key in ["spins", "credits", "nextSpinAtMs", "districtIndex", "districtProgress", "districtDamage", "firewallCharges", "firewallMax", "pendingEncounter", "profile", "progression", "globalProgression", "cards", "chests", "missions", "events", "seasons", "dailyStreak", "dailyAvailable"]:
 		if d.has(key):
-			state[key] = d[key]
+			state["progression" if key == "globalProgression" else key] = d[key]
 	if d.has("serverTimeMs"):
 		set_clock(int(d["serverTimeMs"]))
 	state_changed.emit()

@@ -33,7 +33,12 @@ $expected = @(
     "raid_cashout",
     "raid_failed",
     "repair_started",
-    "repair_completed"
+    "repair_completed",
+    "profile_updated",
+    "friend_request_sent",
+    "friend_request_accepted",
+    "friend_request_declined",
+    "social_target_selected"
 )
 
 $sources = Get-ChildItem -LiteralPath (Join-Path $workspace "client") -Filter "*.gd" -Recurse |

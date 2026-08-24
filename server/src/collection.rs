@@ -5,6 +5,7 @@ use crate::config::{CardConfig, ChestConfig, Reward};
 use crate::db::Db;
 use crate::error::ApiError;
 use crate::game;
+use crate::progression;
 use crate::state::AppState;
 use anyhow::anyhow;
 use axum::extract::{Extension, State};
@@ -204,10 +205,11 @@ pub async fn open_chest(
     }
     let _progress =
         game::progress_action_tx(&mut tx, &addr.0, "chest_open", 1, &state.config).await?;
+    let global_progression = progression::refresh_score_tx(&mut tx, &addr.0, &state.config).await?;
     let before = json!({"chestId": chest.chest_id, "qty": qty});
     let after = json!({"chestId": chest.chest_id, "qty": qty - 1, "drops": drops});
     Db::audit_tx(&mut tx, &addr.0, "chest_open", &before, &after, Some(&rid)).await?;
-    let response = json!({"chestId": chest.chest_id, "remaining": qty - 1, "cards": drops, "serverTimeMs": chrono::Utc::now().timestamp_millis()});
+    let response = json!({"chestId": chest.chest_id, "remaining": qty - 1, "cards": drops, "globalProgression":progression::score_json(global_progression,&state.config), "serverTimeMs": chrono::Utc::now().timestamp_millis()});
     state.db.store_idempotent(&mut tx, &key, &response).await?;
     tx.commit().await?;
     Ok(Json(response))
@@ -268,7 +270,8 @@ pub async fn claim_set(
         chest: None,
     };
     game::grant_reward_tx(&mut tx, &addr.0, &reward).await?;
-    let response = json!({"setId": set.set_id, "reward": reward, "spins": player.spins + set.completion_spins as i32, "serverTimeMs": chrono::Utc::now().timestamp_millis()});
+    let global_progression = progression::refresh_score_tx(&mut tx, &addr.0, &state.config).await?;
+    let response = json!({"setId": set.set_id, "reward": reward, "spins": player.spins + set.completion_spins as i32, "globalProgression":progression::score_json(global_progression,&state.config), "serverTimeMs": chrono::Utc::now().timestamp_millis()});
     Db::audit_tx(
         &mut tx,
         &addr.0,

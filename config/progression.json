@@ -1,0 +1,14 @@
+{
+  "scoreName": "Network Power",
+  "upgradePoints": 1,
+  "districtCompletionPoints": 25,
+  "setCompletionPoints": 20,
+  "rarityPoints": {
+    "common": 1,
+    "uncommon": 2,
+    "rare": 4,
+    "epic": 7,
+    "legendary": 12
+  },
+  "globalLeaderboardLimit": 50
+}

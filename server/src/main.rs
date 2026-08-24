@@ -20,7 +20,9 @@ mod district;
 mod engagement;
 mod env;
 mod error;
+mod friends;
 mod game;
+mod progression;
 mod rate_limit;
 mod social;
 mod spin;
@@ -162,6 +164,18 @@ async fn main() -> anyhow::Result<()> {
         .route("/auth/verify", post(auth::verify))
         .route("/auth/refresh", post(auth::refresh))
         .route("/state", get(get_state))
+        .route(
+            "/profile",
+            get(friends::own_profile).post(friends::update_profile),
+        )
+        .route("/players/search", get(friends::search))
+        .route("/friends", get(friends::list))
+        .route("/friends/request", post(friends::request_friend))
+        .route("/friends/accept", post(friends::accept_friend))
+        .route("/friends/decline", post(friends::decline_friend))
+        .route("/friends/remove", post(friends::remove_friend))
+        .route("/social/target", post(friends::select_target))
+        .route("/progression/leaderboard", get(progression::leaderboard))
         .route("/spin", post(spin::spin))
         .route("/district/upgrade", post(district::upgrade))
         .route("/district/repair", post(social::repair))
@@ -276,6 +290,8 @@ async fn get_state(
         .ok_or_else(|| ApiError::Internal(anyhow!("pas de player_state pour {address}")))?;
 
     let now = Utc::now();
+    let score = progression::refresh_score(&state, &address).await?;
+    let profile = friends::profile_for_state(&state, &address).await?;
     let regen = spin::regen_state(row.last_spin_at, now, row.spins, &state.config);
     let spins = regen.spins;
     let next_spin_at = regen.next_spin_at_ms;
@@ -339,6 +355,8 @@ async fn get_state(
 
     Ok(Json(json!({
         "address": address,
+        "profile": profile,
+        "progression": progression::score_json(score, &state.config),
         "spins": spins,
         "credits": row.credits,
         "lastSpinAtMs": row.last_spin_at.map(|t| t.timestamp_millis()),

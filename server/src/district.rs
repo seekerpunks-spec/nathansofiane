@@ -5,6 +5,7 @@ use crate::config::Reward;
 use crate::db::Db;
 use crate::error::ApiError;
 use crate::game;
+use crate::progression;
 use crate::state::AppState;
 use anyhow::anyhow;
 use axum::extract::{Extension, State};
@@ -185,6 +186,7 @@ pub async fn upgrade(
         .iter()
         .find(|candidate| candidate.id > district.id)
         .map(|candidate| candidate.id);
+    let global_progression = progression::refresh_score_tx(&mut tx, &addr.0, &state.config).await?;
     let after = json!({"spins": balances.0, "credits": balances.1, "districtIndex": balances.2, "districtId": district.id, "elementId": element.id, "level": next_level, "complete": complete});
     Db::audit_tx(
         &mut tx,
@@ -203,6 +205,7 @@ pub async fn upgrade(
         "districtComplete": complete, "completionReward": completion_reward,
         "nextDistrictId": next_district_id,
         "allDistrictsComplete": complete && next_district_id.is_none(),
+        "globalProgression": progression::score_json(global_progression,&state.config),
         "serverTimeMs": chrono::Utc::now().timestamp_millis()
     });
     state.db.store_idempotent(&mut tx, &key, &response).await?;
