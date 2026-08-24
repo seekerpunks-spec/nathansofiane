@@ -42,6 +42,7 @@ var _pending_outcome: Dictionary = {}
 var _pending_credits := 0
 var _pending_base_credits := 0
 var _pending_multiplier := 1
+var _pending_progress: Dictionary = {}
 var _final_symbols: Array[String] = []
 var _anticipation := false
 var _landed_count := 0
@@ -481,6 +482,7 @@ func _do_spin() -> void:
 		_pending_credits = int(data.get("creditsGained", 0))
 		_pending_base_credits = int(data.get("baseCreditsGained", _pending_credits))
 		_pending_multiplier = int(data.get("multiplier", 1))
+		_pending_progress = data.get("progress", {}) if typeof(data.get("progress", {})) == TYPE_DICTIONARY else {}
 		_final_symbols = _symbols_for_result(_pending_outcome)
 		_animate_slots(_final_symbols)
 	elif response.code == 403:
@@ -645,7 +647,7 @@ func _on_landed() -> void:
 	if tier == "legendary":
 		Sfx.jackpot()
 	Haptics.win(tier)
-	Events.track("spin_result", {
+	Events.track("spin_completed", {
 		"tier": tier,
 		"type": result_type,
 		"multiplier": _pending_multiplier,
@@ -653,6 +655,30 @@ func _on_landed() -> void:
 		"baseCredits": _pending_base_credits,
 		"credits": _pending_credits,
 	})
+	if _pending_credits > 0:
+		Events.track("currency_earned", {
+			"currency": "credits",
+			"amount": _pending_credits,
+			"source": "spin",
+			"multiplier": _pending_multiplier,
+		})
+	for event_progress in _pending_progress.get("events", []):
+		if typeof(event_progress) != TYPE_DICTIONARY:
+			continue
+		var event_id := str(event_progress.get("eventId", ""))
+		Events.track("event_progress", {
+			"eventId": event_id,
+			"pointsAdded": int(event_progress.get("pointsAdded", 0)),
+			"points": int(event_progress.get("points", 0)),
+			"cohortId": int(event_progress.get("cohortId", 1)),
+			"source": "spin",
+		})
+		for milestone_index in event_progress.get("autoMilestonesClaimed", []):
+			Events.track("milestone_claim", {
+				"eventId": event_id,
+				"milestoneIndex": int(milestone_index),
+				"claimMode": "auto",
+			})
 	_refresh_hud()
 	_reset_idle_state(false)
 

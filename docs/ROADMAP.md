@@ -83,7 +83,7 @@
 - [x] Deux districts séquentiels, prérequis de déblocage et transition client.
 - [x] Milestones événementiels auto/manuels, claims idempotents et cohortes de
       leaderboard avec égalités `DENSE_RANK`.
-- [ ] Funnel analytics complet.
+- [x] Funnel analytics complet, gate 25 événements et batches idempotents.
 - [ ] Attack, Raid et défense originaux.
 - [ ] Progression globale, amis/équipes/trading et autres systèmes du MASTER TODO.
 - [ ] Design et Wallet Adapter différés explicitement pour ce lot.

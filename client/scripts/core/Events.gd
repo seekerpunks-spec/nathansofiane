@@ -12,6 +12,8 @@ const MAX_BUFFER := 100
 var _buffer: Array = []
 var _timer: Timer
 var _flushing: bool = false
+var _active_batch_id := ""
+var _active_batch_size := 0
 
 func _ready() -> void:
 	_timer = Timer.new()
@@ -37,15 +39,23 @@ func _flush() -> void:
 	if not Net.has_token():
 		return
 	_flushing = true
-	var batch := _buffer.slice(0, min(_buffer.size(), 100))
-	var r := await Net.post("/analytics", { "events": batch }, true, "")
+	if _active_batch_id == "":
+		_active_batch_id = Net.request_id()
+		_active_batch_size = min(_buffer.size(), 100)
+	var batch := _buffer.slice(0, _active_batch_size)
+	var r := await Net.post("/analytics", { "batchId": _active_batch_id, "events": batch }, true, _active_batch_id)
 	if r.ok:
 		_buffer = _buffer.slice(batch.size())
+		_active_batch_id = ""
+		_active_batch_size = 0
 	_flushing = false
 	# Sinon : on garde le buffer (re-queue), nouvel essai au prochain flush.
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_CLOSE_REQUEST:
 		if not _buffer.is_empty() and Net.has_token():
-			var batch := _buffer.slice(0, min(_buffer.size(), 100))
-			Net.post("/analytics", { "events": batch }, true, "")
+			if _active_batch_id == "":
+				_active_batch_id = Net.request_id()
+				_active_batch_size = min(_buffer.size(), 100)
+			var batch := _buffer.slice(0, _active_batch_size)
+			Net.post("/analytics", { "batchId": _active_batch_id, "events": batch }, true, _active_batch_id)

@@ -25,7 +25,8 @@ calculé par le client.
 - `POST /spin {requestId,multiplier}` — multiplicateur présent dans
   `economy.spinMultipliers`; défaut rétrocompatible `1`.
   Réponse : `{outcome,multiplier,spinsSpent,baseCreditsGained,creditsGained,
-  spins,credits,nextSpinAtMs,serverTimeMs}`.
+  spins,credits,progress,nextSpinAtMs,serverTimeMs}`. `progress.events` contient
+  les points ajoutés/totaux, la cohorte et les milestones auto-claimés.
 - `POST /district/upgrade {districtId,elementId,requestId}`
 - `POST /chest/buy {chestId,requestId}`
 - `POST /chest/open {chestId,requestId}`
@@ -37,7 +38,8 @@ calculé par le client.
 - `POST /season/claim {seasonId,tier,premium,requestId}`
 - `POST /ad/reward {receipt,requestId}`
 - `POST /purchase/verify {offerId,txSignature,tokenMint,amountU64,requestId}`
-- `POST /analytics {events:[{name,props}]}`
+- `POST /analytics {batchId,events:[{name,props}]}` — batch ≤ 100, props objet
+  ≤ 8 Kio par événement, déduplication atomique par `(address,batchId)`.
 
 ## Erreurs
 

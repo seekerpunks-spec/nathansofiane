@@ -7,6 +7,8 @@ $ErrorActionPreference = "Stop"
 $workspace = Split-Path -Parent $PSScriptRoot
 $economyCheck = Join-Path $PSScriptRoot "economy_check.ps1"
 & $economyCheck
+$analyticsCheck = Join-Path $PSScriptRoot "analytics_check.ps1"
+& $analyticsCheck
 $cargo = Join-Path $env:USERPROFILE ".cargo\bin\cargo.exe"
 if (-not (Test-Path -LiteralPath $cargo)) { throw "cargo.exe introuvable" }
 

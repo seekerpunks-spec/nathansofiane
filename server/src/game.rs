@@ -5,7 +5,24 @@ use crate::error::ApiError;
 use anyhow::anyhow;
 use axum::http::HeaderMap;
 use chrono::{NaiveDate, Utc};
+use serde::Serialize;
 use sqlx::{Postgres, Transaction};
+
+#[derive(Debug, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProgressResult {
+    pub events: Vec<EventProgressResult>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EventProgressResult {
+    pub event_id: String,
+    pub points_added: i64,
+    pub points: i64,
+    pub cohort_id: i32,
+    pub auto_milestones_claimed: Vec<u32>,
+}
 
 pub fn request_id(headers: &HeaderMap, fallback: Option<&str>) -> Result<String, ApiError> {
     let value = headers
@@ -89,8 +106,9 @@ pub async fn progress_action_tx(
     action: &str,
     amount: i64,
     config: &RemoteConfig,
-) -> Result<(), ApiError> {
+) -> Result<ProgressResult, ApiError> {
     let now = Utc::now();
+    let mut result = ProgressResult::default();
     let today: NaiveDate = now.date_naive();
     for mission in config.daily.missions.iter().filter(|m| m.action == action) {
         sqlx::query(
@@ -175,6 +193,7 @@ pub async fn progress_action_tx(
             .fetch_one(&mut **tx)
             .await?;
 
+            let mut auto_milestones_claimed = Vec::new();
             for (index, milestone) in event.milestones.iter().enumerate() {
                 if !milestone.auto_claim
                     || total_points < checked_u64_to_i64(milestone.points, "milestone.points")?
@@ -193,8 +212,16 @@ pub async fn progress_action_tx(
                 .rows_affected();
                 if inserted == 1 {
                     grant_reward_tx(tx, address, &milestone.reward).await?;
+                    auto_milestones_claimed.push(index as u32);
                 }
             }
+            result.events.push(EventProgressResult {
+                event_id: event.event_id.clone(),
+                points_added: points,
+                points: total_points,
+                cohort_id,
+                auto_milestones_claimed,
+            });
         }
     }
     for season in config
@@ -214,7 +241,7 @@ pub async fn progress_action_tx(
             .await?;
         }
     }
-    Ok(())
+    Ok(result)
 }
 
 #[cfg(test)]

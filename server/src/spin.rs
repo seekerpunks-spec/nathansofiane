@@ -167,7 +167,8 @@ async fn perform_spin(
     .execute(&mut *tx)
     .await?;
 
-    game::progress_action_tx(&mut tx, address, "spin", multiplier as i64, config).await?;
+    let progress =
+        game::progress_action_tx(&mut tx, address, "spin", multiplier as i64, config).await?;
     let final_balances: (i32, i64) =
         sqlx::query_as("SELECT spins,credits FROM player_state WHERE address=$1")
             .bind(address)
@@ -205,6 +206,7 @@ async fn perform_spin(
         "creditsGained": credits_gained,
         "spins": final_balances.0,
         "credits": final_balances.1,
+        "progress": progress,
         "nextSpinAtMs": next_spin_at_ms,
         "serverTimeMs": now.timestamp_millis(),
     });

@@ -61,10 +61,29 @@ func apply_spin(d: Dictionary) -> void:
 		state["credits"] = d["credits"]
 	if d.has("nextSpinAtMs"):
 		state["nextSpinAtMs"] = d["nextSpinAtMs"]
+	var progress: Variant = d.get("progress", {})
+	if typeof(progress) == TYPE_DICTIONARY:
+		_apply_event_progress(progress.get("events", []))
 	if d.has("serverTimeMs"):
 		set_clock(int(d["serverTimeMs"]))
 	state_changed.emit()
 	spin_result.emit(d)
+
+func _apply_event_progress(progress_events: Array) -> void:
+	var events: Array = state.get("events", [])
+	for update in progress_events:
+		if typeof(update) != TYPE_DICTIONARY:
+			continue
+		var event_id := str(update.get("eventId", ""))
+		for event in events:
+			if typeof(event) != TYPE_DICTIONARY or str(event.get("eventId", "")) != event_id:
+				continue
+			event["points"] = int(update.get("points", event.get("points", 0)))
+			var claimed_indexes: Array = update.get("autoMilestonesClaimed", [])
+			for milestone in event.get("milestones", []):
+				if typeof(milestone) == TYPE_DICTIONARY and claimed_indexes.has(int(milestone.get("index", -1))):
+					milestone["claimed"] = true
+					milestone["autoClaimed"] = true
 
 ## Applique les champs communs d'une mutation puis fusionne les collections.
 func apply_mutation(d: Dictionary) -> void:

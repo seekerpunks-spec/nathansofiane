@@ -45,6 +45,7 @@
 | T23 | Multiplicateurs `[1,2,3,4,5,10,20,50,100,250,500,1000,2500,5000,10000,25000,50000,100000]`; une seule animation, débit/progression de N, gain de base ×N, probabilités inchangées | Contrat utilisateur et intégrité économique serveur |
 | T24 | Le district actif est le premier district non complété ; les prérequis forment une chaîne contiguë et la récompense de complétion est unique | Progression lisible et extensible, fidèle à une boucle de villages sans laisser le client choisir un district verrouillé |
 | T25 | Classements événementiels en cohortes configurables, attribution sérialisée et rang `DENSE_RANK`; milestones configurables auto/manuels et idempotents | Évite un classement mondial illisible, traite correctement les égalités et sécurise chaque récompense |
+| T26 | Les 25 événements funnel sont vérifiés statiquement ; les batches analytics ont un `batchId` stable et sont dédupliqués en PostgreSQL | Les retries réseau ne gonflent pas les métriques et les données sont bornées avant insertion |
 
 ## Noms / brandings (à verrouiller — O1 GDD)
 - Jeu : **CyberSeeker** (provisoire, utilisé partout pour l'instant).

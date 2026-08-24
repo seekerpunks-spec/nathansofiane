@@ -1,0 +1,43 @@
+$ErrorActionPreference = "Stop"
+$workspace = Split-Path -Parent $PSScriptRoot
+$expected = @(
+    "session_start",
+    "spin_started",
+    "spin_completed",
+    "spins_empty",
+    "multiplier_changed",
+    "currency_earned",
+    "currency_spent",
+    "upgrade_started",
+    "upgrade_completed",
+    "village_completed",
+    "chest_opened",
+    "card_received",
+    "new_card",
+    "duplicate_card",
+    "set_completed",
+    "daily_claim",
+    "event_progress",
+    "milestone_claim",
+    "leaderboard_join",
+    "leaderboard_finish",
+    "rewarded_ad_offer",
+    "rewarded_ad_complete",
+    "purchase_offer_view",
+    "purchase_started",
+    "purchase_complete"
+)
+
+$sources = Get-ChildItem -LiteralPath (Join-Path $workspace "client") -Filter "*.gd" -Recurse |
+    ForEach-Object { Get-Content -LiteralPath $_.FullName -Raw }
+$joined = $sources -join "`n"
+$missing = @($expected | Where-Object { $joined -notmatch [regex]::Escape('"' + $_ + '"') })
+if ($missing.Count -gt 0) {
+    throw "Événements analytics absents du client: $($missing -join ', ')"
+}
+
+[pscustomobject]@{
+    RequiredEvents = $expected.Count
+    MissingEvents = $missing.Count
+} | Format-List
+Write-Host "ANALYTICS_CHECK_OK" -ForegroundColor Green

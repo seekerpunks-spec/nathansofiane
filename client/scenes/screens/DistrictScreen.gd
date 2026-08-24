@@ -147,12 +147,28 @@ func _upgrade(element_id: int) -> void:
 		return
 	_busy = true
 	var upgraded_district_id := int(_district.get("id", 1))
+	var current_level := Store.district_level(upgraded_district_id, element_id)
+	var expected_cost := 0
+	for element in _district.get("elements", []):
+		if typeof(element) == TYPE_DICTIONARY and int(element.get("id", 0)) == element_id:
+			var levels: Array = element.get("levels", [])
+			if current_level + 1 < levels.size():
+				expected_cost = int(levels[current_level + 1].get("cost", 0))
+			break
+	Events.track("upgrade_started", {
+		"districtId": upgraded_district_id,
+		"elementId": element_id,
+		"fromLevel": current_level,
+		"expectedCost": expected_cost,
+	})
 	Sfx.click()
 	var rid := Net.request_id()
 	var response := await Net.protected_request("POST", "/district/upgrade", {"districtId": int(_district.get("id", 1)), "elementId": element_id, "requestId": rid}, rid)
 	if response.ok:
 		Store.apply_mutation(response.data)
-		Events.track("upgrade_completed", {"districtId": upgraded_district_id, "elementId": element_id, "level": response.data.get("level", 0), "cost": response.data.get("cost", 0)})
+		var paid := int(response.data.get("cost", expected_cost))
+		Events.track("upgrade_completed", {"districtId": upgraded_district_id, "elementId": element_id, "level": response.data.get("level", 0), "cost": paid})
+		Events.track("currency_spent", {"currency": "credits", "amount": paid, "sink": "upgrade", "districtId": upgraded_district_id, "elementId": element_id})
 		Haptics.vibrate(0.55, 45)
 		if response.data.get("districtComplete", false):
 			_show_complete(
@@ -170,7 +186,9 @@ func _upgrade(element_id: int) -> void:
 	_refresh()
 
 func _show_complete(reward: Dictionary, district_id: int, next_district_id: int, all_complete: bool) -> void:
-	Events.track("district_completed", {"districtId": district_id, "nextDistrictId": next_district_id, "allDistrictsComplete": all_complete})
+	Events.track("village_completed", {"districtId": district_id, "nextDistrictId": next_district_id, "allDistrictsComplete": all_complete})
+	if int(reward.get("credits", 0)) > 0:
+		Events.track("currency_earned", {"currency": "credits", "amount": int(reward.get("credits", 0)), "source": "village_completed", "districtId": district_id})
 	var overlay := ColorRect.new()
 	overlay.color = Color(0.02, 0.03, 0.08, 0.94)
 	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)

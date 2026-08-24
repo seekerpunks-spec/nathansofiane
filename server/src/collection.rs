@@ -165,7 +165,8 @@ pub async fn open_chest(
         ).bind(&addr.0).bind(&card.card_id).fetch_one(&mut *tx).await?;
         drops.push(json!({"cardId": card.card_id, "setId": card.set_id, "name": card.name, "rarity": card.rarity, "qty": new_qty, "duplicate": new_qty > 1}));
     }
-    game::progress_action_tx(&mut tx, &addr.0, "chest_open", 1, &state.config).await?;
+    let _progress =
+        game::progress_action_tx(&mut tx, &addr.0, "chest_open", 1, &state.config).await?;
     let before = json!({"chestId": chest.chest_id, "qty": qty});
     let after = json!({"chestId": chest.chest_id, "qty": qty - 1, "drops": drops});
     Db::audit_tx(&mut tx, &addr.0, "chest_open", &before, &after, Some(&rid)).await?;

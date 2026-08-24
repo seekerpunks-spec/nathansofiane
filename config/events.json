@@ -16,7 +16,8 @@
       "rewardTiers": [
         { "minRank": 1, "maxRank": 1, "reward": { "spins": 1000, "credits": 5000000, "chest": "elite" } },
         { "minRank": 2, "maxRank": 3, "reward": { "spins": 500, "credits": 2500000, "chest": "neon" } },
-        { "minRank": 4, "maxRank": 10, "reward": { "spins": 250, "credits": 1000000, "chest": "basic" } }
+        { "minRank": 4, "maxRank": 10, "reward": { "spins": 250, "credits": 1000000, "chest": "basic" } },
+        { "minRank": 11, "maxRank": 50, "reward": { "spins": 50, "credits": 250000 } }
       ]
     }
   ]

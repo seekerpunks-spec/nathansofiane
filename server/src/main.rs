@@ -29,7 +29,7 @@ use crate::error::ApiError;
 use crate::state::AppState;
 use anyhow::anyhow;
 use axum::extract::{ConnectInfo, DefaultBodyLimit, Extension, State};
-use axum::http::{HeaderValue, Method, Request};
+use axum::http::{HeaderMap, HeaderValue, Method, Request};
 use axum::middleware;
 use axum::response::Response;
 use axum::routing::{get, post};
@@ -124,6 +124,14 @@ async fn main() -> anyhow::Result<()> {
                     .await
             {
                 tracing::warn!(?error, "nettoyage idempotency échoué");
+            }
+            if let Err(error) = sqlx::query(
+                "DELETE FROM analytics_batches WHERE created_at < now() - interval '30 days'",
+            )
+            .execute(&maintenance_pool)
+            .await
+            {
+                tracing::warn!(?error, "nettoyage analytics_batches échoué");
             }
         }
     });
@@ -349,7 +357,9 @@ async fn get_state(
 }
 
 #[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct AnalyticsBody {
+    batch_id: Option<String>,
     events: Vec<AnalyticsEvent>,
 }
 
@@ -360,33 +370,74 @@ struct AnalyticsEvent {
     props: Option<Value>,
 }
 
+fn valid_analytics_name(name: &str) -> bool {
+    !name.is_empty()
+        && name.len() <= 64
+        && name
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '-' | ':'))
+}
+
 /// `POST /analytics` — ingestion batch (≤ 100 événements, ARCH §4.1).
 /// Horloge SERVEUR (jamais l'horloge client — GDD §39).
 async fn analytics(
     State(state): State<AppState>,
     Extension(addr): Extension<auth::Addr>,
+    headers: HeaderMap,
     Json(body): Json<AnalyticsBody>,
 ) -> Result<Json<Value>, ApiError> {
+    let batch_id = game::request_id(&headers, body.batch_id.as_deref())?;
     if body.events.is_empty() {
-        return Ok(Json(json!({ "accepted": 0 })));
+        return Ok(Json(
+            json!({ "accepted": 0, "batchId": batch_id, "replayed": false }),
+        ));
     }
     if body.events.len() > 100 {
         return Err(ApiError::BadRequest("max 100 events par batch".to_string()));
     }
     for e in &body.events {
-        let valid = !e.name.is_empty()
-            && e.name.len() <= 64
-            && e.name
-                .chars()
-                .all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '-' | ':'));
-        if !valid {
+        if !valid_analytics_name(&e.name) {
             return Err(ApiError::BadRequest(format!(
                 "nom d'événement invalide : {}",
                 e.name
             )));
         }
+        let props = e.props.as_ref().unwrap_or(&Value::Null);
+        if !props.is_null() && !props.is_object() {
+            return Err(ApiError::BadRequest(
+                "props analytics doit être un objet".to_string(),
+            ));
+        }
+        if serde_json::to_vec(props).map_or(true, |encoded| encoded.len() > 8 * 1024) {
+            return Err(ApiError::BadRequest(
+                "props analytics dépasse 8 Kio".to_string(),
+            ));
+        }
     }
     let mut tx = state.db.begin().await?;
+    let inserted = sqlx::query(
+        "INSERT INTO analytics_batches(address,batch_id,accepted) VALUES($1,$2,$3) \
+         ON CONFLICT DO NOTHING",
+    )
+    .bind(&addr.0)
+    .bind(&batch_id)
+    .bind(body.events.len() as i32)
+    .execute(&mut *tx)
+    .await?
+    .rows_affected();
+    if inserted == 0 {
+        let accepted: i32 = sqlx::query_scalar(
+            "SELECT accepted FROM analytics_batches WHERE address=$1 AND batch_id=$2",
+        )
+        .bind(&addr.0)
+        .bind(&batch_id)
+        .fetch_one(&mut *tx)
+        .await?;
+        tx.rollback().await?;
+        return Ok(Json(
+            json!({ "accepted": accepted, "batchId": batch_id, "replayed": true }),
+        ));
+    }
     for e in &body.events {
         let props = e.props.clone().unwrap_or_else(|| json!({}));
         sqlx::query(
@@ -399,5 +450,21 @@ async fn analytics(
         .await?;
     }
     tx.commit().await?;
-    Ok(Json(json!({ "accepted": body.events.len() })))
+    Ok(Json(
+        json!({ "accepted": body.events.len(), "batchId": batch_id, "replayed": false }),
+    ))
+}
+
+#[cfg(test)]
+mod analytics_tests {
+    use super::valid_analytics_name;
+
+    #[test]
+    fn analytics_names_are_bounded_and_machine_readable() {
+        assert!(valid_analytics_name("spin_completed"));
+        assert!(valid_analytics_name("event:diagnostic-1"));
+        assert!(!valid_analytics_name(""));
+        assert!(!valid_analytics_name("contains space"));
+        assert!(!valid_analytics_name(&"x".repeat(65)));
+    }
 }

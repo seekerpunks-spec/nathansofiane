@@ -166,7 +166,7 @@ pub async fn upgrade(
                 .await?;
         }
     }
-    game::progress_action_tx(&mut tx, &addr.0, "upgrade", 1, &state.config).await?;
+    let _progress = game::progress_action_tx(&mut tx, &addr.0, "upgrade", 1, &state.config).await?;
 
     let balances: (i32, i64, i32) =
         sqlx::query_as("SELECT spins,credits,district_index FROM player_state WHERE address=$1")

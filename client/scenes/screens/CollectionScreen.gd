@@ -140,15 +140,35 @@ func _card_data(card_id: String) -> Dictionary:
 	return {}
 
 func _buy_chest(chest_id: String) -> void:
-	await _mutate("/chest/buy", {"chestId": chest_id}, "chest_buy")
+	var data := await _mutate("/chest/buy", {"chestId": chest_id}, "chest_bought")
+	if not data.is_empty():
+		Events.track("currency_spent", {
+			"currency": "credits",
+			"amount": _chest_cost(chest_id),
+			"sink": "chest",
+			"chestId": chest_id,
+		})
 
 func _open_chest(chest_id: String) -> void:
-	var data := await _mutate("/chest/open", {"chestId": chest_id}, "chest_open")
+	var data := await _mutate("/chest/open", {"chestId": chest_id}, "chest_opened")
 	if not data.is_empty():
-		_show_drops(data.get("cards", []))
+		var cards: Array = data.get("cards", [])
+		for card in cards:
+			if typeof(card) != TYPE_DICTIONARY:
+				continue
+			var props := {
+				"chestId": chest_id,
+				"cardId": str(card.get("cardId", "")),
+				"setId": str(card.get("setId", "")),
+				"rarity": str(card.get("rarity", "common")),
+				"quantity": int(card.get("qty", 0)),
+			}
+			Events.track("card_received", props)
+			Events.track("duplicate_card" if bool(card.get("duplicate", false)) else "new_card", props)
+		_show_drops(cards)
 
 func _claim_set(set_id: String) -> void:
-	var data := await _mutate("/set/claim", {"setId": set_id}, "set_complete")
+	var data := await _mutate("/set/claim", {"setId": set_id}, "set_completed")
 	if not data.is_empty():
 		Sfx.result("legendary")
 		Haptics.win("legendary")
@@ -171,6 +191,12 @@ func _mutate(path: String, body: Dictionary, event_name: String) -> Dictionary:
 	_busy = false
 	_refresh()
 	return data
+
+func _chest_cost(chest_id: String) -> int:
+	for chest in Config.chests():
+		if typeof(chest) == TYPE_DICTIONARY and str(chest.get("chestId", "")) == chest_id:
+			return int(chest.get("priceCredits", 0))
+	return 0
 
 func _sync_state() -> void:
 	var state_response := await Net.protected_request("GET", "/state")

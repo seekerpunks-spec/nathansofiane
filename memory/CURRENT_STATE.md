@@ -23,6 +23,10 @@
   484,5 spins), 6 scènes Godot et intégration PostgreSQL auto-claim/claim manuel/
   replay/cohorte/verrouillage District 2, complétion unique de Neon Slums puis
   premier upgrade autorisé dans Chrome Heights.
+- Funnel analytics complet : 25 événements obligatoires, batches idempotents,
+  props bornées/validées et progression événementielle incluse dans `/spin`.
+- Tous les rangs 1–50 d'une cohorte reçoivent un palier ; le claim final est
+  exposé dans l'écran Missions après expiration.
 
 ## Produit livré
 
@@ -64,7 +68,10 @@
 
 - `tools/economy_check.ps1` : OK, 225,4 spins pour District 1 et 484,5 pour
   District 2, avec courbe strictement croissante.
-- `cargo test --locked` : 8/8.
+- `cargo test --locked` : 9/9.
+- `tools/analytics_check.ps1` : 25/25 événements présents.
+- Intégration analytics PostgreSQL : batch 25 accepté, replay dédupliqué, props
+  invalides refusées et progression de spin renvoyée avec cohorte.
 - `cargo build --release` : OK.
 - Garde release `DEV_AUTH=true` : refus confirmé.
 - Intégration API live : auth, spin idempotent, upgrade, daily, coffre, pub dev,

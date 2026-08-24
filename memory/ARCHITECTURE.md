@@ -42,6 +42,7 @@
 - `0003_core_integrity.sql` : soldes/quantités non négatifs et relations joueur.
 - `0004_event_milestones_cohorts.sql` : cohortes de classement et claims de
   milestones événementiels.
+- `0005_analytics_batches.sql` : déduplication atomique des batches analytics.
 - Configs typées : économie, roue, district, cartes, sets, coffres, daily,
   missions, événements, saisons et offres.
 

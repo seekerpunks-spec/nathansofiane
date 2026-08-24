@@ -130,6 +130,11 @@ func _event_card(event: Dictionary) -> PanelContainer:
 	var leaderboard := Ui.button("VOIR LE CLASSEMENT", Ui.NEON_MAGENTA, true)
 	leaderboard.pressed.connect(_show_leaderboard.bind(str(event.get("eventId", ""))))
 	box.add_child(leaderboard)
+	if remain <= 0 and points > 0 and not bool(event.get("rewardClaimed", false)):
+		var finish := Ui.button("RÉCUPÉRER LE CLASSEMENT", Ui.GOLD)
+		finish.disabled = _busy
+		finish.pressed.connect(_claim_event_finish.bind(str(event.get("eventId", ""))))
+		box.add_child(finish)
 	panel.add_child(box)
 	return panel
 
@@ -185,9 +190,12 @@ func _claim_season(season_id: String, tier: int, premium: bool) -> void:
 func _claim_event_milestone(event_id: String, milestone_index: int) -> void:
 	await _mutate(
 		"/events/%s/milestones/%d/claim" % [event_id, milestone_index],
-		{},
-		"event_milestone_claimed"
+		{"eventId": event_id, "milestoneIndex": milestone_index, "claimMode": "manual"},
+		"milestone_claim"
 	)
+
+func _claim_event_finish(event_id: String) -> void:
+	await _mutate("/events/%s/claim" % event_id, {"eventId": event_id}, "leaderboard_finish")
 
 func _mutate(path: String, body: Dictionary, event_name: String) -> void:
 	if _busy:
@@ -198,7 +206,14 @@ func _mutate(path: String, body: Dictionary, event_name: String) -> void:
 	var response := await Net.protected_request("POST", path, body, rid)
 	if response.ok:
 		Store.apply_mutation(response.data)
-		Events.track(event_name, body)
+		var props := body.duplicate()
+		props.erase("requestId")
+		if typeof(response.data) == TYPE_DICTIONARY:
+			for key in ["rank", "cohortId", "milestoneIndex", "points", "day", "streak", "missionId", "seasonId", "tier", "premium"]:
+				if response.data.has(key):
+					props[key] = response.data[key]
+		Events.track(event_name, props)
+		_track_reward_currency(response.data, event_name)
 		Sfx.result("rare")
 		await _sync_state()
 	else:
@@ -212,11 +227,26 @@ func _sync_state() -> void:
 	if response.ok:
 		Store.apply_state(response.data)
 
+func _track_reward_currency(data: Dictionary, source: String) -> void:
+	var reward: Variant = data.get("reward", {})
+	if typeof(reward) != TYPE_DICTIONARY:
+		return
+	var credits := int(reward.get("credits", 0))
+	if credits > 0:
+		Events.track("currency_earned", {"currency": "credits", "amount": credits, "source": source})
+
 func _show_leaderboard(event_id: String) -> void:
 	var response := await Net.protected_request("GET", "/events/" + event_id + "/leaderboard")
 	if not response.ok:
 		Sfx.error()
 		return
+	var player: Dictionary = response.data.get("player", {})
+	Events.track("leaderboard_join", {
+		"eventId": event_id,
+		"cohortId": int(response.data.get("cohortId", 1)),
+		"rank": int(player.get("rank", 0)),
+		"points": int(player.get("points", 0)),
+	})
 	var overlay := ColorRect.new()
 	overlay.color = Color(0.02, 0.03, 0.08, 0.96)
 	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)

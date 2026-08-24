@@ -694,9 +694,12 @@ impl RemoteConfig {
                 }
                 previous_milestone = milestone.points;
             }
+            let mut previous_max_rank = 0u32;
             for tier in &event.reward_tiers {
                 if tier.min_rank == 0
                     || tier.min_rank > tier.max_rank
+                    || tier.min_rank != previous_max_rank.saturating_add(1)
+                    || tier.max_rank > event.leaderboard.cohort_size
                     || tier
                         .reward
                         .chest
@@ -706,6 +709,13 @@ impl RemoteConfig {
                 {
                     problems.push(format!("event {} : palier invalide", event.event_id));
                 }
+                previous_max_rank = tier.max_rank;
+            }
+            if previous_max_rank != event.leaderboard.cohort_size {
+                problems.push(format!(
+                    "event {} : paliers incomplets jusqu'à la taille de cohorte",
+                    event.event_id
+                ));
             }
         }
         let season_ids: BTreeSet<&str> =

@@ -773,11 +773,11 @@ Exemple :
 ...
 ```
 
-- [ ] progress bar ;
-- [ ] rewards tiers ;
-- [ ] claim ;
-- [ ] auto claim ou manual configurable ;
-- [ ] double claim protection.
+- [x] progress bar ;
+- [x] rewards tiers ;
+- [x] claim ;
+- [x] auto claim ou manual configurable ;
+- [x] double claim protection.
 
 ---
 
@@ -793,14 +793,14 @@ Durées potentielles :
 48h
 ```
 
-- [ ] grouping/cohorts.
-- [ ] score.
-- [ ] ranking.
-- [ ] reward tiers.
-- [ ] expiration.
-- [ ] distribution.
-- [ ] tie handling.
-- [ ] anti-cheat.
+- [x] grouping/cohorts.
+- [x] score.
+- [x] ranking.
+- [x] reward tiers.
+- [x] expiration.
+- [x] distribution.
+- [x] tie handling.
+- [x] anti-cheat.
 
 Ne pas mettre nécessairement tous les joueurs mondiaux dans le même leaderboard.
 
@@ -1074,6 +1074,10 @@ purchase_offer_view
 purchase_started
 purchase_complete
 ```
+
+Statut R24 : les 25 événements ci-dessus sont instrumentés et couverts par la
+gate `tools/analytics_check.ps1`. Les batches sont bornés, validés et dédupliqués
+côté serveur par `batchId` lors des retries réseau.
 
 Pour Attack/Raid :
 

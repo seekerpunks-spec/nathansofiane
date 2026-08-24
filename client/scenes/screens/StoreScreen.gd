@@ -5,6 +5,8 @@ signal navigate_requested(tab: String)
 
 var _content: VBoxContainer
 var _busy := false
+var _ad_offer_tracked := false
+var _tracked_offer_views: Dictionary = {}
 
 func _ready() -> void:
 	var body := Ui.screen_body()
@@ -52,6 +54,12 @@ func _free_card() -> PanelContainer:
 	box.add_theme_constant_override("separation", 9)
 	box.add_child(Ui.label("RÉCOMPENSE VOLONTAIRE", 19, Ui.TEXT))
 	var cfg: Dictionary = Config.economy().get("adsConfig", {})
+	if not _ad_offer_tracked:
+		_ad_offer_tracked = true
+		Events.track("rewarded_ad_offer", {
+			"rewardSpins": int(cfg.get("rewardPerAd", 0)),
+			"maxPerDay": int(cfg.get("maxRewardedAdsPerDay", 0)),
+		})
 	var watched := int(Store.state.get("adsWatchedToday", 0))
 	var maximum := int(cfg.get("maxRewardedAdsPerDay", 0))
 	box.add_child(Ui.label("+%d SPINS  •  %d / %d AUJOURD'HUI" % [int(cfg.get("rewardPerAd", 0)), watched, maximum], 14, Ui.TEXT_DIM))
@@ -66,6 +74,14 @@ func _free_card() -> PanelContainer:
 	return panel
 
 func _offer_card(offer: Dictionary) -> PanelContainer:
+	var offer_id := str(offer.get("offerId", ""))
+	if not _tracked_offer_views.has(offer_id):
+		_tracked_offer_views[offer_id] = true
+		Events.track("purchase_offer_view", {
+			"offerId": offer_id,
+			"priceToken": str(offer.get("priceToken", "")),
+			"priceU64": int(offer.get("priceU64", 0)),
+		})
 	var panel := Ui.panel(Ui.PANEL_HI, Ui.NEON_MAGENTA)
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 8)
@@ -94,23 +110,38 @@ func _reward_ad() -> void:
 	_busy = true
 	var rid := Net.request_id()
 	var response := await Net.protected_request("POST", "/ad/reward", {"receipt": "dev:" + rid, "requestId": rid}, rid)
-	await _finish_mutation(response, "ad_reward")
+	await _finish_mutation(response, "rewarded_ad_complete", {})
 
 func _buy_offer(offer: Dictionary) -> void:
 	if _busy:
 		return
 	_busy = true
+	var offer_props := {
+		"offerId": str(offer.get("offerId", "")),
+		"priceToken": str(offer.get("priceToken", "")),
+		"priceU64": int(offer.get("priceU64", 0)),
+	}
+	Events.track("purchase_started", offer_props)
 	var rid := Net.request_id()
 	var response := await Net.protected_request("POST", "/purchase/verify", {
 		"offerId": offer.get("offerId", ""), "txSignature": "dev:" + rid,
 		"tokenMint": offer.get("priceToken", ""), "amountU64": offer.get("priceU64", 0), "requestId": rid
 	}, rid)
-	await _finish_mutation(response, "purchase")
+	await _finish_mutation(response, "purchase_complete", offer_props)
 
-func _finish_mutation(response: Dictionary, event_name: String) -> void:
+func _finish_mutation(response: Dictionary, event_name: String, props: Dictionary) -> void:
 	if response.ok:
 		Store.apply_mutation(response.data)
-		Events.track(event_name)
+		var completed_props := props.duplicate()
+		if typeof(response.data) == TYPE_DICTIONARY:
+			for key in ["offerId", "purchaseId", "rewardSpins", "adsWatchedToday", "adsRemaining"]:
+				if response.data.has(key):
+					completed_props[key] = response.data[key]
+		Events.track(event_name, completed_props)
+		if event_name == "purchase_complete":
+			for content in response.data.get("contents", []):
+				if typeof(content) == TYPE_DICTIONARY and str(content.get("type", "")) == "credits":
+					Events.track("currency_earned", {"currency": "credits", "amount": int(content.get("amount", 0)), "source": "purchase", "offerId": completed_props.get("offerId", "")})
 		Sfx.result("epic")
 		var state_response := await Net.protected_request("GET", "/state")
 		if state_response.ok:
