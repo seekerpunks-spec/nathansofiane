@@ -1,9 +1,12 @@
-# MÉMOIRE — TODO / PROCHAINES TÂCHES
+# MÉMOIRE — TODO / PROCHAINES TÂCHES R24
 
 > MAJ R20 (22/08/2026). La roadmap détaillée est `docs/ROADMAP.md` et la
 > checklist de publication est `docs/RELEASE_CHECKLIST.md`.
 
 ## Réalisé localement
+
+- [x] Baseline Git, intégrité économique, auth Base58, regen à reliquat.
+- [x] Multiplicateur data-driven ×1 à ×100K serveur/client/analytics.
 
 - [x] M1 : auth dev, état autoritaire, spin, regen, idempotence et analytics.
 - [x] M2 : District 1, cinq éléments, six états visuels par élément, upgrades et
@@ -42,3 +45,11 @@ infrastructure que le dépôt ne peut ni inventer ni certifier.
 
 Le prochain APK/AAB n'est généré qu'une fois cette gate shippable fermée. Les
 itérations intermédiaires utilisent uniquement Godot desktop, captures et tests.
+
+## Exécution gameplay en cours
+
+- [ ] Multi-districts avec transition et exigences de déblocage.
+- [ ] Milestones, cohortes/égalités de leaderboard et funnel analytics.
+- [ ] Attack, Raid et défense originaux dans une boucle sociale type Coin Master.
+- [ ] Progression globale, social léger et systèmes restants du MASTER TODO.
+- [ ] Design et Wallet Adapter explicitement différés par l'utilisateur.

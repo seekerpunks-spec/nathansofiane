@@ -139,7 +139,9 @@ pub fn auth_address(
 
 fn normalize_address(raw: &str, state: &AppState) -> Result<String, crate::error::ApiError> {
     use crate::error::ApiError;
-    let a = raw.trim().to_lowercase();
+    // Une adresse Solana est en Base58 et donc sensible à la casse. Ne jamais
+    // la normaliser en minuscules : cela change la clé publique signataire.
+    let a = raw.trim().to_string();
     if a.is_empty() {
         return Err(ApiError::BadRequest("address est requis".into()));
     }
@@ -148,7 +150,7 @@ fn normalize_address(raw: &str, state: &AppState) -> Result<String, crate::error
         if a.len() > 64 {
             return Err(ApiError::BadRequest("address trop long".into()));
         }
-        if state.dev_address.as_deref() != Some(a.as_str()) {
+        if state.dev_address.as_deref().map(str::trim) != Some(a.as_str()) {
             return Err(ApiError::from(AuthError::InvalidAddress));
         }
         return Ok(a);
@@ -263,4 +265,16 @@ pub async fn refresh(
         "token": token,
         "refreshToken": refresh_token,
     })))
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn solana_base58_case_is_significant() {
+        let address = bs58::encode([7u8; 32]).into_string();
+        assert!(address.chars().any(|c| c.is_ascii_uppercase()));
+        assert_ne!(address, address.to_lowercase());
+        let decoded = bs58::decode(&address).into_vec().unwrap();
+        assert_eq!(decoded, vec![7u8; 32]);
+    }
 }

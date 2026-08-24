@@ -15,6 +15,7 @@
 | D8 | **Pas une copie de Coin Master** : noms, personnages, écrans, collections, brandings originaux |
 | D9 | Pas de marketplace / cash-out / trading / NFT par carte en MVP (GDD §24, confirmé) |
 | D10 | Carte blanche donnée aux agents IA pour builder ("carte blanche", "GO") |
+| D11 | Exécuter tout le MASTER TODO avec une boucle fidèle aux sensations Coin Master mais contenu original ; design et wallet natif différés temporairement |
 
 ## Décisions techniques (agents)
 | # | Décision | Raison |
@@ -41,6 +42,7 @@
 | T20 | Figma sert de source de vérité visuelle R18 avec quatre états (idle/spinning/anticipation/jackpot), puis exécution native Godot | Séparer clairement rythme/hiérarchie visuelle et implémentation runtime |
 | T21 | Rendu final R19 = Blender 5.2 LTS ; Tripo fournit seulement de la géométrie source, puis Blender impose caméra, lumière, matériaux et export PNG 2.5D | Coin Master repose sur une présentation 2D/2.5D ; une pipeline de rendu contrôlée donne cohérence et performance mobile sans imposer une scène 3D temps réel |
 | T22 | Aucun APK/AAB pendant les itérations de design ; validation par Godot desktop, captures et smoke-tests, puis build unique à la gate shippable | Un export Android n'apporte aucune information utile tant que le contenu et l'UX ne sont pas verrouillés |
+| T23 | Multiplicateurs `[1,2,3,4,5,10,20,50,100,250,500,1000,2500,5000,10000,25000,50000,100000]`; une seule animation, débit/progression de N, gain de base ×N, probabilités inchangées | Contrat utilisateur et intégrité économique serveur |
 
 ## Noms / brandings (à verrouiller — O1 GDD)
 - Jeu : **CyberSeeker** (provisoire, utilisé partout pour l'instant).

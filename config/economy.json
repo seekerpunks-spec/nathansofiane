@@ -3,6 +3,7 @@
   "spinRegenMs": 300000,
   "maxFreeSpins": 25,
   "newPlayerSpins": 20,
+  "spinMultipliers": [1, 2, 3, 4, 5, 10, 20, 50, 100, 250, 500, 1000, 2500, 5000, 10000, 25000, 50000, 100000],
   "adsConfig": {
     "maxRewardedAdsPerDay": 10,
     "rewardPerAd": 25,

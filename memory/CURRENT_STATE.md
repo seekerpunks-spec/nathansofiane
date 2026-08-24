@@ -1,8 +1,20 @@
-# MÉMOIRE — ÉTAT ACTUEL R23
+# MÉMOIRE — ÉTAT ACTUEL R24
 
-> MAJ 24/08/2026 : la R23 remplace le rendu local insuffisant par une direction
-> premium produite avec GPT Image intégré, découpée en composants et composée
-> dans Godot sans manipulation d'éditeur. Les builds Android restent gelés.
+> MAJ 24/08/2026 : R24 ouvre l'expansion gameplay du MASTER TODO. Design et
+> wallet natif sont gelés ; aucun build Android avant la gate shippable.
+
+## Lot R24 validé
+
+- Baseline Git locale `main` créée avant changements fonctionnels.
+- Auth Solana corrigée : la casse Base58 est préservée.
+- Ladder data-driven ×1 à ×100K ; un spin dépense N, joue une animation et
+  multiplie le gain de base sans modifier les probabilités.
+- Missions/événements/saison progressent de N ; idempotence et audit conservés.
+- Arithmétique vérifiée, bornes de config, contraintes SQL et notation
+  K/M/B/T/Qa/Qi ajoutées.
+- Regen corrigée pour conserver le reliquat d'intervalle.
+- Validation : 7 tests Rust, économie OK, 6 scènes Godot, intégration PostgreSQL
+  ×4/invalid/insufficient/replay exacte.
 
 ## Produit livré
 

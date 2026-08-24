@@ -97,6 +97,14 @@ func apply_no_spins(next_ms: int) -> void:
 	state_changed.emit()
 	no_spins.emit(next_ms)
 
+func apply_insufficient_spins(available: int, next_ms: int) -> void:
+	state["spins"] = maxi(0, available)
+	if next_ms > 0:
+		state["nextSpinAtMs"] = next_ms
+	state_changed.emit()
+	if available <= 0:
+		no_spins.emit(next_ms)
+
 func reset_session() -> void:
 	state = {}
 	clock_offset_ms = 0

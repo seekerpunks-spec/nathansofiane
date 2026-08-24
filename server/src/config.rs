@@ -39,6 +39,7 @@ pub struct EconomyConfig {
     pub spin_regen_ms: u64,
     pub max_free_spins: u32,
     pub new_player_spins: u32,
+    pub spin_multipliers: Vec<u32>,
     pub ads_config: AdsConfig,
 }
 
@@ -277,6 +278,10 @@ pub struct RemoteConfig {
     pub seasons: Vec<SeasonConfig>,
 }
 
+fn reward_fits_storage(reward: &Reward) -> bool {
+    reward.spins <= i32::MAX as u32 && reward.credits <= i64::MAX as u64
+}
+
 fn get_entry<'a>(entries: &'a [(String, Vec<u8>)], rel: &str) -> Result<&'a [u8]> {
     entries
         .iter()
@@ -400,8 +405,28 @@ impl RemoteConfig {
                 self.economy.spin_regen_ms
             ));
         }
+        if self.economy.spin_regen_ms > i64::MAX as u64 {
+            problems.push("economy.spinRegenMs dépasse la durée supportée".to_string());
+        }
         if self.economy.max_free_spins == 0 {
             problems.push("economy.maxFreeSpins doit être > 0".to_string());
+        }
+        if self.economy.max_free_spins > i32::MAX as u32
+            || self.economy.new_player_spins > i32::MAX as u32
+            || self.economy.ads_config.reward_per_ad > i32::MAX as u32
+        {
+            problems.push("economy : une valeur de spins dépasse INTEGER".to_string());
+        }
+        let multipliers = &self.economy.spin_multipliers;
+        if multipliers.first() != Some(&1)
+            || multipliers.is_empty()
+            || multipliers.iter().any(|m| *m == 0 || *m > 100_000)
+            || multipliers.windows(2).any(|pair| pair[0] >= pair[1])
+        {
+            problems.push(
+                "economy.spinMultipliers doit être strictement croissant, commencer à 1 et rester <= 100000"
+                    .to_string(),
+            );
         }
 
         let mut seen_ids = BTreeSet::new();
@@ -414,9 +439,17 @@ impl RemoteConfig {
             }
             if o.outcome_type == OutcomeType::Credits {
                 match (o.min, o.max) {
-                    (Some(min), Some(max)) if min <= max => {}
+                    (Some(min), Some(max))
+                        if min <= max
+                            && max <= i64::MAX as u64
+                            && max
+                                .checked_mul(
+                                    self.economy.spin_multipliers.last().copied().unwrap_or(1)
+                                        as u64,
+                                )
+                                .map_or(false, |scaled| scaled <= i64::MAX as u64) => {}
                     _ => problems.push(format!(
-                        "spin_table.{} : un outcome credits exige min/max avec 0 <= min <= max",
+                        "spin_table.{} : bornes invalides ou gain multiplié hors BIGINT",
                         o.id
                     )),
                 }
@@ -437,11 +470,23 @@ impl RemoteConfig {
             if !days.insert(d.day) {
                 problems.push(format!("daily.cycle : jour {} en double", d.day));
             }
+            if d.spins > i32::MAX as u32 || d.credits > i64::MAX as u64 {
+                problems.push(format!(
+                    "daily.cycle : récompense jour {} hors stockage",
+                    d.day
+                ));
+            }
         }
         let mut mission_ids = BTreeSet::new();
         for m in &self.daily.missions {
             if m.target == 0 || !mission_ids.insert(&m.mission_id) {
                 problems.push(format!("mission invalide ou en double : {}", m.mission_id));
+            }
+            if m.target > i64::MAX as u64 || !reward_fits_storage(&m.reward) {
+                problems.push(format!(
+                    "mission {} : cible/récompense hors stockage",
+                    m.mission_id
+                ));
             }
         }
 
@@ -469,6 +514,12 @@ impl RemoteConfig {
                             d.id, e.id, l.level
                         ));
                     }
+                    if l.cost > i64::MAX as u64 {
+                        problems.push(format!(
+                            "district {} / élément {} : coût hors BIGINT",
+                            d.id, e.id
+                        ));
+                    }
                 }
                 let max = e.levels.iter().map(|l| l.level).max().unwrap_or(0);
                 if !(0..=max).all(|level| e.levels.iter().any(|l| l.level == level)) {
@@ -477,6 +528,11 @@ impl RemoteConfig {
                         d.id, e.id
                     ));
                 }
+            }
+            if d.completion_reward.as_ref().map_or(false, |reward| {
+                reward.spins > i32::MAX as u32 || reward.credits > i64::MAX as u64
+            }) {
+                problems.push(format!("district {} : récompense hors stockage", d.id));
             }
         }
 
@@ -494,6 +550,12 @@ impl RemoteConfig {
             }
         }
         for set in &self.sets {
+            if set.completion_spins > i32::MAX as u32 {
+                problems.push(format!(
+                    "set {} : récompense spins hors INTEGER",
+                    set.set_id
+                ));
+            }
             for card in &set.cards {
                 if !card_ids.contains(card.as_str()) {
                     problems.push(format!("set {} : carte inconnue {}", set.set_id, card));
@@ -509,6 +571,9 @@ impl RemoteConfig {
                 || chest.loot_table.iter().map(|l| l.weight).sum::<u32>() == 0
             {
                 problems.push(format!("chest {} : loot table invalide", chest.chest_id));
+            }
+            if chest.price_credits > i64::MAX as u64 {
+                problems.push(format!("chest {} : prix hors BIGINT", chest.chest_id));
             }
             for loot in &chest.loot_table {
                 if !self.cards.iter().any(|card| card.rarity == loot.rarity) {
@@ -559,6 +624,13 @@ impl RemoteConfig {
             if event.starts_at_ms >= event.ends_at_ms {
                 problems.push(format!("event {} : fenêtre invalide", event.event_id));
             }
+            if event
+                .point_sources
+                .iter()
+                .any(|source| source.points > i64::MAX as u64)
+            {
+                problems.push(format!("event {} : points hors BIGINT", event.event_id));
+            }
             for tier in &event.reward_tiers {
                 if tier.min_rank == 0
                     || tier.min_rank > tier.max_rank
@@ -567,6 +639,7 @@ impl RemoteConfig {
                         .chest
                         .as_deref()
                         .map_or(false, |id| !chest_ids.contains(id))
+                    || !reward_fits_storage(&tier.reward)
                 {
                     problems.push(format!("event {} : palier invalide", event.event_id));
                 }
@@ -584,6 +657,19 @@ impl RemoteConfig {
                     season.season_id
                 ));
             }
+            if season.tiers.iter().any(|tier| {
+                tier.points > i64::MAX as u64
+                    || !reward_fits_storage(&tier.free_reward)
+                    || tier
+                        .premium_reward
+                        .as_ref()
+                        .map_or(false, |reward| !reward_fits_storage(reward))
+            }) {
+                problems.push(format!(
+                    "season {} : palier hors stockage",
+                    season.season_id
+                ));
+            }
         }
         let offer_ids: BTreeSet<&str> = self.offers.iter().map(|o| o.offer_id.as_str()).collect();
         if offer_ids.len() != self.offers.len() {
@@ -597,6 +683,9 @@ impl RemoteConfig {
                 ));
             }
             for content in &offer.contents {
+                if content.amount > i64::MAX as u64 {
+                    problems.push(format!("offer {} : montant hors BIGINT", offer.offer_id));
+                }
                 match content.content_type.as_str() {
                     "spins" | "credits" => {}
                     "chest"
@@ -648,5 +737,7 @@ mod tests {
         let cfg = RemoteConfig::load(&path).expect("la config livrée doit rester valide");
         assert!(!cfg.spin_table.outcomes.is_empty());
         assert!(!cfg.districts.is_empty());
+        assert_eq!(cfg.economy.spin_multipliers.first(), Some(&1));
+        assert_eq!(cfg.economy.spin_multipliers.last(), Some(&100_000));
     }
 }

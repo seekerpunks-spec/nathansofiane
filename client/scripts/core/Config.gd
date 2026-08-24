@@ -74,6 +74,10 @@ func outcome_index(id: String) -> int:
 func economy() -> Dictionary:
 	return raw.get("economy", {})
 
+func spin_multipliers() -> Array:
+	var configured: Variant = economy().get("spinMultipliers", [1])
+	return configured if typeof(configured) == TYPE_ARRAY else [1]
+
 func districts() -> Array:
 	return raw.get("districts", [])
 

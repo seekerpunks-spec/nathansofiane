@@ -1,4 +1,4 @@
-# CYBERSEEKER — ARCHITECTURE TECHNIQUE R17
+# CYBERSEEKER — ARCHITECTURE TECHNIQUE R24
 
 > État effectivement implémenté au 22/08/2026. Le code serveur constitue le
 > contrat final ; les payloads détaillés sont dans `API_R17.md`.
@@ -34,7 +34,7 @@ client/
   tests/                     smoke des scènes
 server/
   src/                       Axum, auth, jeu, progression, live-ops, commerce
-  migrations/                0001_init + 0002_progression_liveops
+  migrations/                schéma initial, live-ops et invariants économiques
 config/                      économie et contenu data-driven
 docs/                        GDD, design, API, privacy, release et prompts
 tools/                       validation complète et audit de l'économie
@@ -60,7 +60,7 @@ le coffre-fort natif du bridge wallet.
 ### Écrans
 
 - `OnboardingScreen` : gateway visuelle, challenge et connexion.
-- `SpinScreen` : roue, regen, résultats, crédits et états sans spin.
+- `SpinScreen` : slot, multiplicateur data-driven, regen, résultats et crédits.
 - `DistrictScreen` : cinq éléments, six niveaux visuels chacun et upgrade.
 - `CollectionScreen` : coffres, cartes, doublons, progression et claims de sets.
 - `MissionsScreen` : daily, missions, événement, classement et saison.
@@ -73,7 +73,7 @@ serveur.
 ## 4. Serveur Rust
 
 - `auth.rs` : nonce, signature, JWT access/refresh et bypass dev isolé.
-- `spin.rs` : regen, consommation, RNG et récompense idempotente.
+- `spin.rs` : regen à reliquat conservé, multiplicateur, RNG et récompense idempotente.
 - `district.rs` : coûts autoritaires, niveaux et complétion anti double-claim.
 - `collection.rs` : achat/ouverture de coffres, loot pondéré, cartes et sets.
 - `engagement.rs` : daily, missions, événements, leaderboard PostgreSQL et saison.
@@ -122,7 +122,8 @@ d'un autre endpoint.
 
 `0001_init.sql` installe joueurs, état, districts, cartes, sets, événements,
 achats, idempotence, audit et analytics. `0002_progression_liveops.sql` ajoute les
-tables/champs nécessaires aux coffres, daily, missions, événements et saisons.
+tables de rétention. `0003_core_integrity.sql` impose les soldes/quantités
+positifs et les références joueur sur les tables économiques historiques.
 
 Toutes les mutations d'économie sont atomiques : verrou joueur, validation,
 écriture d'état, audit et mémorisation de la réponse idempotente partagent la
@@ -130,7 +131,8 @@ même transaction.
 
 ## 7. Remote config
 
-- `economy.json` : regen, plafonds, nouveaux joueurs et limites publicitaires.
+- `economy.json` : regen, plafonds, ladder de multiplicateurs, nouveaux joueurs
+  et limites publicitaires.
 - `spin_table.json` : outcomes et poids.
 - `districts/district_01.json` : éléments, niveaux, coûts et récompense finale.
 - `cards.json`, `sets.json`, `chests.json` : collection et loot.

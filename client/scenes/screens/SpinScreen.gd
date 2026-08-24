@@ -21,6 +21,7 @@ var _event_timer: Label
 var _status_label: Label
 var _result_banner: Label
 var _spin_btn: Button
+var _multiplier_btn: Button
 var _regen_bar: ProgressBar
 var _regen_label: Label
 var _no_spins: Control
@@ -39,9 +40,12 @@ var _revealed := false
 var _skip_enabled := false
 var _pending_outcome: Dictionary = {}
 var _pending_credits := 0
+var _pending_base_credits := 0
+var _pending_multiplier := 1
 var _final_symbols: Array[String] = []
 var _anticipation := false
 var _landed_count := 0
+var _selected_multiplier := 1
 
 
 func _ready() -> void:
@@ -265,6 +269,13 @@ func _build_lower_controls() -> void:
 	_spin_btn.add_child(spin_art)
 	add_child(_spin_btn)
 
+	_multiplier_btn = _promo_button("BET  ×1", Ui.NEON_MAGENTA)
+	_multiplier_btn.position = Vector2(184, 850)
+	_multiplier_btn.size = Vector2(174, 58)
+	_multiplier_btn.add_theme_font_size_override("font_size", 17)
+	_multiplier_btn.pressed.connect(_cycle_multiplier)
+	add_child(_multiplier_btn)
+
 	var district_btn := _promo_button("CITY", Color("#1867C9"))
 	district_btn.position = Vector2(430, 758)
 	district_btn.size = Vector2(84, 68)
@@ -377,11 +388,43 @@ func _update_event() -> void:
 func _refresh_hud() -> void:
 	_spins_value.text = "⚡ " + str(Store.spins())
 	_credits_value.text = Ui.compact(Store.credits())
+	_normalize_multiplier()
 	var districts := Config.districts()
 	if not districts.is_empty() and typeof(districts[0]) == TYPE_DICTIONARY:
 		_district_label.text = (
 			str(districts[0].get("name", "NEON SLUMS")).to_upper() + " · NODE 01"
 		)
+
+
+func _affordable_multipliers() -> Array[int]:
+	var values: Array[int] = []
+	for raw in Config.spin_multipliers():
+		var value := int(raw)
+		if value > 0 and value <= Store.spins():
+			values.append(value)
+	if values.is_empty():
+		values.append(1)
+	return values
+
+
+func _normalize_multiplier() -> void:
+	var affordable := _affordable_multipliers()
+	if not affordable.has(_selected_multiplier):
+		_selected_multiplier = 1
+	if _multiplier_btn != null:
+		_multiplier_btn.text = "BET  ×" + Ui.compact(_selected_multiplier)
+		_multiplier_btn.disabled = _busy or affordable.size() <= 1
+
+
+func _cycle_multiplier() -> void:
+	if _busy:
+		return
+	var affordable := _affordable_multipliers()
+	var index := affordable.find(_selected_multiplier)
+	_selected_multiplier = affordable[(index + 1) % affordable.size()]
+	_multiplier_btn.text = "BET  ×" + Ui.compact(_selected_multiplier)
+	Events.track("multiplier_changed", {"multiplier": _selected_multiplier})
+	Sfx.click()
 
 
 func _on_spin_pressed() -> void:
@@ -406,13 +449,19 @@ func _do_spin() -> void:
 	_spin_btn.text = "ROLLING…"
 	_spin_btn.disabled = true
 	_stop_idle_animation()
-	Events.track("spin")
+	Events.track("spin_started", {
+		"multiplier": _selected_multiplier,
+		"spinsAvailable": Store.spins(),
+	})
 	Sfx.reel_start()
 	Haptics.vibrate(0.28, 22)
 
 	var request_id := Net.request_id()
 	var response := await Net.protected_request(
-		"POST", "/spin", {"requestId": request_id}, request_id
+		"POST", "/spin", {
+			"requestId": request_id,
+			"multiplier": _selected_multiplier,
+		}, request_id
 	)
 
 	if response.ok and typeof(response.data) == TYPE_DICTIONARY:
@@ -421,13 +470,21 @@ func _do_spin() -> void:
 		var outcome: Variant = data.get("outcome", {})
 		_pending_outcome = outcome if typeof(outcome) == TYPE_DICTIONARY else {}
 		_pending_credits = int(data.get("creditsGained", 0))
+		_pending_base_credits = int(data.get("baseCreditsGained", _pending_credits))
+		_pending_multiplier = int(data.get("multiplier", 1))
 		_final_symbols = _symbols_for_result(_pending_outcome)
 		_animate_slots(_final_symbols)
 	elif response.code == 403:
-		var next_ms := _parse_no_spins_ms(response.data)
-		Store.apply_no_spins(next_ms)
+		var details := _parse_spin_error_details(response.data)
+		var next_ms := int(details.get("nextSpinAtMs", 0))
+		var available := int(details.get("availableSpins", 0))
+		Store.apply_insufficient_spins(available, next_ms)
+		_selected_multiplier = 1
 		_reset_idle_state()
-		_show_no_spins(next_ms)
+		if available > 0:
+			_status_label.text = "BET RESET TO ×1"
+			_result_banner.text = "%d SPINS AVAILABLE" % available
+			_refresh_hud()
 	elif response.code == 401:
 		Store.session_expired.emit()
 		_reset_idle_state()
@@ -568,6 +625,8 @@ func _on_landed() -> void:
 	else:
 		_status_label.text = "MEGA JACKPOT!" if tier == "legendary" else "YOU WIN!"
 		_result_banner.text = "+" + Ui.compact(_pending_credits) + " CR"
+		if _pending_multiplier > 1:
+			_result_banner.text += "  ·  ×" + Ui.compact(_pending_multiplier)
 	_result_banner.add_theme_color_override("font_color", accent)
 	_status_label.add_theme_color_override("font_color", accent)
 	_cabinet.set_mode(accent, tier in ["epic", "legendary"])
@@ -580,6 +639,9 @@ func _on_landed() -> void:
 	Events.track("spin_result", {
 		"tier": tier,
 		"type": result_type,
+		"multiplier": _pending_multiplier,
+		"spinsSpent": _pending_multiplier,
+		"baseCredits": _pending_base_credits,
 		"credits": _pending_credits,
 	})
 	_refresh_hud()
@@ -644,6 +706,7 @@ func _reset_idle_state(reset_message: bool = true) -> void:
 	_skip_enabled = false
 	_spin_btn.disabled = false
 	_spin_btn.text = "SPIN"
+	_normalize_multiplier()
 	if reset_message:
 		_status_label.text = "NEON RUSH"
 		_status_label.add_theme_color_override("font_color", Ui.NEON_MAGENTA)
@@ -671,14 +734,14 @@ func _stop_idle_animation() -> void:
 		_spin_btn.scale = Vector2.ONE
 
 
-func _parse_no_spins_ms(data: Variant) -> int:
+func _parse_spin_error_details(data: Variant) -> Dictionary:
 	if typeof(data) == TYPE_DICTIONARY and data.has("error"):
 		var error: Variant = data["error"]
 		if typeof(error) == TYPE_DICTIONARY and error.has("details"):
 			var details: Variant = error["details"]
 			if typeof(details) == TYPE_DICTIONARY:
-				return int(details.get("nextSpinAtMs", 0))
-	return 0
+				return details
+	return {}
 
 
 func _show_no_spins(_next_ms: int) -> void:

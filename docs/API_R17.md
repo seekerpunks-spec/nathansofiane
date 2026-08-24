@@ -1,4 +1,4 @@
-# API R17 — CONTRATS CLIENT / SERVEUR
+# API R24 — CONTRATS CLIENT / SERVEUR
 
 Toutes les routes de mutation exigent `Authorization: Bearer …`,
 `Content-Type: application/json` et `X-Request-Id`. Une même clé rejoue la même
@@ -21,7 +21,10 @@ calculé par le client.
 
 ## Mutations
 
-- `POST /spin {requestId}`
+- `POST /spin {requestId,multiplier}` — multiplicateur présent dans
+  `economy.spinMultipliers`; défaut rétrocompatible `1`.
+  Réponse : `{outcome,multiplier,spinsSpent,baseCreditsGained,creditsGained,
+  spins,credits,nextSpinAtMs,serverTimeMs}`.
 - `POST /district/upgrade {districtId,elementId,requestId}`
 - `POST /chest/buy {chestId,requestId}`
 - `POST /chest/open {chestId,requestId}`
@@ -38,10 +41,12 @@ calculé par le client.
 
 Format unique : `{ \"error\": { \"code\", \"message\", \"details\"? } }`.
 Codes principaux : `BAD_REQUEST`, `UNAUTHORIZED`, `NOT_FOUND`,
-`INSUFFICIENT_CREDITS`, `ALREADY_CLAIMED`, `UNAVAILABLE`, `NO_SPINS`,
+`INSUFFICIENT_CREDITS`, `INSUFFICIENT_SPINS`, `ALREADY_CLAIMED`, `UNAVAILABLE`,
 `RATE_LIMITED`, `INTERNAL`.
+
+`INSUFFICIENT_SPINS` expose `requiredSpins`, `availableSpins` et
+`nextSpinAtMs`. Le serveur ne remplace jamais silencieusement le multiplicateur.
 
 Les routes publicité et achat n'acceptent les preuves `dev:*` qu'en compilation
 debug avec `DEV_AUTH=true`. Hors de ce contexte, elles refusent de créditer tant
 qu'un provider externe n'a pas été raccordé.
-

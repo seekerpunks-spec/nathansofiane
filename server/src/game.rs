@@ -2,6 +2,7 @@
 
 use crate::config::{RemoteConfig, Reward};
 use crate::error::ApiError;
+use anyhow::anyhow;
 use axum::http::HeaderMap;
 use chrono::{NaiveDate, Utc};
 use sqlx::{Postgres, Transaction};
@@ -27,19 +28,47 @@ pub fn idem_key(action: &str, address: &str, request_id: &str) -> String {
     format!("{action}|{address}|{request_id}")
 }
 
+pub fn checked_u64_to_i64(value: u64, label: &str) -> Result<i64, ApiError> {
+    i64::try_from(value).map_err(|_| ApiError::Internal(anyhow!("overflow économique: {label}")))
+}
+
+pub fn checked_add_credits(current: i64, delta: u64, label: &str) -> Result<i64, ApiError> {
+    let delta = checked_u64_to_i64(delta, label)?;
+    current
+        .checked_add(delta)
+        .ok_or_else(|| ApiError::Internal(anyhow!("overflow économique: {label}")))
+}
+
+pub fn checked_scale(value: u64, multiplier: u32, label: &str) -> Result<u64, ApiError> {
+    value
+        .checked_mul(multiplier as u64)
+        .filter(|scaled| *scaled <= i64::MAX as u64)
+        .ok_or_else(|| ApiError::Internal(anyhow!("overflow économique: {label}")))
+}
+
 pub async fn grant_reward_tx(
     tx: &mut Transaction<'_, Postgres>,
     address: &str,
     reward: &Reward,
 ) -> Result<(), ApiError> {
-    sqlx::query(
-        "UPDATE player_state SET spins = spins + $1, credits = credits + $2 WHERE address = $3",
-    )
-    .bind(reward.spins as i32)
-    .bind(reward.credits as i64)
-    .bind(address)
-    .execute(&mut **tx)
-    .await?;
+    let current: (i32, i64) =
+        sqlx::query_as("SELECT spins,credits FROM player_state WHERE address=$1 FOR UPDATE")
+            .bind(address)
+            .fetch_one(&mut **tx)
+            .await?;
+    let spins_delta = i32::try_from(reward.spins)
+        .map_err(|_| ApiError::Internal(anyhow!("overflow économique: reward.spins")))?;
+    let spins = current
+        .0
+        .checked_add(spins_delta)
+        .ok_or_else(|| ApiError::Internal(anyhow!("overflow économique: player.spins")))?;
+    let credits = checked_add_credits(current.1, reward.credits, "reward.credits")?;
+    sqlx::query("UPDATE player_state SET spins=$1,credits=$2 WHERE address=$3")
+        .bind(spins)
+        .bind(credits)
+        .bind(address)
+        .execute(&mut **tx)
+        .await?;
     if let Some(chest) = &reward.chest {
         sqlx::query(
             "INSERT INTO player_chests(address, chest_id, qty) VALUES ($1,$2,1) \
@@ -65,13 +94,14 @@ pub async fn progress_action_tx(
     let today: NaiveDate = now.date_naive();
     for mission in config.daily.missions.iter().filter(|m| m.action == action) {
         sqlx::query(
-            "INSERT INTO mission_progress(address,mission_id,mission_day,progress) VALUES($1,$2,$3,$4) \
-             ON CONFLICT(address,mission_id,mission_day) DO UPDATE SET progress = mission_progress.progress + EXCLUDED.progress",
+            "INSERT INTO mission_progress(address,mission_id,mission_day,progress) VALUES($1,$2,$3,LEAST($4,$5)) \
+             ON CONFLICT(address,mission_id,mission_day) DO UPDATE SET progress = LEAST($5, mission_progress.progress + EXCLUDED.progress)",
         )
         .bind(address)
         .bind(&mission.mission_id)
         .bind(today)
         .bind(amount.max(0))
+        .bind(checked_u64_to_i64(mission.target, "mission.target")?)
         .execute(&mut **tx)
         .await?;
     }
@@ -83,17 +113,23 @@ pub async fn progress_action_tx(
         .iter()
         .filter(|e| e.starts_at_ms <= now_ms && now_ms < e.ends_at_ms)
     {
-        let points: i64 = event
-            .point_sources
-            .iter()
-            .filter(|s| s.action == action)
-            .map(|s| s.points as i64 * amount.max(0))
-            .sum();
+        let mut points = 0i64;
+        for source in event.point_sources.iter().filter(|s| s.action == action) {
+            let source_points = checked_u64_to_i64(source.points, "event.points")?;
+            let delta = source_points
+                .checked_mul(amount.max(0))
+                .ok_or_else(|| ApiError::Internal(anyhow!("overflow économique: event.points")))?;
+            points = points
+                .checked_add(delta)
+                .ok_or_else(|| ApiError::Internal(anyhow!("overflow économique: event.total")))?;
+        }
         if points > 0 {
-            season_points += points;
+            season_points = season_points
+                .checked_add(points)
+                .ok_or_else(|| ApiError::Internal(anyhow!("overflow économique: season.points")))?;
             sqlx::query(
                 "INSERT INTO event_scores(event_id,address,points) VALUES($1,$2,$3) \
-                 ON CONFLICT(event_id,address) DO UPDATE SET points = event_scores.points + EXCLUDED.points",
+                 ON CONFLICT(event_id,address) DO UPDATE SET points = LEAST(9223372036854775807::numeric, event_scores.points::numeric + EXCLUDED.points::numeric)::bigint",
             )
             .bind(&event.event_id)
             .bind(address)
@@ -110,7 +146,7 @@ pub async fn progress_action_tx(
         if season_points > 0 {
             sqlx::query(
                 "INSERT INTO season_progress(address,season_id,points) VALUES($1,$2,$3) \
-                 ON CONFLICT(address,season_id) DO UPDATE SET points = season_progress.points + EXCLUDED.points",
+                 ON CONFLICT(address,season_id) DO UPDATE SET points = LEAST(9223372036854775807::numeric, season_progress.points::numeric + EXCLUDED.points::numeric)::bigint",
             )
             .bind(address)
             .bind(&season.season_id)
@@ -132,5 +168,15 @@ mod tests {
             idem_key("spin", "alice", "1"),
             idem_key("upgrade", "alice", "1")
         );
+    }
+
+    #[test]
+    fn checked_scaling_rejects_bigint_overflow() {
+        assert_eq!(
+            checked_scale(6_000_000, 100_000, "test").unwrap(),
+            600_000_000_000
+        );
+        assert!(checked_scale(i64::MAX as u64, 2, "test").is_err());
+        assert!(checked_add_credits(i64::MAX, 1, "test").is_err());
     }
 }

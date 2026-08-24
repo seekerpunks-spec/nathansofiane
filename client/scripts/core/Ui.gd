@@ -38,13 +38,20 @@ static func tier_color(tier: String) -> Color:
 		_:
 			return GREY
 
-## Formatage compact : 950 → "950", 15000 → "15K", 1500000 → "1.5M".
+## Formatage compact jusqu'aux grandes économies : K/M/B/T/Qa/Qi.
 static func compact(n: int) -> String:
-	if n < 1000:
+	if absi(n) < 1000:
 		return str(n)
-	if n < 1_000_000:
-		return _trim(n / 1000.0) + "K"
-	return _trim(n / 1_000_000.0) + "M"
+	var sign := "-" if n < 0 else ""
+	var value := absf(float(n))
+	var suffixes: Array[String] = ["K", "M", "B", "T", "Qa", "Qi"]
+	var suffix: String = suffixes[0]
+	for candidate in suffixes:
+		value /= 1000.0
+		suffix = candidate
+		if value < 1000.0:
+			break
+	return sign + _trim(value) + suffix
 
 static func _trim(v: float) -> String:
 	var s: String

@@ -33,16 +33,17 @@ Hiérarchie de vérité : `server/src/*.rs` = contrat API définitif > `docs/` (
 6. **GDScript 4** : pas de méthode nommée `get()` (collision `Object.get`, warning = erreur) ; une `const` doit être une expression constante (pas d'appel de fonction) ; pas de variable et fonction au même nom.
 7. **Mémorisation (T14)** : tout changement significatif → mise à jour du/des `memory/*.md` dans la même session, condensé.
 
-## État actuel (R16 — 21/08/2026)
-- **M1 GREEN** : serveur validé (R11, re-validé live R16 : challenge→verify→state→spin×3→config, maths crédits exactes, 401 sans token, zéro 500) + client validé chez l'utilisateur (logs 21/08 : `/config 200` → auth dev → `/state` → `spin×3 200` → `/analytics 200`, **zéro erreur script**).
-- **Cleanup post-M1 fait** : `fix_linker.bat` → `tools/`, `Net.gd` `const DEBUG := false`.
-- **Reste utilisateur** : checks visuels (roue centrée `WHEEL_CENTER`, barre de regen, overlay no-spins à 0).
-- **Ensuite : M2** — District 1 : `POST /district/upgrade` (spécification complète `memory/TODO.md` section 🟠 M2) + écran District client.
+## État actuel (R24 — 24/08/2026)
+- Baseline Git créée. Auth Base58, arithmétique, contraintes SQL et regen à
+  reliquat corrigées.
+- Multiplicateur data-driven ×1→×100K validé en PostgreSQL : débit, reward,
+  progression et rejeu idempotent exacts. 7 tests Rust et 6 scènes Godot verts.
+- Prochain lot : multi-districts, puis live-ops, Attack/Raid/défense.
 
 ## Roadmap (condensé)
 M1 spin+auth (**GREEN** R16) → **M2 districts/upgrades (prochain)** → M3 coffres/cartes/collections → M4 rétention (dailies, leaderboards, events) → M5 monétisation SKR (packs, paiements SPL vérifiés on-chain) → M6/M7 polish + build Android + dApp Store. Détails : `memory/TODO.md` + `memory/GDD.md`.
 
 ## Contrat API M1 (vérifié client↔serveur)
-`POST /auth/challenge {address}` → `{nonce, expiresAt}` · `POST /auth/verify {address, signature}` → `{token, refreshToken, isNewPlayer, address}` · `POST /auth/refresh {refreshToken}` → `{token, refreshToken}` · `GET /state` → `{address, spins, credits, lastSpinAtMs, nextSpinAtMs, districtIndex, dailyStreak, lastDailyClaim, adsWatchedToday, districtProgress[], cards, chests, events[], configVersion, serverTimeMs}` · `POST /spin` (header `x-request-id` + body `requestId`, idempotent) → `{outcome:{id,type,tier,label}, creditsGained, spins, credits, nextSpinAtMs, serverTimeMs}` ; 403 → `{error:{code:"NO_SPINS", message, details:{nextSpinAtMs}}}` · `GET /config` public → `{version, hash, payload}` · `POST /analytics {events:[{name, props}]}` → `{accepted}` · `GET /health`.
+`POST /spin {requestId,multiplier}` → `{outcome,multiplier,spinsSpent,baseCreditsGained,creditsGained,spins,credits,nextSpinAtMs,serverTimeMs}` ; 403 `INSUFFICIENT_SPINS` expose required/available/next. Contrats complets : `docs/API_R17.md`.
 
 **Règle d'or anti-triche** : le client est une VUE — il ne calcule JAMAIS RNG/soldes/probas/récompenses ; tout vient du serveur (CSPRNG `OsRng`, horloge serveur, transactions atomiques, idempotence, audit). Les valeurs économiques sont 100 % dans `config/` (PROVISIONAL, hashé au boot).

@@ -34,8 +34,12 @@ pub enum ApiError {
     AlreadyClaimed,
     #[error("resource unavailable")]
     Unavailable(String),
-    #[error("no spins available")]
-    NoSpins { next_spin_at_ms: Option<i64> },
+    #[error("insufficient spins")]
+    InsufficientSpins {
+        required_spins: u32,
+        available_spins: i32,
+        next_spin_at_ms: Option<i64>,
+    },
     #[error("too many requests")]
     RateLimited,
     #[error("database error")]
@@ -67,10 +71,10 @@ impl IntoResponse for ApiError {
             ApiError::Unavailable(message) => {
                 (StatusCode::FORBIDDEN, "UNAVAILABLE", message.clone())
             }
-            ApiError::NoSpins { .. } => (
+            ApiError::InsufficientSpins { .. } => (
                 StatusCode::FORBIDDEN,
-                "NO_SPINS",
-                "no spins available".to_string(),
+                "INSUFFICIENT_SPINS",
+                "insufficient spins".to_string(),
             ),
             ApiError::RateLimited => (
                 StatusCode::TOO_MANY_REQUESTS,
@@ -96,8 +100,17 @@ impl IntoResponse for ApiError {
         };
 
         let mut err = json!({ "code": code, "message": message });
-        if let ApiError::NoSpins { next_spin_at_ms } = &self {
-            err["details"] = json!({ "nextSpinAtMs": next_spin_at_ms });
+        if let ApiError::InsufficientSpins {
+            required_spins,
+            available_spins,
+            next_spin_at_ms,
+        } = &self
+        {
+            err["details"] = json!({
+                "requiredSpins": required_spins,
+                "availableSpins": available_spins,
+                "nextSpinAtMs": next_spin_at_ms,
+            });
         }
 
         let body = Json(json!({ "error": err }));

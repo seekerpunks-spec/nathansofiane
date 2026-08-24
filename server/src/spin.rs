@@ -5,7 +5,7 @@
 //! 2. idempotence (X-Request-Id) — la réponse est stockée DANS la même
 //!    transaction que le spin (pas de double-spend même en race)
 //! 3. regen temporelle (horloge serveur, jamais l'horloge client)
-//! 4. spins < 1 → 403 `NO_SPINS` + `nextSpinAtMs`
+//! 4. validation + débit atomique du multiplicateur data-driven
 //! 5. tirage sur `spin_table.json` (CSPRNG `OsRng`, poids entiers)
 //! 6. transaction SQL atomique : état + audit économie
 //!
@@ -32,6 +32,12 @@ pub struct SpinReq {
     /// Fallback idempotence (l'en-tête `X-Request-Id` a la priorité).
     #[serde(default, rename = "requestId")]
     pub request_id: Option<String>,
+    #[serde(default = "default_multiplier")]
+    pub multiplier: u32,
+}
+
+fn default_multiplier() -> u32 {
+    1
 }
 
 pub async fn spin(
@@ -50,7 +56,14 @@ pub async fn spin(
         return Ok(Json(stored));
     }
 
-    let response = perform_spin(&state.db, &state.config, &address, &request_id).await?;
+    let response = perform_spin(
+        &state.db,
+        &state.config,
+        &address,
+        &request_id,
+        body.multiplier,
+    )
+    .await?;
     Ok(Json(response))
 }
 
@@ -60,7 +73,13 @@ async fn perform_spin(
     config: &RemoteConfig,
     address: &str,
     request_id: &str,
+    multiplier: u32,
 ) -> Result<Value, ApiError> {
+    if !config.economy.spin_multipliers.contains(&multiplier) {
+        return Err(ApiError::BadRequest(
+            "multiplier absent de la configuration".to_string(),
+        ));
+    }
     let mut tx = db.begin().await?;
 
     let row = db
@@ -78,18 +97,16 @@ async fn perform_spin(
 
     // 1) Regen temporelle (horloge serveur).
     let now = Utc::now();
-    let gained = regen_gained(row.last_spin_at, now, row.spins, config);
-    let spins_after_regen = row.spins + gained;
+    let regen = regen_state(row.last_spin_at, now, row.spins, config);
+    let spins_after_regen = regen.spins;
 
-    // 2) Pas de spin → NO_SPINS + heure du prochain spin.
-    if spins_after_regen < 1 {
-        let next = row.last_spin_at.map(|last| {
-            (last + ChronoDuration::milliseconds(config.economy.spin_regen_ms as i64))
-                .timestamp_millis()
-        });
+    // 2) Solde insuffisant : le serveur ne rétrograde jamais silencieusement.
+    if spins_after_regen < multiplier as i32 {
         tx.rollback().await?;
-        return Err(ApiError::NoSpins {
-            next_spin_at_ms: next,
+        return Err(ApiError::InsufficientSpins {
+            required_spins: multiplier,
+            available_spins: spins_after_regen,
+            next_spin_at_ms: regen.next_spin_at_ms,
         });
     }
 
@@ -107,7 +124,7 @@ async fn perform_spin(
         .expect("table non vide (validée au boot)");
 
     // 4) Gain en crédits (bornes min/max validées au boot).
-    let credits_gained: u64 = if outcome.outcome_type == OutcomeType::Credits {
+    let base_credits_gained: u64 = if outcome.outcome_type == OutcomeType::Credits {
         match (outcome.min, outcome.max) {
             (Some(min), Some(max)) => rand::rngs::OsRng.gen_range(min..=max),
             _ => 0,
@@ -116,23 +133,36 @@ async fn perform_spin(
         // M1 : pas d'issues chest/card dans la table (activées en M3).
         0
     };
+    let credits_gained =
+        game::checked_scale(base_credits_gained, multiplier, "spin.creditsGained")?;
 
     // 5) Écriture atomique : état + audit (+ idempotence).
     let before = json!({
         "spins": row.spins,
         "credits": row.credits,
         "lastSpinAt": row.last_spin_at.map(|t| t.to_rfc3339()),
+        "multiplier": multiplier,
     });
 
-    let new_spins = spins_after_regen - 1;
-    let new_credits = row.credits + credits_gained as i64;
+    let new_spins = spins_after_regen - multiplier as i32;
+    let new_credits = game::checked_add_credits(row.credits, credits_gained, "spin.credits")?;
+    let max_free = config.economy.max_free_spins as i32;
+    let persisted_anchor = if new_spins < max_free {
+        if spins_after_regen >= max_free {
+            now
+        } else {
+            regen.anchor.unwrap_or(now)
+        }
+    } else {
+        now
+    };
 
     sqlx::query(
         "UPDATE player_state SET spins = $1, credits = $2, last_spin_at = $3 WHERE address = $4",
     )
     .bind(new_spins)
     .bind(new_credits)
-    .bind(now)
+    .bind(persisted_anchor)
     .bind(address)
     .execute(&mut *tx)
     .await?;
@@ -140,14 +170,17 @@ async fn perform_spin(
     let after = json!({
         "spins": new_spins,
         "credits": new_credits,
-        "lastSpinAt": now.to_rfc3339(),
+        "lastSpinAt": persisted_anchor.to_rfc3339(),
+        "multiplier": multiplier,
+        "baseCreditsGained": base_credits_gained,
+        "creditsGained": credits_gained,
     });
-    game::progress_action_tx(&mut tx, address, "spin", 1, config).await?;
+    game::progress_action_tx(&mut tx, address, "spin", multiplier as i64, config).await?;
     Db::audit_tx(&mut tx, address, "spin", &before, &after, Some(request_id)).await?;
 
     let next_spin_at_ms = if new_spins < config.economy.max_free_spins as i32 {
         Some(
-            (now + ChronoDuration::milliseconds(config.economy.spin_regen_ms as i64))
+            (persisted_anchor + ChronoDuration::milliseconds(config.economy.spin_regen_ms as i64))
                 .timestamp_millis(),
         )
     } else {
@@ -161,6 +194,9 @@ async fn perform_spin(
             "tier": outcome.tier,
             "label": outcome.label,
         },
+        "multiplier": multiplier,
+        "spinsSpent": multiplier,
+        "baseCreditsGained": base_credits_gained,
         "creditsGained": credits_gained,
         "spins": new_spins,
         "credits": new_credits,
@@ -185,33 +221,87 @@ mod tests {
             RemoteConfig::load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../config")).unwrap();
         let now = Utc::now();
         let old = now - ChronoDuration::milliseconds(cfg.economy.spin_regen_ms as i64 * 100);
+        let capped = regen_state(Some(old), now, 0, &cfg);
+        assert_eq!(capped.spins, cfg.economy.max_free_spins as i32);
+        assert_eq!(capped.next_spin_at_ms, None);
+        let future = regen_state(Some(now + ChronoDuration::seconds(1)), now, 0, &cfg);
+        assert_eq!(future.spins, 0);
+    }
+
+    #[test]
+    fn regen_preserves_partial_interval() {
+        let cfg =
+            RemoteConfig::load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../config")).unwrap();
+        let now = Utc::now();
+        let interval = cfg.economy.spin_regen_ms as i64;
+        let last = now - ChronoDuration::milliseconds(interval + interval / 2);
+        let snapshot = regen_state(Some(last), now, 0, &cfg);
+        assert_eq!(snapshot.spins, 1);
+        let anchor = snapshot.anchor.unwrap();
+        assert_eq!(anchor, last + ChronoDuration::milliseconds(interval));
         assert_eq!(
-            regen_gained(Some(old), now, 0, &cfg),
-            cfg.economy.max_free_spins as i32
-        );
-        assert_eq!(
-            regen_gained(Some(now + ChronoDuration::seconds(1)), now, 0, &cfg),
-            0
+            snapshot.next_spin_at_ms,
+            Some((last + ChronoDuration::milliseconds(interval * 2)).timestamp_millis())
         );
     }
 }
 
-/// Spins régénérés depuis `last_spin_at`, plafonnés à `maxFreeSpins`.
-fn regen_gained(
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct RegenState {
+    pub spins: i32,
+    pub anchor: Option<DateTime<Utc>>,
+    pub next_spin_at_ms: Option<i64>,
+}
+
+/// Snapshot de régénération sans mutation. `anchor` avance uniquement des
+/// intervalles complets afin de conserver le reliquat temporel du joueur.
+pub(crate) fn regen_state(
     last_spin_at: Option<DateTime<Utc>>,
     now: DateTime<Utc>,
     spins: i32,
     config: &RemoteConfig,
-) -> i32 {
+) -> RegenState {
+    let max_free = config.economy.max_free_spins as i32;
+    if spins >= max_free {
+        return RegenState {
+            spins,
+            anchor: None,
+            next_spin_at_ms: None,
+        };
+    }
     let Some(last) = last_spin_at else {
-        return 0;
+        let next = now + ChronoDuration::milliseconds(config.economy.spin_regen_ms as i64);
+        return RegenState {
+            spins,
+            anchor: Some(now),
+            next_spin_at_ms: Some(next.timestamp_millis()),
+        };
     };
     let elapsed = (now - last).num_milliseconds();
     if elapsed <= 0 {
-        return 0;
+        let next = last + ChronoDuration::milliseconds(config.economy.spin_regen_ms as i64);
+        return RegenState {
+            spins,
+            anchor: Some(last),
+            next_spin_at_ms: Some(next.timestamp_millis()),
+        };
     }
     let gained = (elapsed / config.economy.spin_regen_ms as i64) as i32;
-    (gained)
-        .min(config.economy.max_free_spins as i32 - spins)
-        .max(0)
+    let applied = gained.min(max_free - spins).max(0);
+    let total = spins + applied;
+    if total >= max_free {
+        return RegenState {
+            spins: total,
+            anchor: None,
+            next_spin_at_ms: None,
+        };
+    }
+    let anchor =
+        last + ChronoDuration::milliseconds(config.economy.spin_regen_ms as i64 * applied as i64);
+    let next = anchor + ChronoDuration::milliseconds(config.economy.spin_regen_ms as i64);
+    RegenState {
+        spins: total,
+        anchor: Some(anchor),
+        next_spin_at_ms: Some(next.timestamp_millis()),
+    }
 }

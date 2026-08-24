@@ -259,24 +259,9 @@ async fn get_state(
         .ok_or_else(|| ApiError::Internal(anyhow!("pas de player_state pour {address}")))?;
 
     let now = Utc::now();
-    let mut spins = row.spins;
-    if let Some(last) = row.last_spin_at {
-        let elapsed = (now - last).num_milliseconds();
-        if elapsed > 0 {
-            let gained = (elapsed / state.config.economy.spin_regen_ms as i64) as i32;
-            spins += gained
-                .min(state.config.economy.max_free_spins as i32 - row.spins)
-                .max(0);
-        }
-    }
-    let next_spin_at = if spins < state.config.economy.max_free_spins as i32 {
-        row.last_spin_at.map(|last| {
-            (last + chrono::Duration::milliseconds(state.config.economy.spin_regen_ms as i64))
-                .timestamp_millis()
-        })
-    } else {
-        None
-    };
+    let regen = spin::regen_state(row.last_spin_at, now, row.spins, &state.config);
+    let spins = regen.spins;
+    let next_spin_at = regen.next_spin_at_ms;
 
     let cards = state.db.fetch_cards(&address).await?;
     let chests = state.db.fetch_chests(&address).await?;
