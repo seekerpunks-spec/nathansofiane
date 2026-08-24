@@ -54,6 +54,7 @@
 | T32 | L'événement coopératif est une extension optionnelle du moteur d'événements existant ; score d'équipe et contribution suivent les mêmes `pointSources`, le claim est personnel et unique sur `(eventId, milestoneIndex, address)` indépendamment de l'équipe | Évite un second moteur liveops, empêche le leech sans contribution et ferme le double-claim par changement d'équipe |
 | T33 | Les achievements permanents réutilisent `progress_action_tx`, stockent un total par action et ne créditent la récompense qu'au claim ; chaque claim contribue à Network Power via un poids configurable | Une source cumulative suffit à plusieurs paliers, reste extensible sans nouvelle table par objectif et maintient le score global autoritaire |
 | T34 | Les perks NFT passent exclusivement par des entitlements serveur actifs et non expirés ; aucun endpoint client d'ownership, définition OG désactivée, TTL remote-config et bonus limité au daily login | Le système est prêt pour un provider futur sans implémenter le wallet, échoue fermé en cas de panne/transfert et ne crée aucun rendement financier |
+| T35 | La gate locale inclut désormais invariants sécurité, absence de Pets, safe areas, Retour Android, cibles tactiles et smoke 360×800 / 540×1170 / 720×1280 ; les claims finaux événement/saison relisent l'idempotence sous verrou | Transforme l'audit transversal en régression automatique tout en séparant clairement la QA Seeker physique encore externe |
 
 ## Noms / brandings (à verrouiller — O1 GDD)
 - Jeu : **CyberSeeker** (provisoire, utilisé partout pour l'instant).

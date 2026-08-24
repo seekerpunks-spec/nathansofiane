@@ -48,6 +48,9 @@
 - Entitlements NFT centralisés et fail-closed : aucune route d'ownership client,
   activation + TTL + provider requis côté serveur, expiration automatique et
   bonus daily spins uniquement. La collection OG reste désactivée par défaut.
+- Audit transversal : aucun Pets runtime ; claims événement/saison relus sous
+  verrou ; safe areas, stretch portrait, Retour Android, modales dismissibles,
+  inputs tactiles et redraw réduit sont couverts par deux nouvelles gates.
 
 ## Produit livré
 
@@ -91,6 +94,8 @@
   233,5 spins pour District 1 et 501,8 pour District 2.
 - `cargo test --locked` : 18/18 ; `cargo clippy --locked -- -D warnings` : OK.
 - `tools/analytics_check.ps1` : 52/52 événements présents.
+- `tools/security_check.ps1` et `tools/mobile_ux_check.ps1` : OK ; six scènes
+  validées à 360×800, 540×1170 et 720×1280.
 - Intégration analytics PostgreSQL : batch 25 accepté, replay dédupliqué, props
   invalides refusées et progression de spin renvoyée avec cohorte.
 - Slot social complet : outcomes Attack/Raid/Shield/Chest/Card, Signal Jam,
@@ -125,6 +130,8 @@
 - Intégration entitlements : état sans preuve = zéro perk ; une ownership active
   écrite via le point d'entrée provider obtient le bonus configuré, puis retombe
   automatiquement à zéro dès que son TTL PostgreSQL est expiré.
+- Intégration idempotence season : deux claims simultanés du même palier donnent
+  deux HTTP 200 identiques et une seule récompense (+25 spins, +100 000 CR).
 - Économie réauditée : 277 605 CR équivalents/spin, 9,4 % de spins vides,
   districts estimés à 233,5 puis 501,8 spins. `cargo clippy -D warnings` vert.
 - `cargo build --release` : OK.

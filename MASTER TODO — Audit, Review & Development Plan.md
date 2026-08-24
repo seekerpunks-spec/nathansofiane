@@ -36,23 +36,23 @@ mais :
 
 Avant toute grosse implémentation :
 
-- [ ] Lire l'arborescence complète du repository.
-- [ ] Identifier frontend, backend, shared code, configuration et données.
-- [ ] Identifier la stack exacte utilisée.
-- [ ] Identifier tous les systèmes déjà implémentés.
-- [ ] Identifier tous les systèmes partiellement implémentés.
-- [ ] Identifier les prototypes temporaires.
-- [ ] Identifier le code mort / doublonné.
-- [ ] Identifier les valeurs économiques hardcodées.
-- [ ] Identifier les points faisant confiance au client alors qu'ils devraient être serveur-authoritative.
-- [ ] Identifier les risques évidents de duplication de rewards.
-- [ ] Identifier les problèmes potentiels de concurrence / double-click / double-claim.
-- [ ] Vérifier la persistance joueur.
-- [ ] Vérifier le RNG.
-- [ ] Vérifier la gestion des erreurs.
-- [ ] Vérifier le responsive/mobile.
-- [ ] Vérifier les performances évidentes.
-- [ ] Vérifier les dépendances inutiles ou fragiles.
+- [x] Lire l'arborescence complète du repository.
+- [x] Identifier frontend, backend, shared code, configuration et données.
+- [x] Identifier la stack exacte utilisée.
+- [x] Identifier tous les systèmes déjà implémentés.
+- [x] Identifier tous les systèmes partiellement implémentés.
+- [x] Identifier les prototypes temporaires.
+- [x] Identifier le code mort / doublonné.
+- [x] Identifier les valeurs économiques hardcodées.
+- [x] Identifier les points faisant confiance au client alors qu'ils devraient être serveur-authoritative.
+- [x] Identifier les risques évidents de duplication de rewards.
+- [x] Identifier les problèmes potentiels de concurrence / double-click / double-claim.
+- [x] Vérifier la persistance joueur.
+- [x] Vérifier le RNG.
+- [x] Vérifier la gestion des erreurs.
+- [x] Vérifier le responsive/mobile.
+- [x] Vérifier les performances évidentes.
+- [x] Vérifier les dépendances inutiles ou fragiles.
 
 Créer ensuite un état synthétique :
 
@@ -103,20 +103,20 @@ Cette boucle doit être extrêmement solide avant d'empiler les Live Ops.
 
 Auditer d'abord ce qui existe.
 
-- [ ] Vérifier le système de spin actuel.
-- [ ] Vérifier que le résultat est déterminé de manière fiable.
-- [ ] Vérifier que le client ne peut pas choisir son résultat.
-- [ ] Vérifier consommation correcte des spins.
-- [ ] Empêcher double spin accidentel.
-- [ ] Empêcher spam réseau.
-- [ ] Empêcher double reward.
-- [ ] Prévoir état loading / animation / result.
-- [ ] Prévoir reprise correcte après perte réseau.
-- [ ] Prévoir idempotency côté backend.
-- [ ] Vérifier animation fluide sur mobile.
-- [ ] Prévoir feedback haptique.
-- [ ] Prévoir feedback audio.
-- [ ] Prévoir différents niveaux de célébration selon la récompense.
+- [x] Vérifier le système de spin actuel.
+- [x] Vérifier que le résultat est déterminé de manière fiable.
+- [x] Vérifier que le client ne peut pas choisir son résultat.
+- [x] Vérifier consommation correcte des spins.
+- [x] Empêcher double spin accidentel.
+- [x] Empêcher spam réseau.
+- [x] Empêcher double reward.
+- [x] Prévoir état loading / animation / result.
+- [x] Prévoir reprise correcte après perte réseau.
+- [x] Prévoir idempotency côté backend.
+- [x] Vérifier animation fluide sur mobile.
+- [x] Prévoir feedback haptique.
+- [x] Prévoir feedback audio.
+- [x] Prévoir différents niveaux de célébration selon la récompense.
 
 Le gameplay doit rester rapide.
 
@@ -128,12 +128,12 @@ Ne pas créer une animation de 5 secondes obligatoire pour chaque spin.
 
 Ajouter ou auditer :
 
-- [ ] x1
-- [ ] x2
-- [ ] x3
-- [ ] x5
-- [ ] x10
-- [ ] autres valeurs configurables plus tard
+- [x] x1
+- [x] x2
+- [x] x3
+- [x] x5
+- [x] x10
+- [x] autres valeurs configurables jusqu'à ×100K
 
 Le multiplicateur :
 
@@ -148,13 +148,13 @@ Le multiplicateur doit être DATA-DRIVEN.
 
 # 3. SPIN REGENERATION
 
-- [ ] Recharge automatique basée sur le temps serveur.
-- [ ] Maximum gratuit configurable.
-- [ ] Temps de recharge configurable.
-- [ ] Calcul offline fiable.
-- [ ] Affichage timer client.
-- [ ] Aucun timer critique basé uniquement sur l'heure du téléphone.
-- [ ] Gestion du retour après plusieurs heures/jours.
+- [x] Recharge automatique basée sur le temps serveur.
+- [x] Maximum gratuit configurable.
+- [x] Temps de recharge configurable.
+- [x] Calcul offline fiable.
+- [x] Affichage timer client.
+- [x] Aucun timer critique basé uniquement sur l'heure du téléphone.
+- [x] Gestion du retour après plusieurs heures/jours.
 
 ---
 
@@ -162,13 +162,13 @@ Le multiplicateur doit être DATA-DRIVEN.
 
 Une monnaie interne sans valeur monétaire réelle.
 
-- [ ] Vérifier earning.
-- [ ] Vérifier spending.
-- [ ] Vérifier persistence.
-- [ ] Vérifier grosses valeurs numériques.
-- [ ] Prévoir progression pouvant atteindre des montants très élevés.
-- [ ] Utiliser un système numérique adapté pour éviter overflow / imprécision.
-- [ ] Prévoir notation UI : K / M / B / T / etc.
+- [x] Vérifier earning.
+- [x] Vérifier spending.
+- [x] Vérifier persistence.
+- [x] Vérifier grosses valeurs numériques.
+- [x] Prévoir progression pouvant atteindre des montants très élevés.
+- [x] Utiliser un système numérique adapté pour éviter overflow / imprécision.
+- [x] Prévoir notation UI : K / M / B / T / Qa / Qi.
 
 La monnaie sert notamment à :
 
@@ -204,17 +204,17 @@ Base de référence :
 
 Mais rendre ces valeurs configurables.
 
-- [ ] Village data model.
-- [ ] Structure data model.
-- [ ] Upgrade levels.
-- [ ] Upgrade costs.
-- [ ] Visual state selon niveau.
-- [ ] Completion detection.
-- [ ] Village completion reward.
-- [ ] Transition vers village suivant.
-- [ ] Sauvegarde.
-- [ ] Reprise correcte.
-- [ ] Protection contre double-completion reward.
+- [x] Village data model.
+- [x] Structure data model.
+- [x] Upgrade levels.
+- [x] Upgrade costs.
+- [x] Visual state selon niveau.
+- [x] Completion detection.
+- [x] Village completion reward.
+- [x] Transition vers village suivant.
+- [x] Sauvegarde.
+- [x] Reprise correcte.
+- [x] Protection contre double-completion reward.
 
 ---
 
@@ -258,11 +258,11 @@ sans architecture différente.
 
 Créer une vraie couche de configuration permettant de contrôler :
 
-- [ ] progression des coûts ;
-- [ ] récompenses ;
-- [ ] vitesse de progression ;
-- [ ] difficulté ;
-- [ ] inflation monétaire.
+- [x] progression des coûts ;
+- [x] récompenses ;
+- [x] vitesse de progression ;
+- [x] difficulté ;
+- [x] inflation monétaire.
 
 NE PAS choisir arbitrairement la courbe finale.
 
@@ -300,14 +300,14 @@ Epic
 Legendary
 ```
 
-- [ ] Collection inventory.
-- [ ] New card detection.
-- [ ] Duplicate detection.
-- [ ] Collection progress UI.
-- [ ] Missing card display.
-- [ ] Card detail.
-- [ ] Persistence.
-- [ ] Data-driven card definitions.
+- [x] Collection inventory.
+- [x] New card detection.
+- [x] Duplicate detection.
+- [x] Collection progress UI.
+- [x] Missing card display.
+- [x] Card detail.
+- [x] Persistence.
+- [x] Data-driven card definitions.
 
 ---
 
@@ -339,11 +339,11 @@ visualTheme
 
 Quand toutes les cartes sont obtenues :
 
-- [ ] détecter completion ;
-- [ ] empêcher double claim ;
-- [ ] afficher célébration ;
-- [ ] attribuer grosse récompense ;
-- [ ] enregistrer set completed.
+- [x] détecter completion ;
+- [x] empêcher double claim ;
+- [x] afficher célébration ;
+- [x] attribuer grosse récompense ;
+- [x] enregistrer set completed.
 
 Les récompenses peuvent atteindre des valeurs importantes :
 
@@ -365,10 +365,10 @@ Le système doit accepter facilement ces ordres de grandeur.
 
 Conserver les doublons.
 
-- [ ] quantity per card.
-- [ ] affichage duplicates.
-- [ ] architecture compatible avec futur trading.
-- [ ] architecture compatible avec futur système d'échange.
+- [x] quantity per card.
+- [x] affichage duplicates.
+- [x] architecture compatible avec trading.
+- [x] système d'échange direct 1-pour-1 implémenté.
 
 IMPORTANT :
 
@@ -406,14 +406,14 @@ lootTable
 unlockRequirement
 ```
 
-- [ ] Achat en monnaie virtuelle.
-- [ ] Loot serveur.
-- [ ] Animation opening.
-- [ ] Révélation cartes.
-- [ ] New/duplicate visual feedback.
-- [ ] Anti-double opening.
-- [ ] Persistence.
-- [ ] Configurable drop tables.
+- [x] Achat en monnaie virtuelle.
+- [x] Loot serveur.
+- [x] Animation opening.
+- [x] Révélation cartes.
+- [x] New/duplicate visual feedback.
+- [x] Anti-double opening.
+- [x] Persistence.
+- [x] Configurable drop tables.
 
 ---
 
@@ -1094,12 +1094,12 @@ Cette feature est **GATED / FUTURE**.
 
 Nous supprimons volontairement cette mécanique.
 
-- [ ] Vérifier si un système Pets existe déjà.
-- [ ] Si aucun : ne rien créer.
-- [ ] Si prototype incomplet : retirer proprement.
-- [ ] Si dépendances existent : supprimer sans casser les autres systèmes.
-- [ ] Nettoyer données/config/assets inutilisés.
-- [ ] Ne pas remplacer automatiquement Pets par une mécanique équivalente.
+- [x] Vérifier si un système Pets existe déjà : aucun runtime, config ou schéma.
+- [x] Si aucun : ne rien créer.
+- [x] Si prototype incomplet : N/A, aucun prototype détecté.
+- [x] Si dépendances existent : N/A, aucune dépendance détectée.
+- [x] Nettoyer données/config/assets inutilisés : aucun artefact Pets détecté.
+- [x] Ne pas remplacer automatiquement Pets par une mécanique équivalente.
 
 Nous voulons éviter une feature supplémentaire sans nécessité.
 
@@ -1137,8 +1137,8 @@ purchase_started
 purchase_complete
 ```
 
-Statut R24 : les 25 événements ci-dessus et 25 événements rétention/social,
-soit 50 événements, sont instrumentés et couverts
+Statut R24 : les 25 événements ci-dessus et 27 événements rétention/social,
+soit 52 événements, sont instrumentés et couverts
 par la gate `tools/analytics_check.ps1`. Les batches sont bornés, validés et
 dédupliqués côté serveur par `batchId` lors des retries réseau.
 
@@ -1179,16 +1179,21 @@ L'objectif est de pouvoir équilibrer le jeu sans toucher à sa logique.
 
 Faire audit explicite de :
 
-- [ ] client-authoritative resources.
-- [ ] manipulated timers.
-- [ ] duplicate API calls.
-- [ ] replay attacks.
-- [ ] duplicate purchase credits.
-- [ ] duplicate claims.
-- [ ] leaderboard manipulation.
-- [ ] invalid ownership claims.
-- [ ] RNG predictability where relevant.
-- [ ] race conditions.
+- [x] client-authoritative resources.
+- [x] manipulated timers.
+- [x] duplicate API calls.
+- [x] replay attacks.
+- [x] duplicate purchase credits.
+- [x] duplicate claims.
+- [x] leaderboard manipulation.
+- [x] invalid ownership claims.
+- [x] RNG predictability where relevant.
+- [x] race conditions.
+
+Gate reproductible : `tools/security_check.ps1`. La revue R24 a notamment
+corrigé la relecture idempotente sous verrou des claims finaux événement/saison ;
+le retry concurrent season renvoie désormais deux réponses 200 identiques pour
+un seul crédit de reward.
 
 Ne pas over-engineer.
 
@@ -1202,16 +1207,19 @@ Tout le jeu est pensé mobile.
 
 Review :
 
-- [ ] touch targets.
-- [ ] responsive layout.
-- [ ] portrait screens.
-- [ ] animation performance.
-- [ ] low-latency interactions.
-- [ ] loading states.
-- [ ] offline/error states.
-- [ ] back button behavior.
-- [ ] safe areas.
-- [ ] different screen ratios.
+- [x] touch targets.
+- [x] responsive layout.
+- [x] portrait screens.
+- [x] animation performance locale et mode mouvement réduit.
+- [x] low-latency interactions.
+- [x] loading states.
+- [x] offline/error states.
+- [x] back button behavior.
+- [x] safe areas.
+- [x] different screen ratios (360×800, 540×1170, 720×1280).
+
+Gate reproductible : `tools/mobile_ux_check.ps1` + smoke des six scènes aux
+trois ratios. La validation appareil Seeker physique reste une dépendance externe.
 
 L'expérience doit pouvoir être comprise avec très peu de texte.
 
@@ -1221,12 +1229,12 @@ L'expérience doit pouvoir être comprise avec très peu de texte.
 
 Après chaque système significatif :
 
-- [ ] tests pertinents ;
-- [ ] lint/typecheck ;
-- [ ] build ;
-- [ ] inspect diff ;
-- [ ] tester flow complet ;
-- [ ] vérifier régressions.
+- [x] tests pertinents ;
+- [x] lint/typecheck ;
+- [x] build serveur/debug desktop sans APK intermédiaire ;
+- [x] inspect diff ;
+- [x] tester flow complet ;
+- [x] vérifier régressions.
 
 Quand tu corriges un bug :
 

@@ -24,6 +24,25 @@ const NAV_HEIGHT := 104
 const SAFE_MARGIN := 20
 const HERO_HEIGHT := 172
 
+static func safe_insets() -> Vector4:
+	var window_size := Vector2(DisplayServer.window_get_size())
+	var safe := DisplayServer.get_display_safe_area()
+	if window_size.x <= 0.0 or window_size.y <= 0.0 or safe.size.x <= 0 or safe.size.y <= 0:
+		return Vector4.ZERO
+	var design_size := Vector2(
+		float(ProjectSettings.get_setting("display/window/size/viewport_width", 540)),
+		float(ProjectSettings.get_setting("display/window/size/viewport_height", 1170))
+	)
+	var scale := design_size / window_size
+	var right_px := maxf(0.0, window_size.x - float(safe.position.x + safe.size.x))
+	var bottom_px := maxf(0.0, window_size.y - float(safe.position.y + safe.size.y))
+	return Vector4(
+		maxf(0.0, float(safe.position.x) * scale.x),
+		maxf(0.0, float(safe.position.y) * scale.y),
+		right_px * scale.x,
+		bottom_px * scale.y
+	)
+
 ## Couleur d'une rareté (cohérente roue / bannières / cartes).
 static func tier_color(tier: String) -> Color:
 	match tier.to_lower():
@@ -243,10 +262,11 @@ static func _scroll_box(color: Color) -> StyleBoxFlat:
 static func screen_body() -> VBoxContainer:
 	var body := VBoxContainer.new()
 	body.set_anchors_preset(Control.PRESET_FULL_RECT)
-	body.offset_left = SAFE_MARGIN
-	body.offset_right = -SAFE_MARGIN
-	body.offset_top = SAFE_MARGIN
-	body.offset_bottom = -(NAV_HEIGHT + 12)
+	var safe := safe_insets()
+	body.offset_left = SAFE_MARGIN + safe.x
+	body.offset_right = -(SAFE_MARGIN + safe.z)
+	body.offset_top = SAFE_MARGIN + safe.y
+	body.offset_bottom = -(NAV_HEIGHT + 12 + safe.w)
 	body.add_theme_constant_override("separation", 14)
 	return body
 
@@ -274,7 +294,7 @@ class SignalBackdrop extends Control:
 	func _process(delta: float) -> void:
 		if not Preferences.get("reduced_motion"):
 			phase += delta
-		queue_redraw()
+			queue_redraw()
 
 	func _draw() -> void:
 		var drift := sin(phase * 0.32) * 24.0

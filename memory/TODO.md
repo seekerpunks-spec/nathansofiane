@@ -62,6 +62,7 @@ itérations intermédiaires utilisent uniquement Godot desktop, captures et test
       et intégration Network Power.
 - [x] Entitlements NFT fail-closed, expiration serveur et point d'entrée interne
       pour un provider futur ; aucun self-claim client.
-- [ ] Audit Pets/sécurité/mobile et systèmes restants du MASTER TODO compatibles
-      avec les exclusions utilisateur.
+- [x] Audit Pets/sécurité/mobile : aucun Pets runtime, idempotence finale corrigée,
+      safe areas, Retour Android et trois ratios sous gate automatique.
+- [ ] Systèmes restants du MASTER TODO compatibles avec les exclusions utilisateur.
 - [ ] Design et Wallet Adapter explicitement différés par l'utilisateur.

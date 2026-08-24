@@ -30,6 +30,29 @@ func _ready() -> void:
 	Store.session_expired.connect(_on_session_expired)
 	_boot()
 
+func _notification(what: int) -> void:
+	if what != NOTIFICATION_WM_GO_BACK_REQUEST:
+		return
+	if _screen != null and _screen.has_method("handle_back") and bool(_screen.call("handle_back")):
+		return
+	if _dismiss_top_modal():
+		return
+	if _current_tab != "" and _current_tab != "spin":
+		_open_tab("spin")
+		return
+	get_tree().quit()
+
+func _dismiss_top_modal() -> bool:
+	if _screen == null:
+		return false
+	var nodes := get_tree().get_nodes_in_group("dismiss_on_back")
+	for index in range(nodes.size() - 1, -1, -1):
+		var node := nodes[index]
+		if is_instance_valid(node) and node is CanvasItem and node.visible and (_screen == node or _screen.is_ancestor_of(node)):
+			node.queue_free()
+			return true
+	return false
+
 func _build_shell() -> void:
 	var bg := ColorRect.new()
 	bg.color = Ui.BG
@@ -106,10 +129,11 @@ func _nav_box(bg: Color, border: Color = Color.TRANSPARENT, width: int = 0) -> S
 func _build_nav() -> void:
 	_nav = Ui.panel(Color("#15183C", 0.98), Color("#5DE9FF"))
 	_nav.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
-	_nav.offset_left = 10
-	_nav.offset_right = -10
+	var safe := Ui.safe_insets()
+	_nav.offset_left = 10 + safe.x
+	_nav.offset_right = -(10 + safe.z)
 	_nav.offset_top = -Ui.NAV_HEIGHT
-	_nav.offset_bottom = -8
+	_nav.offset_bottom = -(8 + safe.w)
 	var stack := VBoxContainer.new()
 	stack.add_theme_constant_override("separation", 2)
 	var active_rail := ColorRect.new()
@@ -190,7 +214,7 @@ func _show_network_error() -> void:
 	center.set_anchors_preset(Control.PRESET_FULL_RECT)
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 24)
-	box.custom_minimum_size = Vector2(380, 0)
+	box.custom_minimum_size = Vector2(0, 0)
 
 	var title := Ui.label("HORS LIGNE", 34, Ui.NEON_MAGENTA)
 	var msg := Ui.label("Serveur CyberSeeker injoignable.\nVérifie ta connexion et réessaie.", 18, Ui.TEXT_DIM)

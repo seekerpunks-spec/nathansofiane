@@ -9,6 +9,10 @@ $economyCheck = Join-Path $PSScriptRoot "economy_check.ps1"
 & $economyCheck
 $analyticsCheck = Join-Path $PSScriptRoot "analytics_check.ps1"
 & $analyticsCheck
+$securityCheck = Join-Path $PSScriptRoot "security_check.ps1"
+& $securityCheck
+$mobileCheck = Join-Path $PSScriptRoot "mobile_ux_check.ps1"
+& $mobileCheck
 $cargo = Join-Path $env:USERPROFILE ".cargo\bin\cargo.exe"
 if (-not (Test-Path -LiteralPath $cargo)) { throw "cargo.exe introuvable" }
 
@@ -36,10 +40,12 @@ Write-Host $importLog
 if ($LASTEXITCODE -ne 0 -or $importLog -match "SCRIPT ERROR|Parse Error|Failed to load script") {
     throw "Import Godot échoué"
 }
-$smokeLog = (& $GodotPath --headless --path $client "res://tests/SmokeScenes.tscn" 2>&1 | Out-String)
-Write-Host $smokeLog
-if ($LASTEXITCODE -ne 0 -or $smokeLog -match "SCRIPT ERROR|Parse Error|Failed to load script" -or $smokeLog -notmatch "SMOKE_SCENES_OK") {
-    throw "Smoke test Godot échoué"
+foreach ($resolution in @("360x800", "540x1170", "720x1280")) {
+    $smokeLog = (& $GodotPath --headless --resolution $resolution --path $client "res://tests/SmokeScenes.tscn" 2>&1 | Out-String)
+    Write-Host $smokeLog
+    if ($LASTEXITCODE -ne 0 -or $smokeLog -match "SCRIPT ERROR|Parse Error|Failed to load script" -or $smokeLog -notmatch "SMOKE_SCENES_OK") {
+        throw "Smoke test Godot échoué à la résolution $resolution"
+    }
 }
 
 if ($BuildAndroid) {

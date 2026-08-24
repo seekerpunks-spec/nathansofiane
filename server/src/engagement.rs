@@ -772,7 +772,8 @@ pub async fn claim_event(
     Json(body): Json<ClaimReq>,
 ) -> Result<Json<Value>, ApiError> {
     let rid = game::request_id(&headers, body.request_id.as_deref())?;
-    let key = game::idem_key("event_claim", &addr.0, &rid);
+    let action = format!("event_claim:{event_id}");
+    let key = game::idem_key(&action, &addr.0, &rid);
     if let Some(v) = state.db.fetch_idempotent(&key).await? {
         return Ok(Json(v));
     }
@@ -791,6 +792,10 @@ pub async fn claim_event(
         .fetch_state_locked(&mut tx, &addr.0)
         .await?
         .ok_or_else(|| ApiError::Internal(anyhow!("player_state absent")))?;
+    if let Some(value) = state.db.fetch_idempotent_locked(&mut tx, &key).await? {
+        tx.rollback().await?;
+        return Ok(Json(value));
+    }
     let row: Option<(i64, bool, i32)> = sqlx::query_as("SELECT points,reward_claimed,cohort_id FROM event_scores WHERE event_id=$1 AND address=$2 FOR UPDATE")
         .bind(&event.event_id).bind(&addr.0).fetch_optional(&mut *tx).await?;
     let Some((points, claimed, cohort_id)) = row else {
@@ -826,7 +831,8 @@ pub async fn claim_event(
             .bind(&addr.0)
             .fetch_one(&mut *tx)
             .await?;
-    let response = json!({"eventId": event.event_id, "rank": rank, "cohortId": cohort_id, "reward": tier.reward, "spins": balances.0, "credits": balances.1});
+    let response = json!({"eventId": event.event_id, "rank": rank, "cohortId": cohort_id, "reward": tier.reward,
+        "spins": balances.0, "credits": balances.1, "serverTimeMs":Utc::now().timestamp_millis()});
     Db::audit_tx(
         &mut tx,
         &addr.0,
@@ -848,7 +854,11 @@ pub async fn claim_season(
     Json(body): Json<SeasonClaimReq>,
 ) -> Result<Json<Value>, ApiError> {
     let rid = game::request_id(&headers, body.request_id.as_deref())?;
-    let key = game::idem_key("season_claim", &addr.0, &rid);
+    let action = format!(
+        "season_claim:{}:{}:{}",
+        body.season_id, body.tier, body.premium
+    );
+    let key = game::idem_key(&action, &addr.0, &rid);
     if let Some(v) = state.db.fetch_idempotent(&key).await? {
         return Ok(Json(v));
     }
@@ -873,6 +883,10 @@ pub async fn claim_season(
         .fetch_state_locked(&mut tx, &addr.0)
         .await?
         .ok_or_else(|| ApiError::Internal(anyhow!("player_state absent")))?;
+    if let Some(value) = state.db.fetch_idempotent_locked(&mut tx, &key).await? {
+        tx.rollback().await?;
+        return Ok(Json(value));
+    }
     let row: Option<(i64, bool, Value, Value)> = sqlx::query_as("SELECT points,premium,free_claimed,paid_claimed FROM season_progress WHERE address=$1 AND season_id=$2 FOR UPDATE")
         .bind(&addr.0).bind(&season.season_id).fetch_optional(&mut *tx).await?;
     let Some((points, premium_owned, free_claimed, paid_claimed)) = row else {
@@ -912,7 +926,9 @@ pub async fn claim_season(
             .bind(&addr.0)
             .fetch_one(&mut *tx)
             .await?;
-    let response = json!({"seasonId": season.season_id, "tier": body.tier, "premium": body.premium, "reward": reward, "spins": balances.0, "credits": balances.1});
+    let response = json!({"seasonId": season.season_id, "tier": body.tier, "premium": body.premium,
+        "reward": reward, "spins": balances.0, "credits": balances.1,
+        "serverTimeMs":Utc::now().timestamp_millis()});
     Db::audit_tx(
         &mut tx,
         &addr.0,

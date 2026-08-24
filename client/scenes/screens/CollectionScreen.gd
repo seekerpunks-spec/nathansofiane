@@ -207,10 +207,11 @@ func _show_drops(cards: Array) -> void:
 	var overlay := ColorRect.new()
 	overlay.color = Color(0.02, 0.03, 0.08, 0.95)
 	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	overlay.add_to_group("dismiss_on_back")
 	var center := CenterContainer.new()
 	center.set_anchors_preset(Control.PRESET_FULL_RECT)
 	var box := VBoxContainer.new()
-	box.custom_minimum_size.x = 390
+	box.custom_minimum_size.x = 0
 	box.add_theme_constant_override("separation", 12)
 	box.add_child(Ui.label("CACHE DÉCRYPTÉ", 30, Ui.NEON_CYAN))
 	for card in cards:

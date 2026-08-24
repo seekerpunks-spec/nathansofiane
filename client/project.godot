@@ -36,6 +36,7 @@ Events="*res://scripts/core/Events.gd"
 window/size/viewport_width=540
 window/size/viewport_height=1170
 window/stretch/mode="canvas_items"
+window/stretch/aspect="expand"
 window/handheld/orientation=1
 
 [gui]

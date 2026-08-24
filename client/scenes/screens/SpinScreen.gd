@@ -69,6 +69,16 @@ func _ready() -> void:
 	_resume_pending_encounter.call_deferred()
 
 
+func handle_back() -> bool:
+	if is_instance_valid(_social_overlay):
+		_clear_social_overlay()
+		return true
+	if is_instance_valid(_no_spins) and _no_spins.visible:
+		_no_spins.visible = false
+		return true
+	return false
+
+
 func _build() -> void:
 	var bg := TextureRect.new()
 	bg.texture = SPIN_BG
@@ -874,6 +884,7 @@ func _show_network_loading() -> void:
 	_social_overlay = ColorRect.new()
 	_social_overlay.color = Color(0.015, 0.02, 0.07, 0.97)
 	_social_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_social_overlay.add_to_group("dismiss_on_back")
 	var center := CenterContainer.new()
 	center.set_anchors_preset(Control.PRESET_FULL_RECT)
 	center.add_child(Ui.label("SYNCING NETWORK…", 24, Ui.NEON_CYAN))
@@ -900,10 +911,13 @@ func _render_network() -> void:
 	_social_overlay = ColorRect.new()
 	_social_overlay.color = Color(0.015, 0.02, 0.07, 0.97)
 	_social_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_social_overlay.add_to_group("dismiss_on_back")
 	var center := CenterContainer.new()
 	center.set_anchors_preset(Control.PRESET_FULL_RECT)
 	var panel := Ui.panel(Ui.PANEL_HI, Ui.NEON_CYAN)
-	panel.custom_minimum_size = Vector2(500, 820)
+	panel.custom_minimum_size = Vector2(0, 0)
+	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	var shell := VBoxContainer.new()
 	shell.add_theme_constant_override("separation", 10)
 	var title_row := HBoxContainer.new()
@@ -915,7 +929,8 @@ func _render_network() -> void:
 	title_row.add_child(close)
 	shell.add_child(title_row)
 	var scroll := ScrollContainer.new()
-	scroll.custom_minimum_size = Vector2(460, 720)
+	scroll.custom_minimum_size = Vector2(0, 0)
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	Ui.style_scroll(scroll, Ui.NEON_CYAN)
 	var content := VBoxContainer.new()
@@ -953,7 +968,7 @@ func _build_network_profile(parent: VBoxContainer) -> void:
 	var name_edit := LineEdit.new()
 	name_edit.text = str(profile.get("displayName", "Runner"))
 	name_edit.max_length = 24
-	name_edit.custom_minimum_size.x = 300
+	name_edit.custom_minimum_size.y = 52
 	name_edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	edit_row.add_child(name_edit)
 	var save := Ui.button("SAVE", Ui.NEON_CYAN)
@@ -970,6 +985,7 @@ func _build_network_search(parent: VBoxContainer) -> void:
 	var query := LineEdit.new()
 	query.placeholder_text = "Friend code or name"
 	query.max_length = 24
+	query.custom_minimum_size.y = 52
 	query.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(query)
 	var search := Ui.button("SEARCH", Ui.NEON_CYAN)
@@ -1092,6 +1108,7 @@ func _build_network_team(parent: VBoxContainer) -> void:
 		var team_name := LineEdit.new()
 		team_name.placeholder_text = "Crew name (%s CR)" % Ui.compact(create_cost)
 		team_name.max_length = 24
+		team_name.custom_minimum_size.y = 52
 		team_name.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		create_row.add_child(team_name)
 		var create := Ui.button("CREATE", Ui.NEON_CYAN)
@@ -1102,6 +1119,7 @@ func _build_network_team(parent: VBoxContainer) -> void:
 		var team_query := LineEdit.new()
 		team_query.placeholder_text = "Crew name or NET-code"
 		team_query.max_length = 24
+		team_query.custom_minimum_size.y = 52
 		team_query.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		search_row.add_child(team_query)
 		var search := Ui.button("FIND", Ui.NEON_CYAN)
@@ -1174,17 +1192,20 @@ func _build_network_trades(parent: VBoxContainer) -> void:
 		parent.add_child(Ui.label("Ajoute un ami et garde au moins un doublon échangeable.", 12, Ui.TEXT_DIM))
 		return
 	var friend_menu := OptionButton.new()
+	friend_menu.custom_minimum_size.y = 52
 	for friend in friends:
 		if typeof(friend) == TYPE_DICTIONARY:
 			friend_menu.add_item(str(friend.get("displayName", "Runner")))
 			friend_menu.set_item_metadata(friend_menu.item_count - 1, str(friend.get("playerId", "")))
 	parent.add_child(friend_menu)
 	var offered_menu := OptionButton.new()
+	offered_menu.custom_minimum_size.y = 52
 	for card in duplicates:
 		offered_menu.add_item("GIVE  •  " + str(card.get("name", "Card")))
 		offered_menu.set_item_metadata(offered_menu.item_count - 1, str(card.get("cardId", "")))
 	parent.add_child(offered_menu)
 	var requested_menu := OptionButton.new()
+	requested_menu.custom_minimum_size.y = 52
 	for card in Config.cards():
 		if typeof(card) == TYPE_DICTIONARY and tradeable.has(str(card.get("rarity", ""))):
 			requested_menu.add_item("GET  •  " + str(card.get("name", "Card")))
@@ -1390,10 +1411,11 @@ func _show_social_encounter(encounter: Dictionary, banner: String = "") -> void:
 	_social_overlay = ColorRect.new()
 	_social_overlay.color = Color(0.015, 0.02, 0.07, 0.97)
 	_social_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_social_overlay.add_to_group("dismiss_on_back")
 	var center := CenterContainer.new()
 	center.set_anchors_preset(Control.PRESET_FULL_RECT)
 	var panel := Ui.panel(Ui.PANEL_HI, Ui.NEON_MAGENTA)
-	panel.custom_minimum_size = Vector2(440, 0)
+	panel.custom_minimum_size = Vector2(0, 0)
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 12)
 	var kind := str(encounter.get("kind", ""))
@@ -1519,10 +1541,11 @@ func _show_social_result(message: String, failed: bool) -> void:
 	_social_overlay = ColorRect.new()
 	_social_overlay.color = Color(0.015, 0.02, 0.07, 0.97)
 	_social_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_social_overlay.add_to_group("dismiss_on_back")
 	var center := CenterContainer.new()
 	center.set_anchors_preset(Control.PRESET_FULL_RECT)
 	var box := VBoxContainer.new()
-	box.custom_minimum_size.x = 410
+	box.custom_minimum_size.x = 0
 	box.add_theme_constant_override("separation", 16)
 	box.add_child(Ui.label(message, 25, Ui.NEON_MAGENTA if failed else Ui.GOLD))
 	var close := Ui.button("CONTINUE", Ui.NEON_CYAN)
@@ -1553,6 +1576,8 @@ class SlotCabinet extends Control:
 		queue_redraw()
 
 	func _process(delta: float) -> void:
+		if Preferences.reduced_motion:
+			return
 		_time += delta
 		queue_redraw()
 
@@ -1623,9 +1648,11 @@ class SlotReel extends Control:
 		queue_redraw()
 
 	func _process(delta: float) -> void:
-		_time += delta
+		if not Preferences.reduced_motion or spinning:
+			_time += delta
 		tick_flash = maxf(0.0, tick_flash - delta * 6.0)
-		queue_redraw()
+		if not Preferences.reduced_motion or spinning or tick_flash > 0.0:
+			queue_redraw()
 
 	func _draw() -> void:
 		var panel := StyleBoxFlat.new()
@@ -1708,6 +1735,8 @@ class AnimatedBackdrop extends Control:
 		set_process(true)
 
 	func _process(delta: float) -> void:
+		if Preferences.reduced_motion:
+			return
 		_time += delta
 		queue_redraw()
 

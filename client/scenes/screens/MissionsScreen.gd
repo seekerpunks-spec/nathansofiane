@@ -259,6 +259,7 @@ func _settings_card() -> PanelContainer:
 	var box := VBoxContainer.new()
 	for data in [["SONS", "sound_enabled"], ["VIBRATIONS", "haptics_enabled"], ["RÉDUIRE LES ANIMATIONS", "reduced_motion"]]:
 		var toggle := CheckButton.new()
+		toggle.custom_minimum_size.y = 52
 		toggle.text = data[0]
 		toggle.button_pressed = bool(Preferences.get(data[1]))
 		toggle.toggled.connect(_set_preference.bind(data[1]))
@@ -365,10 +366,11 @@ func _show_leaderboard(event_id: String) -> void:
 	var overlay := ColorRect.new()
 	overlay.color = Color(0.02, 0.03, 0.08, 0.96)
 	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	overlay.add_to_group("dismiss_on_back")
 	var center := CenterContainer.new()
 	center.set_anchors_preset(Control.PRESET_FULL_RECT)
 	var box := VBoxContainer.new()
-	box.custom_minimum_size.x = 410
+	box.custom_minimum_size.x = 0
 	box.add_theme_constant_override("separation", 8)
 	box.add_child(Ui.label("NEON LEADERBOARD  •  GROUP %d" % int(response.data.get("cohortId", 1)), 24, Ui.NEON_MAGENTA))
 	var leaders: Array = response.data.get("leaders", [])

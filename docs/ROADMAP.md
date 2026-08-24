@@ -96,5 +96,7 @@
       idempotentes et contribution configurable à Network Power.
 - [x] Entitlements NFT fail-closed, TTL serveur et bonus daily centralisé ;
       collection et provider restent désactivés jusqu'à configuration externe.
+- [x] Audit Pets négatif, gate sécurité, safe areas, Retour Android, touch targets
+      et smoke des six scènes sur trois ratios portrait.
 - [ ] Autres systèmes restants du MASTER TODO.
 - [ ] Design et Wallet Adapter différés explicitement pour ce lot.
