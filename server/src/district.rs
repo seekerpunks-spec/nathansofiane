@@ -6,6 +6,7 @@ use crate::db::Db;
 use crate::error::ApiError;
 use crate::game;
 use crate::progression;
+use crate::reward_pool;
 use crate::state::AppState;
 use anyhow::anyhow;
 use axum::extract::{Extension, State};
@@ -95,7 +96,9 @@ pub async fn upgrade(
     .fetch_optional(&mut *tx)
     .await?
     .unwrap_or(0);
-    let next_level = current + 1;
+    let next_level = current
+        .checked_add(1)
+        .ok_or_else(|| ApiError::Internal(anyhow!("overflow économique: district.level")))?;
     let level_cfg = element
         .levels
         .iter()
@@ -141,6 +144,7 @@ pub async fn upgrade(
     });
 
     let mut completion_reward: Option<Reward> = None;
+    let mut reward_pool_allocations: Vec<Value> = Vec::new();
     if complete {
         let inserted = sqlx::query(
             "INSERT INTO district_completion(address,district_id) VALUES($1,$2) ON CONFLICT DO NOTHING",
@@ -165,6 +169,14 @@ pub async fn upgrade(
                 .bind(&addr.0)
                 .execute(&mut *tx)
                 .await?;
+            reward_pool_allocations = reward_pool::allocate_tx(
+                &mut tx,
+                &addr.0,
+                "district_complete",
+                &district.id.to_string(),
+                &state.config.reward_pool,
+            )
+            .await?;
         }
     }
     let _progress = game::progress_action_tx(&mut tx, &addr.0, "upgrade", 1, &state.config).await?;
@@ -203,6 +215,7 @@ pub async fn upgrade(
         "districtIndex": balances.2,
         "districtProgress": all_rows.into_iter().map(|(district_id, element_id, level)| json!({"districtId": district_id, "elementId": element_id, "level": level})).collect::<Vec<_>>(),
         "districtComplete": complete, "completionReward": completion_reward,
+        "rewardPoolAllocations": reward_pool_allocations,
         "nextDistrictId": next_district_id,
         "allDistrictsComplete": complete && next_district_id.is_none(),
         "globalProgression": progression::score_json(global_progression,&state.config),

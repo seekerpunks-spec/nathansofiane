@@ -55,12 +55,17 @@ memory/                      contexte condensé de reprise
 - `Ui.gd` : design system cyberpunk partagé.
 
 Les tokens restent en mémoire. Une persistance sécurisée ne sera activée qu'avec
-le coffre-fort natif du bridge wallet.
+le coffre-fort natif du bridge wallet. Le refresh est single-flight : les
+requêtes 401 concurrentes réutilisent une rotation déjà terminée.
 
 ### Écrans
 
 - `OnboardingScreen` : gateway visuelle, challenge et connexion.
-- `SpinScreen` : slot, multiplicateur data-driven, regen, résultats et crédits.
+- `SpinScreen` : orchestration du slot, multiplicateur data-driven, regen et résultats.
+- `scripts/components/SpinVisuals.gd` : cabinet, reels, backdrop et particules sans réseau.
+- `SpinNetworkView.gd`, `SpinNetworkActions.gd` : composition et mutations du
+  Seeker Network isolées de la boucle de spin.
+- `SpinEncounterView.gd` : overlays Attack/Raid sans calcul économique client.
 - `DistrictScreen` : cinq éléments, six niveaux visuels chacun et upgrade.
 - `CollectionScreen` : coffres, cartes, doublons, progression et claims de sets.
 - `MissionsScreen` : daily, missions, événement, classement et saison.
@@ -72,7 +77,8 @@ serveur.
 
 ## 4. Serveur Rust
 
-- `auth.rs` : nonce, signature, JWT access/refresh et bypass dev isolé.
+- `auth.rs`, `db.rs` : challenge, nonce PostgreSQL single-use, signature,
+  JWT access et refresh rotatif (`jti` hashé) avec bypass dev isolé.
 - `spin.rs` : regen à reliquat conservé, multiplicateur, RNG et récompense idempotente.
 - `district.rs` : coûts autoritaires, niveaux et complétion anti double-claim.
 - `collection.rs` : achat/ouverture de coffres, loot pondéré, cartes et sets.
@@ -83,24 +89,32 @@ serveur.
 - `progression.rs`, `friends.rs` : Network Power, profils, amis, ciblage et revanche.
 - `teams.rs` : roster, propriété, capacité et classement des crews.
 - `trading.rs` : offres carte-contre-carte, réservations de doublons et transfert atomique.
+- `reward_pool.rs` : ledger saisonnier futur, budget global verrouillé,
+  allocations idempotentes et settlement interne sans route client.
 - `game.rs` : helpers communs d'idempotence, récompense et tirage.
 - `config.rs` : désérialisation typée, validation et distribution hashée.
 - `state.rs` : agrégation de l'état complet du joueur.
-- `rate_limit.rs` : fenêtre mémoire bornée et nettoyage.
+- `rate_limit.rs` : fenêtre PostgreSQL atomique partagée entre instances.
 
-Les classements R17 utilisent `event_scores` dans PostgreSQL. Redis n'est pas une
+Les classements, nonces et quotas API utilisent PostgreSQL. Redis n'est pas une
 dépendance runtime actuelle ; il ne devient utile qu'en cas de charge nécessitant
-un cache de classement distribué.
+un cache distribué spécialisé.
+
+Les invariants relationnels interdisent également les rencontres auto-ciblées,
+les statuts résolus sans timestamp, les fenêtres temporelles inversées et plus
+d'un owner par équipe, même hors des handlers applicatifs.
 
 ## 5. API
 
 ### Publique
 
 - `GET /health`
+- `GET /ready`
 - `GET /config`
 - `POST /auth/challenge`
 - `POST /auth/verify`
 - `POST /auth/refresh`
+- `POST /auth/logout`
 
 ### Authentifiée
 
@@ -163,12 +177,19 @@ coûts, récompenses ou fenêtres de contenu sont incohérents.
 ## 8. Sécurité et résilience
 
 - JWT production d'au moins 32 caractères ; `DEV_AUTH=true` interdit en release.
+- Le secret d'exemple est également refusé en release ; `/ready` contrôle
+  PostgreSQL et SIGTERM/Ctrl-C déclenchent un arrêt avec drainage Axum.
 - CORS allowlist en production, permissif uniquement en dev.
 - Corps HTTP limité à 256 Kio.
-- Nonces à usage unique, expiration et nettoyage périodique.
-- Rate-limit borné sans confiance dans `X-Forwarded-For` non authentifié.
+- Nonces PostgreSQL à usage unique, consommation atomique inter-instance,
+  expiration et nettoyage périodique.
+- Refresh tokens à usage unique, rotation PostgreSQL inter-instance et rejet du replay.
+- Rate-limit PostgreSQL partagé et borné, sans confiance dans
+  `X-Forwarded-For` non authentifié.
 - Retry client limité aux GET et mutations idempotentes.
 - Publicité et paiement refusés hors dev sans preuve provider valide.
+- Reward pool et settlements désactivés par défaut ; aucune route client ne peut
+  déclarer une allocation ou un payout.
 - Aucun détail SQL n'est renvoyé au client.
 
 ## 9. Android

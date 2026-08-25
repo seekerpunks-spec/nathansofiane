@@ -72,6 +72,19 @@ func _refresh() -> void:
 			Ui.reveal(card, reveal_index * 0.04)
 			reveal_index += 1
 
+	var reward_pool: Dictionary = Store.state.get("rewardPool", {})
+	if bool(reward_pool.get("enabled", false)):
+		_content.add_child(Ui.section_title("SEASON REWARD POOL", Ui.GOLD))
+		for pool in reward_pool.get("pools", []):
+			if typeof(pool) == TYPE_DICTIONARY:
+				var pool_panel := Ui.panel()
+				var pool_box := VBoxContainer.new()
+				pool_box.add_child(Ui.label(str(pool.get("poolId", "POOL")).to_upper(), 17, Ui.GOLD))
+				pool_box.add_child(Ui.label("Pending %s • minimum %s" % [Ui.compact(int(pool.get("pendingU64", 0))), Ui.compact(int(pool.get("minClaimU64", 0)))], 13, Ui.TEXT_DIM))
+				pool_box.add_child(Ui.label("Provider requis" if not bool(pool.get("claimable", false)) else "Claim disponible", 12, Ui.TEXT_DIM))
+				pool_panel.add_child(pool_box)
+				_content.add_child(pool_panel)
+
 	_content.add_child(Ui.section_title("ÉVÉNEMENT ACTIF", Ui.NEON_MAGENTA))
 	for event in Store.state.get("events", []):
 		if typeof(event) == TYPE_DICTIONARY:
@@ -329,6 +342,7 @@ func _mutate(path: String, body: Dictionary, event_name: String) -> void:
 				if response.data.has(key):
 					props[key] = response.data[key]
 		Events.track(event_name, props)
+		_track_reward_pool(response.data.get("rewardPoolAllocations", []))
 		_track_reward_currency(response.data, event_name)
 		Sfx.result("rare")
 		await _sync_state()
@@ -337,6 +351,13 @@ func _mutate(path: String, body: Dictionary, event_name: String) -> void:
 		Haptics.error()
 	_busy = false
 	_refresh()
+
+func _track_reward_pool(allocations: Variant) -> void:
+	if typeof(allocations) != TYPE_ARRAY:
+		return
+	for allocation in allocations:
+		if typeof(allocation) == TYPE_DICTIONARY and int(allocation.get("amountU64", 0)) > 0:
+			Events.track("reward_pool_progress", allocation)
 
 func _sync_state() -> void:
 	var response := await Net.protected_request("GET", "/state")
@@ -375,7 +396,7 @@ func _show_leaderboard(event_id: String) -> void:
 	box.add_child(Ui.label("NEON LEADERBOARD  •  GROUP %d" % int(response.data.get("cohortId", 1)), 24, Ui.NEON_MAGENTA))
 	var leaders: Array = response.data.get("leaders", [])
 	for row in leaders.slice(0, mini(10, leaders.size())):
-		box.add_child(Ui.label("#%d   %s   %s" % [int(row.get("rank", 0)), str(row.get("address", "")).left(12), Ui.compact(int(row.get("points", 0)))], 14, Ui.TEXT))
+		box.add_child(Ui.label("#%d   %s   %s" % [int(row.get("rank", 0)), str(row.get("displayName", "Runner")), Ui.compact(int(row.get("points", 0)))], 14, Ui.TEXT))
 	var me: Dictionary = response.data.get("player", {})
 	var my_rank := int(me.get("rank", 0))
 	box.add_child(Ui.label("TON RANG  %s  •  %s PTS" % ["#%d" % my_rank if my_rank > 0 else "--", Ui.compact(int(me.get("points", 0)))], 16, Ui.GOLD))

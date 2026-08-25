@@ -29,6 +29,9 @@ var server_url: String = ""
 var _http: HTTPRequest
 var _request_in_flight := false
 signal _request_done
+var _refresh_in_flight := false
+var _last_refresh_ok := false
+signal _refresh_done
 
 func _ready() -> void:
 	server_url = OS.get_environment("CYBERSEEKER_API_URL").strip_edges()
@@ -82,6 +85,20 @@ func has_token() -> bool:
 func clear_session() -> void:
 	token = ""
 	refresh_token = ""
+	_last_refresh_ok = false
+
+## Révoque le refresh courant puis purge toujours la session locale. Le client
+## ne reste jamais connecté parce que le réseau est indisponible au logout.
+func logout() -> bool:
+	if _refresh_in_flight:
+		await _refresh_done
+	var token_to_revoke := refresh_token
+	var revoked := true
+	if token_to_revoke != "":
+		var r := await request("POST", "/auth/logout", { "refreshToken": token_to_revoke }, false, "")
+		revoked = r.ok
+	clear_session()
+	return revoked
 
 # ---------------------------------------------------------------------------
 # Cœur réseau — file d'attente (1 requête à la fois)
@@ -159,13 +176,22 @@ func post(path: String, body: Dictionary = {}, use_auth: bool = true, rid: Strin
 
 ## Échange un refresh token contre un nouveau pair.
 func refresh() -> bool:
+	if _refresh_in_flight:
+		await _refresh_done
+		return _last_refresh_ok
 	if refresh_token == "":
 		return false
-	var r := await request("POST", "/auth/refresh", { "refreshToken": refresh_token }, false, "")
+	_refresh_in_flight = true
+	var token_to_rotate := refresh_token
+	var r := await request("POST", "/auth/refresh", { "refreshToken": token_to_rotate }, false, "")
 	if r.ok and typeof(r.data) == TYPE_DICTIONARY and r.data.has("token"):
-		store_token(r.data["token"], r.data.get("refreshToken", refresh_token))
-		return true
-	return false
+		store_token(r.data["token"], r.data.get("refreshToken", ""))
+		_last_refresh_ok = true
+	else:
+		_last_refresh_ok = false
+	_refresh_in_flight = false
+	_refresh_done.emit()
+	return _last_refresh_ok
 
 ## Appel protégé avec rejeu unique après 401.
 func protected_request(
@@ -174,6 +200,7 @@ func protected_request(
 	body: Dictionary = {},
 	rid: String = ""
 ) -> Dictionary:
+	var access_token_used := token
 	var res := await request(method, path, body, true, rid)
 	# GET et mutations idempotentes peuvent être rejoués une fois après un
 	# transport interrompu. Les POST sans request-id ne sont jamais rejoués.
@@ -181,7 +208,13 @@ func protected_request(
 		await get_tree().create_timer(0.35).timeout
 		res = await request(method, path, body, true, rid)
 	if res.code == 401 and refresh_token != "":
-		if await refresh():
+		# Une autre coroutine peut avoir déjà renouvelé la session pendant que
+		# cette requête attendait la file HTTP. Dans ce cas, rejouer avec le token
+		# actuel évite de faire tourner inutilement le nouveau refresh.
+		var session_ready := token != access_token_used
+		if not session_ready:
+			session_ready = await refresh()
+		if session_ready:
 			res = await request(method, path, body, true, rid)
 	return res
 

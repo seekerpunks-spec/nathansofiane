@@ -58,6 +58,12 @@ struct TradeListRow {
     counterparty_display_name: String,
 }
 
+fn canonical_trade_id(raw: &str) -> Result<String, ApiError> {
+    Uuid::parse_str(raw.trim())
+        .map(|id| id.to_string())
+        .map_err(|_| ApiError::BadRequest("tradeId invalide".to_string()))
+}
+
 fn card<'a>(config: &'a RemoteConfig, card_id: &str) -> Result<&'a CardConfig, ApiError> {
     config
         .cards
@@ -267,18 +273,19 @@ pub async fn accept(
     headers: HeaderMap,
     Json(body): Json<TradeActionReq>,
 ) -> Result<Json<Value>, ApiError> {
+    let trade_id = canonical_trade_id(&body.trade_id)?;
     let rid = game::request_id(&headers, body.request_id.as_deref())?;
-    let key = game::idem_key(&format!("trade_accept:{}", body.trade_id), &addr.0, &rid);
+    let key = game::idem_key(&format!("trade_accept:{trade_id}"), &addr.0, &rid);
     if let Some(value) = state.db.fetch_idempotent(&key).await? {
         return Ok(Json(value));
     }
-    let snapshot = prefetch_trade(&state, &body.trade_id).await?;
+    let snapshot = prefetch_trade(&state, &trade_id).await?;
     if snapshot.recipient != addr.0 {
         return Err(ApiError::NotFound);
     }
     let mut tx = state.db.begin().await?;
     lock_players_tx(&mut tx, &snapshot.sender, &snapshot.recipient).await?;
-    let row = load_trade_locked_tx(&mut tx, &body.trade_id).await?;
+    let row = load_trade_locked_tx(&mut tx, &trade_id).await?;
     if let Some(value) = state.db.fetch_idempotent_locked(&mut tx, &key).await? {
         tx.rollback().await?;
         return Ok(Json(value));
@@ -420,9 +427,10 @@ macro_rules! trade_handler {
             headers: HeaderMap,
             Json(body): Json<TradeActionReq>,
         ) -> Result<Json<Value>, ApiError> {
+            let trade_id = canonical_trade_id(&body.trade_id)?;
             let rid = game::request_id(&headers, body.request_id.as_deref())?;
             Ok(Json(
-                resolve_without_exchange(&state, &addr.0, &body.trade_id, &rid, $status).await?,
+                resolve_without_exchange(&state, &addr.0, &trade_id, &rid, $status).await?,
             ))
         }
     };

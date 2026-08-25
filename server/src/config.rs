@@ -23,6 +23,7 @@ const TOP_LEVEL_FILES: &[&str] = &[
     "events.json",
     "offers.json",
     "progression.json",
+    "reward_pool.json",
     "seasons.json",
     "sets.json",
     "social.json",
@@ -241,6 +242,34 @@ pub struct EntitlementConfig {
     pub collection_address: String,
     pub verification_ttl_ms: u64,
     pub perks: EntitlementPerks,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RewardPoolRule {
+    pub source: String,
+    pub source_id: String,
+    pub amount_u64: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SeasonRewardPool {
+    pub pool_id: String,
+    pub token_mint: String,
+    pub starts_at_ms: i64,
+    pub ends_at_ms: i64,
+    pub budget_u64: u64,
+    pub min_claim_u64: u64,
+    pub rules: Vec<RewardPoolRule>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RewardPoolConfig {
+    pub enabled: bool,
+    pub settlement_enabled: bool,
+    pub pools: Vec<SeasonRewardPool>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -479,6 +508,7 @@ pub struct RemoteConfig {
     pub spin_table: SpinTable,
     pub social: SocialConfig,
     pub progression: ProgressionConfig,
+    pub reward_pool: RewardPoolConfig,
     pub daily: DailyConfig,
     pub achievements: Vec<AchievementConfig>,
     pub entitlements: Vec<EntitlementConfig>,
@@ -577,6 +607,9 @@ impl RemoteConfig {
         let progression: ProgressionConfig =
             serde_json::from_slice(get_entry(&entries, "progression.json")?)
                 .context("progression.json invalide")?;
+        let reward_pool: RewardPoolConfig =
+            serde_json::from_slice(get_entry(&entries, "reward_pool.json")?)
+                .context("reward_pool.json invalide")?;
         let daily: DailyConfig = serde_json::from_slice(get_entry(&entries, "daily.json")?)
             .context("daily.json invalide")?;
         let achievements = parse_items(
@@ -609,6 +642,7 @@ impl RemoteConfig {
             spin_table,
             social,
             progression,
+            reward_pool,
             daily,
             achievements,
             entitlements,
@@ -961,6 +995,12 @@ impl RemoteConfig {
                 if !elem_ids.insert(e.id) {
                     problems.push(format!("district {} : élément id {} en double", d.id, e.id));
                 }
+                if e.id > i32::MAX as u32 {
+                    problems.push(format!(
+                        "district {} : élément id {} hors INTEGER",
+                        d.id, e.id
+                    ));
+                }
                 let mut levels = BTreeSet::new();
                 for l in &e.levels {
                     if !levels.insert(l.level) {
@@ -972,6 +1012,12 @@ impl RemoteConfig {
                     if l.cost > i64::MAX as u64 {
                         problems.push(format!(
                             "district {} / élément {} : coût hors BIGINT",
+                            d.id, e.id
+                        ));
+                    }
+                    if l.level > i32::MAX as u32 {
+                        problems.push(format!(
+                            "district {} / élément {} : niveau hors INTEGER",
                             d.id, e.id
                         ));
                     }
@@ -1213,6 +1259,61 @@ impl RemoteConfig {
                 ));
             }
         }
+        if self.reward_pool.settlement_enabled && !self.reward_pool.enabled {
+            problems.push("rewardPool.settlementEnabled exige rewardPool.enabled".to_string());
+        }
+        if self.reward_pool.enabled && self.reward_pool.pools.is_empty() {
+            problems.push("rewardPool activé sans pool".to_string());
+        }
+        let pool_ids: BTreeSet<&str> = self
+            .reward_pool
+            .pools
+            .iter()
+            .map(|pool| pool.pool_id.as_str())
+            .collect();
+        if pool_ids.len() != self.reward_pool.pools.len() {
+            problems.push("rewardPool : poolId en double".to_string());
+        }
+        for pool in &self.reward_pool.pools {
+            let valid_identity = !pool.pool_id.trim().is_empty()
+                && pool.pool_id.len() <= 64
+                && !pool.token_mint.trim().is_empty()
+                && pool.token_mint.len() <= 128;
+            let valid_economy = pool.starts_at_ms < pool.ends_at_ms
+                && pool.budget_u64 > 0
+                && pool.budget_u64 <= i64::MAX as u64
+                && pool.min_claim_u64 > 0
+                && pool.min_claim_u64 <= pool.budget_u64
+                && !pool.rules.is_empty();
+            if !valid_identity || !valid_economy {
+                problems.push(format!("rewardPool {} : définition invalide", pool.pool_id));
+            }
+            let mut rule_keys = BTreeSet::new();
+            for rule in &pool.rules {
+                let source_exists = match rule.source.as_str() {
+                    "district_complete" => {
+                        rule.source_id.parse::<u32>().ok().is_some_and(|id| {
+                            self.districts.iter().any(|district| district.id == id)
+                        })
+                    }
+                    "achievement_claim" => self
+                        .achievements
+                        .iter()
+                        .any(|achievement| achievement.achievement_id == rule.source_id),
+                    _ => false,
+                };
+                if !source_exists
+                    || rule.source_id.is_empty()
+                    || rule.source_id.len() > 96
+                    || rule.amount_u64 == 0
+                    || rule.amount_u64 > pool.budget_u64
+                    || !rule_keys.insert((rule.source.as_str(), rule.source_id.as_str()))
+                {
+                    problems.push(format!("rewardPool {} : règle invalide", pool.pool_id));
+                }
+            }
+        }
+
         let offer_ids: BTreeSet<&str> = self.offers.iter().map(|o| o.offer_id.as_str()).collect();
         if offer_ids.len() != self.offers.len() {
             problems.push("offers : offerId en double".to_string());
@@ -1286,6 +1387,7 @@ impl RemoteConfig {
             "spinTable": self.spin_table,
             "social": self.social,
             "progression": self.progression,
+            "rewardPool": self.reward_pool,
             "daily": self.daily,
             "achievements": self.achievements,
             "entitlements": self.entitlements,

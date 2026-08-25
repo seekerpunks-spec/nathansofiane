@@ -206,6 +206,7 @@ func _upgrade(element_id: int) -> void:
 		var paid := int(response.data.get("cost", expected_cost))
 		Events.track("upgrade_completed", {"districtId": upgraded_district_id, "elementId": element_id, "level": response.data.get("level", 0), "cost": paid})
 		Events.track("currency_spent", {"currency": "credits", "amount": paid, "sink": "upgrade", "districtId": upgraded_district_id, "elementId": element_id})
+		_track_reward_pool(response.data.get("rewardPoolAllocations", []))
 		Haptics.vibrate(0.55, 45)
 		if response.data.get("districtComplete", false):
 			_show_complete(
@@ -221,6 +222,13 @@ func _upgrade(element_id: int) -> void:
 		Haptics.error()
 	_busy = false
 	_refresh()
+
+func _track_reward_pool(allocations: Variant) -> void:
+	if typeof(allocations) != TYPE_ARRAY:
+		return
+	for allocation in allocations:
+		if typeof(allocation) == TYPE_DICTIONARY and int(allocation.get("amountU64", 0)) > 0:
+			Events.track("reward_pool_progress", allocation)
 
 func _show_complete(reward: Dictionary, district_id: int, next_district_id: int, all_complete: bool) -> void:
 	Events.track("village_completed", {"districtId": district_id, "nextDistrictId": next_district_id, "allDistrictsComplete": all_complete})

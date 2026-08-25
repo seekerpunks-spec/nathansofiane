@@ -53,6 +53,7 @@ $expected = @(
     "trade_accepted",
     "trade_declined",
     "trade_cancelled"
+    "reward_pool_progress"
 )
 
 $sources = Get-ChildItem -LiteralPath (Join-Path $workspace "client") -Filter "*.gd" -Recurse |

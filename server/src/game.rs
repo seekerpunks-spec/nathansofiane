@@ -173,7 +173,8 @@ pub async fn progress_action_tx(
     for mission in config.daily.missions.iter().filter(|m| m.action == action) {
         sqlx::query(
             "INSERT INTO mission_progress(address,mission_id,mission_day,progress) VALUES($1,$2,$3,LEAST($4,$5)) \
-             ON CONFLICT(address,mission_id,mission_day) DO UPDATE SET progress = LEAST($5, mission_progress.progress + EXCLUDED.progress)",
+             ON CONFLICT(address,mission_id,mission_day) DO UPDATE SET progress = \
+             LEAST($5::numeric, mission_progress.progress::numeric + EXCLUDED.progress::numeric)::bigint",
         )
         .bind(address)
         .bind(&mission.mission_id)
@@ -408,6 +409,24 @@ mod tests {
             persisted.1.timestamp_millis(),
             (last + chrono::Duration::milliseconds(interval * 2)).timestamp_millis()
         );
+
+        sqlx::query("UPDATE player_state SET spins=$1,last_spin_at=now() WHERE address=$2")
+            .bind(i32::MAX)
+            .bind(&address)
+            .execute(&mut *tx)
+            .await?;
+        let overflow = grant_reward_tx(
+            &mut tx,
+            &address,
+            &Reward {
+                spins: 1,
+                credits: 0,
+                chest: None,
+            },
+            &config,
+        )
+        .await;
+        assert!(overflow.is_err());
         tx.rollback().await?;
         Ok(())
     }

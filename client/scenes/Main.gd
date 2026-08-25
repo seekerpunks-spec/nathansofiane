@@ -193,6 +193,10 @@ func _boot() -> void:
 			Store.apply_state(st.data)
 			_enter_game("spin")
 			return
+		if st.code == 401:
+			Net.clear_session()
+			Store.reset_session()
+			Events.reset_session()
 	# Pas de session valide → onboarding.
 	_go_onboarding()
 
@@ -237,5 +241,7 @@ func _on_retry() -> void:
 	_boot()
 
 func _on_session_expired() -> void:
+	Net.clear_session()
 	Store.reset_session()
+	Events.reset_session()
 	_go_onboarding()

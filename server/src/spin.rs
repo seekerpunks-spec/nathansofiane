@@ -327,6 +327,21 @@ mod tests {
             Some((last + ChronoDuration::milliseconds(interval * 2)).timestamp_millis())
         );
     }
+
+    #[test]
+    fn regen_caps_when_elapsed_intervals_exceed_i32() {
+        let cfg =
+            RemoteConfig::load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../config")).unwrap();
+        let now = Utc::now();
+        let interval = cfg.economy.spin_regen_ms as i64;
+        let elapsed = interval
+            .checked_mul(i64::from(i32::MAX) + 10)
+            .expect("durée de test représentable");
+        let ancient = now - ChronoDuration::milliseconds(elapsed);
+        let snapshot = regen_state(Some(ancient), now, 0, &cfg);
+        assert_eq!(snapshot.spins, cfg.economy.max_free_spins as i32);
+        assert!(snapshot.next_spin_at_ms.is_none());
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -369,8 +384,14 @@ pub(crate) fn regen_state(
             next_spin_at_ms: Some(next.timestamp_millis()),
         };
     }
-    let gained = (elapsed / config.economy.spin_regen_ms as i64) as i32;
-    let applied = gained.min(max_free - spins).max(0);
+    let gained = elapsed / config.economy.spin_regen_ms as i64;
+    let capacity = max_free - spins;
+    // Un retour après plusieurs millénaires peut dépasser i32 intervalles.
+    // On borne en i64 avant conversion au lieu de laisser `as i32` boucler.
+    let applied = match i32::try_from(gained.max(0)) {
+        Ok(value) => value.min(capacity),
+        Err(_) => capacity,
+    };
     let total = spins + applied;
     if total >= max_free {
         return RegenState {

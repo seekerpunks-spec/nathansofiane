@@ -136,7 +136,7 @@ func _apply_achievement_progress(progress_achievements: Array) -> void:
 func apply_mutation(d: Dictionary) -> void:
 	if typeof(d) != TYPE_DICTIONARY:
 		return
-	for key in ["spins", "credits", "nextSpinAtMs", "districtIndex", "districtProgress", "districtDamage", "firewallCharges", "firewallMax", "pendingEncounter", "profile", "progression", "globalProgression", "cards", "chests", "missions", "achievements", "entitlements", "events", "teamEvents", "seasons", "dailyStreak", "dailyAvailable"]:
+	for key in ["spins", "credits", "nextSpinAtMs", "districtIndex", "districtProgress", "districtDamage", "firewallCharges", "firewallMax", "pendingEncounter", "profile", "progression", "globalProgression", "cards", "chests", "missions", "achievements", "entitlements", "rewardPool", "events", "teamEvents", "seasons", "dailyStreak", "dailyAvailable", "adsWatchedToday", "adsClaimedDate"]:
 		if d.has(key):
 			state["progression" if key == "globalProgression" else key] = d[key]
 	if d.has("serverTimeMs"):

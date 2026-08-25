@@ -304,7 +304,13 @@ pub async fn claim_set(
     };
     game::grant_reward_tx(&mut tx, &addr.0, &reward, &state.config).await?;
     let global_progression = progression::refresh_score_tx(&mut tx, &addr.0, &state.config).await?;
-    let response = json!({"setId": set.set_id, "reward": reward, "spins": player.spins + set.completion_spins as i32, "globalProgression":progression::score_json(global_progression,&state.config), "serverTimeMs": chrono::Utc::now().timestamp_millis()});
+    // Relire le solde autoritaire : `grant_reward_tx` applique aussi la regen
+    // non persistée et vérifie l'overflow. Recalculer ici divergeait.
+    let spins: i32 = sqlx::query_scalar("SELECT spins FROM player_state WHERE address=$1")
+        .bind(&addr.0)
+        .fetch_one(&mut *tx)
+        .await?;
+    let response = json!({"setId": set.set_id, "reward": reward, "spins": spins, "globalProgression":progression::score_json(global_progression,&state.config), "serverTimeMs": chrono::Utc::now().timestamp_millis()});
     Db::audit_tx(
         &mut tx,
         &addr.0,

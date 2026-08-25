@@ -1,5 +1,7 @@
 param(
     [string]$GodotPath = "",
+    [string]$ApiBaseUrl = "",
+    [string]$ApiDevAddress = "dev-player-0001",
     [switch]$BuildAndroid
 )
 
@@ -46,6 +48,12 @@ foreach ($resolution in @("360x800", "540x1170", "720x1280")) {
     if ($LASTEXITCODE -ne 0 -or $smokeLog -match "SCRIPT ERROR|Parse Error|Failed to load script" -or $smokeLog -notmatch "SMOKE_SCENES_OK") {
         throw "Smoke test Godot échoué à la résolution $resolution"
     }
+}
+
+if ($ApiBaseUrl) {
+    & (Join-Path $PSScriptRoot "api_contract_check.ps1") `
+        -BaseUrl $ApiBaseUrl -DevAddress $ApiDevAddress
+    if ($LASTEXITCODE -ne 0) { throw "Contrats API échoués" }
 }
 
 if ($BuildAndroid) {

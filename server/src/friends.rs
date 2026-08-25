@@ -57,12 +57,24 @@ fn valid_display_name(raw: &str) -> Option<String> {
     Some(name.to_string())
 }
 
+pub(crate) fn normalize_friend_code(raw: &str) -> Result<String, ApiError> {
+    let code = raw.trim().to_ascii_uppercase();
+    if code.len() != 16
+        || !code.starts_with("CYB-")
+        || !code[4..].bytes().all(|byte| byte.is_ascii_hexdigit())
+    {
+        return Err(ApiError::BadRequest("friendCode invalide".to_string()));
+    }
+    Ok(code)
+}
+
 pub(crate) async fn address_from_code_tx(
     tx: &mut Transaction<'_, Postgres>,
     friend_code: &str,
 ) -> Result<String, ApiError> {
+    let friend_code = normalize_friend_code(friend_code)?;
     sqlx::query_scalar("SELECT address FROM player_profiles WHERE upper(friend_code)=upper($1)")
-        .bind(friend_code.trim())
+        .bind(friend_code)
         .fetch_optional(&mut **tx)
         .await?
         .ok_or(ApiError::NotFound)
@@ -188,7 +200,7 @@ pub async fn search(
          LEFT JOIN friendships f ON f.address_a=LEAST($1,p.address) AND f.address_b=GREATEST($1,p.address) \
          LEFT JOIN friend_requests incoming ON incoming.requester=p.address AND incoming.addressee=$1 \
          LEFT JOIN friend_requests outgoing ON outgoing.requester=$1 AND outgoing.addressee=p.address \
-         WHERE p.address<>$1 AND (upper(p.friend_code)=upper($2) OR p.display_name ILIKE '%' || $2 || '%') \
+         WHERE p.address<>$1 AND (upper(p.friend_code)=upper($2) OR position(lower($2) in lower(p.display_name))>0) \
          ORDER BY (upper(p.friend_code)=upper($2)) DESC,COALESCE(ps.score,0) DESC,p.friend_code LIMIT 20",
     )
     .bind(&addr.0)
@@ -264,12 +276,13 @@ async fn friend_mutation(
     rid: &str,
     action: &str,
 ) -> Result<Value, ApiError> {
+    let friend_code = normalize_friend_code(friend_code)?;
     let key = game::idem_key(action, address, rid);
     if let Some(value) = state.db.fetch_idempotent(&key).await? {
         return Ok(value);
     }
     let mut tx = state.db.begin().await?;
-    let target = address_from_code_tx(&mut tx, friend_code).await?;
+    let target = address_from_code_tx(&mut tx, &friend_code).await?;
     if target == address {
         return Err(ApiError::BadRequest(
             "impossible de s'ajouter soi-même".to_string(),
@@ -362,7 +375,7 @@ async fn friend_mutation(
         }
         _ => return Err(ApiError::BadRequest("action sociale inconnue".to_string())),
     };
-    let response = json!({"playerId":friend_code.trim().to_uppercase(),"status":if accepted{"friend"}else if action=="friend_request"{"outgoing"}else{"none"},"serverTimeMs":Utc::now().timestamp_millis()});
+    let response = json!({"playerId":friend_code,"status":if accepted{"friend"}else if action=="friend_request"{"outgoing"}else{"none"},"serverTimeMs":Utc::now().timestamp_millis()});
     state.db.store_idempotent(&mut tx, &key, &response).await?;
     tx.commit().await?;
     Ok(response)
@@ -400,13 +413,14 @@ pub async fn select_target(
             "source doit être friend ou revenge".to_string(),
         ));
     }
+    let friend_code = normalize_friend_code(&body.friend_code)?;
     let rid = game::request_id(&headers, body.request_id.as_deref())?;
     let key = game::idem_key("social_target", &addr.0, &rid);
     if let Some(value) = state.db.fetch_idempotent(&key).await? {
         return Ok(Json(value));
     }
     let mut tx = state.db.begin().await?;
-    let target = address_from_code_tx(&mut tx, &body.friend_code).await?;
+    let target = address_from_code_tx(&mut tx, &friend_code).await?;
     if target == addr.0 {
         return Err(ApiError::BadRequest(
             "cible identique au joueur".to_string(),
@@ -467,7 +481,7 @@ pub async fn select_target(
     .bind(expires_at)
     .execute(&mut *tx)
     .await?;
-    let response = json!({"playerId":body.friend_code.trim().to_uppercase(),"source":body.source,"expiresAtMs":expires_at.timestamp_millis(),"serverTimeMs":Utc::now().timestamp_millis()});
+    let response = json!({"playerId":friend_code,"source":body.source,"expiresAtMs":expires_at.timestamp_millis(),"serverTimeMs":Utc::now().timestamp_millis()});
     state.db.store_idempotent(&mut tx, &key, &response).await?;
     tx.commit().await?;
     Ok(Json(response))

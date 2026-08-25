@@ -64,6 +64,17 @@ fn valid_team_name(raw: &str) -> Option<String> {
     Some(name.to_string())
 }
 
+fn normalize_team_code(raw: &str) -> Result<String, ApiError> {
+    let code = raw.trim().to_ascii_uppercase();
+    if code.len() != 20
+        || !code.starts_with("NET-")
+        || !code[4..].bytes().all(|byte| byte.is_ascii_hexdigit())
+    {
+        return Err(ApiError::BadRequest("teamCode invalide".to_string()));
+    }
+    Ok(code)
+}
+
 async fn lock_players_tx(
     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     first: &str,
@@ -128,7 +139,7 @@ pub async fn list(
         "SELECT t.team_code,t.name,COUNT(tm.address)::bigint,COALESCE(SUM(ps.score),0)::bigint \
          FROM teams t LEFT JOIN team_members tm ON tm.team_id=t.team_id \
          LEFT JOIN progression_scores ps ON ps.address=tm.address \
-         WHERE $1='' OR upper(t.team_code)=upper($1) OR t.name ILIKE '%' || $1 || '%' \
+         WHERE $1='' OR upper(t.team_code)=upper($1) OR position(lower($1) in lower(t.name))>0 \
          GROUP BY t.team_id ORDER BY (upper(t.team_code)=upper($1)) DESC,COALESCE(SUM(ps.score),0) DESC,t.team_code LIMIT $2",
     )
     .bind(q)
@@ -235,6 +246,7 @@ pub async fn join(
     headers: HeaderMap,
     Json(body): Json<TeamCodeReq>,
 ) -> Result<Json<Value>, ApiError> {
+    let team_code = normalize_team_code(&body.team_code)?;
     let rid = game::request_id(&headers, body.request_id.as_deref())?;
     let key = game::idem_key("team_join", &addr.0, &rid);
     if let Some(value) = state.db.fetch_idempotent(&key).await? {
@@ -253,7 +265,7 @@ pub async fn join(
     let team: (String, String, String) = sqlx::query_as(
         "SELECT team_id,team_code,name FROM teams WHERE upper(team_code)=upper($1) FOR UPDATE",
     )
-    .bind(body.team_code.trim())
+    .bind(team_code)
     .fetch_optional(&mut *tx)
     .await?
     .ok_or(ApiError::NotFound)?;
@@ -351,6 +363,7 @@ async fn owner_member_action(
     rid: &str,
     transfer: bool,
 ) -> Result<Value, ApiError> {
+    let friend_code = friends::normalize_friend_code(friend_code)?;
     let action = if transfer {
         "team_transfer"
     } else {
@@ -361,7 +374,7 @@ async fn owner_member_action(
         return Ok(value);
     }
     let mut tx = state.db.begin().await?;
-    let target = friends::address_from_code_tx(&mut tx, friend_code).await?;
+    let target = friends::address_from_code_tx(&mut tx, &friend_code).await?;
     if target == owner {
         return Err(ApiError::BadRequest("membre invalide".to_string()));
     }
@@ -413,7 +426,7 @@ async fn owner_member_action(
             .execute(&mut *tx)
             .await?;
     }
-    let response = json!({"playerId":friend_code.trim().to_uppercase(),"transferred":transfer,"kicked":!transfer,"serverTimeMs":Utc::now().timestamp_millis()});
+    let response = json!({"playerId":friend_code,"transferred":transfer,"kicked":!transfer,"serverTimeMs":Utc::now().timestamp_millis()});
     state.db.store_idempotent(&mut tx, &key, &response).await?;
     tx.commit().await?;
     Ok(response)

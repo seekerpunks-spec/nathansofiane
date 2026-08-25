@@ -11,6 +11,7 @@
 //!   la signature littérale `"dev"` est acceptée pour `DEV_ADDRESS`.
 //!
 //! JWT : HS256 — access 15 min + refresh 30 jours (`POST /auth/refresh`).
+//! La déconnexion révoque le refresh courant (`POST /auth/logout`).
 //! Nonces : single-use, TTL 120 s (anti-replay du pair address/signature).
 
 use crate::error::AuthError;
@@ -25,8 +26,7 @@ use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, 
 use rand::RngCore;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use std::collections::HashMap;
-use std::sync::Mutex;
+use sha2::{Digest, Sha256};
 use std::time::Duration;
 
 const NONCE_TTL: Duration = Duration::from_secs(120);
@@ -37,59 +37,30 @@ const REFRESH_TTL: Duration = Duration::from_secs(30 * 24 * 3600);
 #[derive(Clone)]
 pub struct Addr(pub String);
 
-/// Un nonce par adresse (single-use, TTL).
-#[derive(Default)]
-pub struct NonceStore(Mutex<HashMap<String, (String, i64)>>);
-
-impl NonceStore {
-    /// Génère un nouveau nonce pour l'adresse (remplace l'existant).
-    pub fn set(&self, address: &str) -> (String, i64) {
-        let mut buf = [0u8; 32];
-        rand::rngs::OsRng.fill_bytes(&mut buf);
-        let nonce: String = buf.iter().map(|b| format!("{:02x}", b)).collect();
-        let expires_at = Utc::now().timestamp() + NONCE_TTL.as_secs() as i64;
-        let mut map = self
-            .0
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
-        if map.len() > 10_000 {
-            let now = Utc::now().timestamp();
-            map.retain(|_, (_, expires)| *expires >= now);
-        }
-        map.insert(address.to_string(), (nonce.clone(), expires_at));
-        (nonce, expires_at)
-    }
-
-    /// Consomme le nonce (single-use). `None` si inconnu ou expiré.
-    pub fn take(&self, address: &str) -> Option<String> {
-        let mut map = self
-            .0
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
-        let entry = map.get(address)?;
-        if Utc::now().timestamp() > entry.1 {
-            map.remove(address);
-            return None;
-        }
-        map.remove(address).map(|e| e.0)
-    }
-}
-
 #[derive(Serialize, Deserialize)]
 struct Claims {
     sub: String,
     typ: String,
     iat: i64,
     exp: i64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    jti: Option<String>,
 }
 
-fn make_token(secret: &str, address: &str, typ: &str, ttl: Duration) -> Result<String, AuthError> {
+fn make_token(
+    secret: &str,
+    address: &str,
+    typ: &str,
+    ttl: Duration,
+    jti: Option<&str>,
+) -> Result<String, AuthError> {
     let now = Utc::now().timestamp();
     let claims = Claims {
         sub: address.to_string(),
         typ: typ.to_string(),
         iat: now,
         exp: now + ttl.as_secs() as i64,
+        jti: jti.map(str::to_string),
     };
     encode(
         &Header::new(Algorithm::HS256),
@@ -100,6 +71,34 @@ fn make_token(secret: &str, address: &str, typ: &str, ttl: Duration) -> Result<S
         tracing::error!(?e, "echec signature JWT");
         AuthError::InvalidToken
     })
+}
+
+fn hash_jti(jti: &str) -> String {
+    let digest = Sha256::digest(jti.as_bytes());
+    digest.iter().map(|byte| format!("{byte:02x}")).collect()
+}
+
+async fn issue_initial_tokens(
+    state: &AppState,
+    address: &str,
+) -> Result<(String, String), crate::error::ApiError> {
+    let jti = uuid::Uuid::new_v4().to_string();
+    let token = make_token(&state.jwt_secret, address, "access", ACCESS_TTL, None)?;
+    let refresh_token = make_token(
+        &state.jwt_secret,
+        address,
+        "refresh",
+        REFRESH_TTL,
+        Some(&jti),
+    )?;
+    let expires_at = Utc::now()
+        + chrono::Duration::from_std(REFRESH_TTL)
+            .map_err(|error| crate::error::ApiError::Internal(error.into()))?;
+    state
+        .db
+        .store_refresh_session(address, &hash_jti(&jti), expires_at)
+        .await?;
+    Ok((token, refresh_token))
 }
 
 fn decode_token(secret: &str, token: &str) -> Result<Claims, AuthError> {
@@ -176,10 +175,19 @@ pub async fn challenge(
     Json(body): Json<ChallengeReq>,
 ) -> Result<Json<Value>, crate::error::ApiError> {
     let address = normalize_address(&body.address, &state)?;
-    let (nonce, expires_at) = state.nonce.set(&address);
+    let mut bytes = [0u8; 32];
+    rand::rngs::OsRng.fill_bytes(&mut bytes);
+    let nonce: String = bytes.iter().map(|byte| format!("{byte:02x}")).collect();
+    let expires_at = Utc::now()
+        + chrono::Duration::from_std(NONCE_TTL)
+            .map_err(|error| crate::error::ApiError::Internal(error.into()))?;
+    state
+        .db
+        .store_auth_nonce(&address, &nonce, expires_at)
+        .await?;
     Ok(Json(json!({
         "nonce": nonce,
-        "expiresAt": expires_at,
+        "expiresAt": expires_at.timestamp(),
     })))
 }
 
@@ -198,8 +206,9 @@ pub async fn verify(
     let address = normalize_address(&body.address, &state)?;
     // Nonce single-use : anti-replay du pair (address, signature).
     let nonce = state
-        .nonce
-        .take(&address)
+        .db
+        .take_auth_nonce(&address)
+        .await?
         .ok_or(ApiError::from(AuthError::InvalidNonce))?;
 
     if state.dev_auth {
@@ -233,8 +242,7 @@ pub async fn verify(
         .db
         .ensure_player(&address, state.config.economy.new_player_spins as i32)
         .await?;
-    let token = make_token(&state.jwt_secret, &address, "access", ACCESS_TTL)?;
-    let refresh_token = make_token(&state.jwt_secret, &address, "refresh", REFRESH_TTL)?;
+    let (token, refresh_token) = issue_initial_tokens(&state, &address).await?;
     Ok(Json(json!({
         "token": token,
         "refreshToken": refresh_token,
@@ -259,12 +267,60 @@ pub async fn refresh(
     if claims.typ != "refresh" {
         return Err(ApiError::from(AuthError::InvalidToken));
     }
-    let token = make_token(&state.jwt_secret, &claims.sub, "access", ACCESS_TTL)?;
-    let refresh_token = make_token(&state.jwt_secret, &claims.sub, "refresh", REFRESH_TTL)?;
+    let old_jti = claims
+        .jti
+        .as_deref()
+        .ok_or(ApiError::from(AuthError::InvalidToken))?;
+    let new_jti = uuid::Uuid::new_v4().to_string();
+    let token = make_token(&state.jwt_secret, &claims.sub, "access", ACCESS_TTL, None)?;
+    let refresh_token = make_token(
+        &state.jwt_secret,
+        &claims.sub,
+        "refresh",
+        REFRESH_TTL,
+        Some(&new_jti),
+    )?;
+    let expires_at = Utc::now()
+        + chrono::Duration::from_std(REFRESH_TTL)
+            .map_err(|error| ApiError::Internal(error.into()))?;
+    if !state
+        .db
+        .rotate_refresh_session(
+            &claims.sub,
+            &hash_jti(old_jti),
+            &hash_jti(&new_jti),
+            expires_at,
+        )
+        .await?
+    {
+        return Err(ApiError::from(AuthError::InvalidToken));
+    }
     Ok(Json(json!({
         "token": token,
         "refreshToken": refresh_token,
     })))
+}
+
+/// `POST /auth/logout` — révoque le refresh courant. Un second appel avec le
+/// même JWT signé reste un succès idempotent et n'expose aucune autre session.
+pub async fn logout(
+    State(state): State<AppState>,
+    Json(body): Json<RefreshReq>,
+) -> Result<Json<Value>, crate::error::ApiError> {
+    use crate::error::ApiError;
+    let claims = decode_token(&state.jwt_secret, body.refresh_token.trim())?;
+    if claims.typ != "refresh" {
+        return Err(ApiError::from(AuthError::InvalidToken));
+    }
+    let jti = claims
+        .jti
+        .as_deref()
+        .ok_or(ApiError::from(AuthError::InvalidToken))?;
+    let revoked = state
+        .db
+        .revoke_refresh_session(&claims.sub, &hash_jti(jti))
+        .await?;
+    Ok(Json(json!({ "revoked": revoked })))
 }
 
 #[cfg(test)]

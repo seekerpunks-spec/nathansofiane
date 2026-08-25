@@ -80,6 +80,9 @@ func social() -> Dictionary:
 func progression() -> Dictionary:
 	return raw.get("progression", {})
 
+func reward_pool() -> Dictionary:
+	return raw.get("rewardPool", {})
+
 func spin_multipliers() -> Array:
 	var configured: Variant = economy().get("spinMultipliers", [1])
 	return configured if typeof(configured) == TYPE_ARRAY else [1]

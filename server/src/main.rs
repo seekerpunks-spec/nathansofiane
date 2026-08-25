@@ -25,6 +25,7 @@ mod friends;
 mod game;
 mod progression;
 mod rate_limit;
+pub mod reward_pool;
 mod social;
 mod spin;
 mod state;
@@ -72,6 +73,16 @@ async fn main() -> anyhow::Result<()> {
             }
         }
     };
+    if !cfg!(debug_assertions)
+        && matches!(
+            jwt_secret.as_str(),
+            "dev-only-change-me" | "dev-only-change-me-32-characters-minimum"
+        )
+    {
+        return Err(anyhow!(
+            "JWT_SECRET de démonstration interdit dans un build release"
+        ));
+    }
     let config_dir = std::env::var("CONFIG_DIR").unwrap_or_else(|_| "../config".to_string());
     let port: u16 = std::env::var("PORT")
         .ok()
@@ -102,6 +113,11 @@ async fn main() -> anyhow::Result<()> {
 
     let db = db::Db::connect(&database_url).await?;
     tracing::info!("Postgres connecté, migrations appliquées");
+    let rate = Arc::new(rate_limit::RateLimiter::new(
+        db.pool().clone(),
+        Duration::from_secs(60),
+        rate_per_min,
+    ));
 
     let state = Arc::new(AppState {
         db,
@@ -109,11 +125,7 @@ async fn main() -> anyhow::Result<()> {
         jwt_secret,
         dev_auth,
         dev_address,
-        nonce: Arc::new(auth::NonceStore::default()),
-        rate: Arc::new(rate_limit::RateLimiter::new(
-            Duration::from_secs(60),
-            rate_per_min,
-        )),
+        rate,
         started_at: std::time::Instant::now(),
     });
 
@@ -139,6 +151,28 @@ async fn main() -> anyhow::Result<()> {
             {
                 tracing::warn!(?error, "nettoyage analytics_batches échoué");
             }
+            if let Err(error) = sqlx::query("DELETE FROM auth_nonces WHERE expires_at < now()")
+                .execute(&maintenance_pool)
+                .await
+            {
+                tracing::warn!(?error, "nettoyage auth_nonces échoué");
+            }
+            if let Err(error) = sqlx::query(
+                "DELETE FROM api_rate_limits WHERE updated_at < now() - interval '24 hours'",
+            )
+            .execute(&maintenance_pool)
+            .await
+            {
+                tracing::warn!(?error, "nettoyage api_rate_limits échoué");
+            }
+            if let Err(error) = sqlx::query(
+                "DELETE FROM refresh_sessions WHERE expires_at < now() - interval '30 days'",
+            )
+            .execute(&maintenance_pool)
+            .await
+            {
+                tracing::warn!(?error, "nettoyage refresh_sessions échoué");
+            }
         }
     });
 
@@ -162,10 +196,12 @@ async fn main() -> anyhow::Result<()> {
 
     let app = Router::new()
         .route("/health", get(health))
+        .route("/ready", get(readiness))
         .route("/config", get(config_endpoint))
         .route("/auth/challenge", post(auth::challenge))
         .route("/auth/verify", post(auth::verify))
         .route("/auth/refresh", post(auth::refresh))
+        .route("/auth/logout", post(auth::logout))
         .route("/state", get(get_state))
         .route(
             "/profile",
@@ -242,6 +278,7 @@ async fn main() -> anyhow::Result<()> {
         listener,
         app.into_make_service_with_connect_info::<SocketAddr>(),
     )
+    .with_graceful_shutdown(shutdown_signal())
     .await?;
     Ok(())
 }
@@ -256,7 +293,7 @@ async fn guard(
     let path = req.uri().path().to_string();
 
     // Sans auth ni rate limit.
-    if path == "/health" || path == "/config" {
+    if path == "/health" || path == "/ready" || path == "/config" {
         return Ok(next.run(req).await);
     }
 
@@ -264,7 +301,7 @@ async fn guard(
     if path.starts_with("/auth/") {
         // Ne jamais faire confiance à X-Forwarded-For sans proxy de confiance.
         let ip = peer.ip().to_string();
-        if !state.rate.check(&format!("ip:{ip}")) {
+        if !state.rate.check(&format!("ip:{ip}")).await? {
             return Err(ApiError::RateLimited);
         }
         return Ok(next.run(req).await);
@@ -272,7 +309,7 @@ async fn guard(
 
     // Routes protégées : JWT obligatoire + rate limit par adresse.
     let address = auth::auth_address(&state, req.headers())?;
-    if !state.rate.check(&address) {
+    if !state.rate.check(&format!("wallet:{address}")).await? {
         return Err(ApiError::RateLimited);
     }
     req.extensions_mut().insert(auth::Addr(address));
@@ -287,6 +324,45 @@ async fn health(State(state): State<AppState>) -> Json<Value> {
         "configVersion": state.config.version,
         "uptimeMs": state.started_at.elapsed().as_millis() as u64,
     }))
+}
+
+/// `GET /ready` — readiness : la configuration est déjà validée au boot et
+/// cette sonde confirme que PostgreSQL accepte encore les requêtes.
+async fn readiness(State(state): State<AppState>) -> Result<Json<Value>, ApiError> {
+    let database_ok: i32 = sqlx::query_scalar("SELECT 1")
+        .fetch_one(state.db.pool())
+        .await?;
+    Ok(Json(json!({
+        "status": if database_ok == 1 { "ready" } else { "unavailable" },
+        "database": database_ok == 1,
+        "configVersion": state.config.version,
+    })))
+}
+
+async fn shutdown_signal() {
+    let ctrl_c = async {
+        if let Err(error) = tokio::signal::ctrl_c().await {
+            tracing::error!(?error, "écoute Ctrl-C impossible");
+        }
+    };
+
+    #[cfg(unix)]
+    let terminate = async {
+        match tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()) {
+            Ok(mut signal) => {
+                signal.recv().await;
+            }
+            Err(error) => tracing::error!(?error, "écoute SIGTERM impossible"),
+        }
+    };
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<()>();
+
+    tokio::select! {
+        _ = ctrl_c => {},
+        _ = terminate => {},
+    }
+    tracing::info!("signal d'arrêt reçu, drainage des requêtes en cours");
 }
 
 /// `GET /config` — publique. Le client compare le hash local ; différent →
@@ -336,6 +412,8 @@ async fn get_state(
     let daily_bonus = engagement::daily_bonus_for_state(&state, &address, today).await?;
     let achievements = engagement::achievements_for_state(&state, &address).await?;
     let entitlements = entitlements::for_state(&state, &address).await?;
+    let reward_pool =
+        reward_pool::for_state(state.db.pool(), &address, &state.config.reward_pool).await?;
     let mission_rows: Vec<(String, i64, bool)> = sqlx::query_as(
         "SELECT mission_id,progress,claimed FROM mission_progress WHERE address=$1 AND mission_day=$2",
     ).bind(&address).bind(today).fetch_all(state.db.pool()).await?;
@@ -408,6 +486,7 @@ async fn get_state(
         "dailyBonus": daily_bonus,
         "achievements": achievements,
         "entitlements": entitlements,
+        "rewardPool": reward_pool,
         "missions": missions,
         "events": events,
         "teamEvents": team_events,

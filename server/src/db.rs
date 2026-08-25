@@ -55,6 +55,104 @@ impl Db {
         Ok(self.pool.begin().await?)
     }
 
+    /// Crée ou remplace le challenge d'une adresse. PostgreSQL est la source
+    /// partagée entre instances ; un nouveau challenge invalide l'ancien.
+    pub async fn store_auth_nonce(
+        &self,
+        address: &str,
+        nonce: &str,
+        expires_at: DateTime<Utc>,
+    ) -> Result<()> {
+        sqlx::query(
+            "INSERT INTO auth_nonces(address,nonce,expires_at) VALUES($1,$2,$3) \
+             ON CONFLICT(address) DO UPDATE SET nonce=EXCLUDED.nonce, \
+             expires_at=EXCLUDED.expires_at,created_at=now()",
+        )
+        .bind(address)
+        .bind(nonce)
+        .bind(expires_at)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    /// Consomme exactement une fois le challenge, même si deux serveurs
+    /// reçoivent simultanément la même preuve. Un nonce expiré est aussi retiré.
+    pub async fn take_auth_nonce(&self, address: &str) -> Result<Option<String>> {
+        let row: Option<(String, bool)> = sqlx::query_as(
+            "DELETE FROM auth_nonces WHERE address=$1 \
+             RETURNING nonce, expires_at >= now()",
+        )
+        .bind(address)
+        .fetch_optional(&self.pool)
+        .await?;
+        Ok(row.and_then(|(nonce, valid)| valid.then_some(nonce)))
+    }
+
+    pub async fn store_refresh_session(
+        &self,
+        address: &str,
+        jti_hash: &str,
+        expires_at: DateTime<Utc>,
+    ) -> Result<()> {
+        sqlx::query("INSERT INTO refresh_sessions(jti_hash,address,expires_at) VALUES($1,$2,$3)")
+            .bind(jti_hash)
+            .bind(address)
+            .bind(expires_at)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
+    /// Consomme l'ancien refresh et crée son remplaçant dans la même
+    /// transaction. Deux instances concurrentes ne peuvent obtenir qu'un succès.
+    pub async fn rotate_refresh_session(
+        &self,
+        address: &str,
+        old_jti_hash: &str,
+        new_jti_hash: &str,
+        new_expires_at: DateTime<Utc>,
+    ) -> Result<bool> {
+        let mut tx = self.pool.begin().await?;
+        let consumed = sqlx::query(
+            "UPDATE refresh_sessions SET consumed_at=now(),replaced_by_hash=$1 \
+             WHERE jti_hash=$2 AND address=$3 AND consumed_at IS NULL AND expires_at>=now()",
+        )
+        .bind(new_jti_hash)
+        .bind(old_jti_hash)
+        .bind(address)
+        .execute(&mut *tx)
+        .await?
+        .rows_affected();
+        if consumed == 0 {
+            tx.rollback().await?;
+            return Ok(false);
+        }
+        sqlx::query("INSERT INTO refresh_sessions(jti_hash,address,expires_at) VALUES($1,$2,$3)")
+            .bind(new_jti_hash)
+            .bind(address)
+            .bind(new_expires_at)
+            .execute(&mut *tx)
+            .await?;
+        tx.commit().await?;
+        Ok(true)
+    }
+
+    /// Révoque une session refresh précise. L'opération est idempotente :
+    /// `false` signifie que le jeton était déjà consommé ou expiré.
+    pub async fn revoke_refresh_session(&self, address: &str, jti_hash: &str) -> Result<bool> {
+        let revoked = sqlx::query(
+            "UPDATE refresh_sessions SET consumed_at=now() \
+             WHERE jti_hash=$1 AND address=$2 AND consumed_at IS NULL AND expires_at>=now()",
+        )
+        .bind(jti_hash)
+        .bind(address)
+        .execute(&self.pool)
+        .await?
+        .rows_affected();
+        Ok(revoked == 1)
+    }
+
     /// Crée le joueur s'il est nouveau (spins de bienvenue + `last_spin_at = now`).
     /// Renvoie `true` si le joueur vient d'être créé. Les deux écritures sont
     /// atomiques : pas de joueur sans ligne d'état.
@@ -215,5 +313,179 @@ impl Db {
             .into_iter()
             .map(|(chest_id, qty)| json!({ "chestId": chest_id, "qty": qty }))
             .collect())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use chrono::{Duration, Utc};
+
+    #[tokio::test]
+    async fn postgres_nonce_is_shared_single_use_and_expires() -> anyhow::Result<()> {
+        let Ok(database_url) = std::env::var("CYBERSEEKER_TEST_DATABASE_URL") else {
+            return Ok(());
+        };
+        let db = super::Db::connect(&database_url).await?;
+        let address = format!("nonce-test-{}", uuid::Uuid::new_v4());
+        let nonce = "a".repeat(64);
+        db.store_auth_nonce(&address, &nonce, Utc::now() + Duration::minutes(1))
+            .await?;
+
+        let first_db = db.clone();
+        let second_db = db.clone();
+        let first_address = address.clone();
+        let second_address = address.clone();
+        let (first, second) = tokio::join!(
+            async move { first_db.take_auth_nonce(&first_address).await },
+            async move { second_db.take_auth_nonce(&second_address).await }
+        );
+        let consumed = [first?, second?];
+        assert_eq!(consumed.iter().filter(|value| value.is_some()).count(), 1);
+        assert!(consumed.iter().flatten().all(|value| value == &nonce));
+
+        db.store_auth_nonce(&address, &nonce, Utc::now() + Duration::minutes(1))
+            .await?;
+        // Représente un vrai challenge créé puis expiré, sans violer l'ordre
+        // temporel protégé par la migration 0019.
+        sqlx::query(
+            "UPDATE auth_nonces SET created_at=now()-interval '2 minutes', \
+             expires_at=now()-interval '1 minute' WHERE address=$1",
+        )
+        .bind(&address)
+        .execute(db.pool())
+        .await?;
+        assert!(db.take_auth_nonce(&address).await?.is_none());
+        assert!(db.take_auth_nonce(&address).await?.is_none());
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn postgres_refresh_rotation_has_one_concurrent_winner() -> anyhow::Result<()> {
+        let Ok(database_url) = std::env::var("CYBERSEEKER_TEST_DATABASE_URL") else {
+            return Ok(());
+        };
+        let db = super::Db::connect(&database_url).await?;
+        let address = format!("refresh-test-{}", uuid::Uuid::new_v4());
+        db.ensure_player(&address, 1).await?;
+        let old = uuid::Uuid::new_v4().simple().to_string().repeat(2);
+        let first_new = uuid::Uuid::new_v4().simple().to_string().repeat(2);
+        let second_new = uuid::Uuid::new_v4().simple().to_string().repeat(2);
+        let expiry = Utc::now() + Duration::days(1);
+        db.store_refresh_session(&address, &old, expiry).await?;
+
+        let first_db = db.clone();
+        let second_db = db.clone();
+        let first_address = address.clone();
+        let second_address = address.clone();
+        let old_first = old.clone();
+        let old_second = old.clone();
+        let (first, second) = tokio::join!(
+            async move {
+                first_db
+                    .rotate_refresh_session(&first_address, &old_first, &first_new, expiry)
+                    .await
+            },
+            async move {
+                second_db
+                    .rotate_refresh_session(&second_address, &old_second, &second_new, expiry)
+                    .await
+            }
+        );
+        assert_eq!([first?, second?].into_iter().filter(|won| *won).count(), 1);
+        let active: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM refresh_sessions WHERE address=$1 AND consumed_at IS NULL",
+        )
+        .bind(&address)
+        .fetch_one(db.pool())
+        .await?;
+        assert_eq!(active, 1);
+
+        let active_hash: String = sqlx::query_scalar(
+            "SELECT jti_hash FROM refresh_sessions WHERE address=$1 AND consumed_at IS NULL",
+        )
+        .bind(&address)
+        .fetch_one(db.pool())
+        .await?;
+        assert!(db.revoke_refresh_session(&address, &active_hash).await?);
+        assert!(!db.revoke_refresh_session(&address, &active_hash).await?);
+        let active_after_logout: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM refresh_sessions WHERE address=$1 AND consumed_at IS NULL",
+        )
+        .bind(&address)
+        .fetch_one(db.pool())
+        .await?;
+        assert_eq!(active_after_logout, 0);
+
+        sqlx::query("DELETE FROM player_state WHERE address=$1")
+            .bind(&address)
+            .execute(db.pool())
+            .await?;
+        sqlx::query("DELETE FROM players WHERE address=$1")
+            .bind(&address)
+            .execute(db.pool())
+            .await?;
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn postgres_rejects_self_target_and_two_team_owners() -> anyhow::Result<()> {
+        let Ok(database_url) = std::env::var("CYBERSEEKER_TEST_DATABASE_URL") else {
+            return Ok(());
+        };
+        let db = super::Db::connect(&database_url).await?;
+        let first = format!("invariant-a-{}", uuid::Uuid::new_v4());
+        let second = format!("invariant-b-{}", uuid::Uuid::new_v4());
+        db.ensure_player(&first, 1).await?;
+        db.ensure_player(&second, 1).await?;
+
+        let mut encounter_tx = db.begin().await?;
+        let self_target = sqlx::query(
+            "INSERT INTO social_encounters(encounter_id,attacker,target,kind,multiplier,expires_at) \
+             VALUES($1,$2,$2,'attack',1,$3)",
+        )
+        .bind(uuid::Uuid::new_v4().to_string())
+        .bind(&first)
+        .bind(Utc::now() + Duration::minutes(1))
+        .execute(&mut *encounter_tx)
+        .await;
+        assert!(self_target.is_err());
+        encounter_tx.rollback().await?;
+
+        let mut team_tx = db.begin().await?;
+        let team_id = uuid::Uuid::new_v4().to_string();
+        let team_code = format!("QA-{}", &uuid::Uuid::new_v4().simple().to_string()[..12]);
+        let team_name = format!("QA {}", &uuid::Uuid::new_v4().simple().to_string()[..8]);
+        sqlx::query("INSERT INTO teams(team_id,team_code,name,owner_address) VALUES($1,$2,$3,$4)")
+            .bind(&team_id)
+            .bind(&team_code)
+            .bind(&team_name)
+            .bind(&first)
+            .execute(&mut *team_tx)
+            .await?;
+        sqlx::query("INSERT INTO team_members(team_id,address,role) VALUES($1,$2,'owner')")
+            .bind(&team_id)
+            .bind(&first)
+            .execute(&mut *team_tx)
+            .await?;
+        let second_owner =
+            sqlx::query("INSERT INTO team_members(team_id,address,role) VALUES($1,$2,'owner')")
+                .bind(&team_id)
+                .bind(&second)
+                .execute(&mut *team_tx)
+                .await;
+        assert!(second_owner.is_err());
+        team_tx.rollback().await?;
+
+        sqlx::query("DELETE FROM player_state WHERE address=$1 OR address=$2")
+            .bind(&first)
+            .bind(&second)
+            .execute(db.pool())
+            .await?;
+        sqlx::query("DELETE FROM players WHERE address=$1 OR address=$2")
+            .bind(&first)
+            .bind(&second)
+            .execute(db.pool())
+            .await?;
+        Ok(())
     }
 }

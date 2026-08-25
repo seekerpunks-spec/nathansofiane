@@ -220,7 +220,7 @@ pub async fn reward_ad(
     let regen_anchor = regen.anchor.or(player.last_spin_at).unwrap_or(now);
     sqlx::query("UPDATE player_state SET spins=$1,last_spin_at=$2,ads_watched_today=$3,ads_claimed_date=$4 WHERE address=$5")
         .bind(spins).bind(regen_anchor).bind(ads_watched_today).bind(today).bind(&addr.0).execute(&mut *tx).await?;
-    let response = json!({"rewardSpins": cfg.reward_per_ad, "spins": spins, "adsWatchedToday": count+1, "adsRemaining": cfg.max_rewarded_ads_per_day as i64-count-1, "serverTimeMs": Utc::now().timestamp_millis()});
+    let response = json!({"rewardSpins": cfg.reward_per_ad, "spins": spins, "adsWatchedToday": i64::from(ads_watched_today), "adsRemaining": cfg.max_rewarded_ads_per_day as i64-count-1, "serverTimeMs": Utc::now().timestamp_millis()});
     Db::audit_tx(
         &mut tx,
         &addr.0,

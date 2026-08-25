@@ -152,8 +152,13 @@ func _connect() -> void:
 	if st.ok:
 		Store.apply_state(st.data)
 	else:
-		# Token valide mais état illisible : on part quand même (spin recalculera).
-		Store.apply_state({ "spins": 0, "credits": 0 })
+		# Ne jamais fabriquer un solde local : sans snapshot autoritaire, la
+		# session est abandonnée et l'utilisateur relance le flow complet.
+		Net.clear_session()
+		Store.reset_session()
+		Events.reset_session()
+		_finish_error("État joueur indisponible. Réessaie dans un instant.")
+		return
 
 	Haptics.vibrate(0.5, 40)
 	connected.emit()

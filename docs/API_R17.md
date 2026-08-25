@@ -1,6 +1,6 @@
 # API R24 — CONTRATS CLIENT / SERVEUR
 
-Toutes les routes de mutation exigent `Authorization: Bearer …`,
+Toutes les routes de mutation de gameplay exigent `Authorization: Bearer …`,
 `Content-Type: application/json` et `X-Request-Id`. Une même clé rejoue la même
 réponse sans répéter la mutation. Le serveur ignore tout prix ou récompense
 calculé par le client.
@@ -8,19 +8,24 @@ calculé par le client.
 ## Lecture
 
 - `GET /health` — liveness, version serveur/config.
+- `GET /ready` — readiness PostgreSQL et version de config.
 - `GET /config` — configuration complète versionnée SHA-256.
 - `GET /state` — soldes, district, inventaire, daily, missions, événements,
-  saison et horloge serveur.
+  saison, état fail-closed du reward pool et horloge serveur.
 - `GET /offers` — uniquement les offres actuellement éligibles pour le joueur,
   avec type, fenêtre et nombre d'achats restants.
 - `GET /events/:event_id/leaderboard` — classement `DENSE_RANK` et rang du
-  joueur dans sa cohorte configurable.
+  joueur dans sa cohorte configurable. Les leaders exposent uniquement
+  `{playerId,displayName,avatarId,points,rank}`, jamais l'adresse wallet.
 
 ## Auth
 
 - `POST /auth/challenge {address}`
 - `POST /auth/verify {address,signature}`
-- `POST /auth/refresh {refreshToken}`
+- `POST /auth/refresh {refreshToken}` — rotation one-time-use : le token présenté
+  est consommé atomiquement et son replay renvoie `UNAUTHORIZED`.
+- `POST /auth/logout {refreshToken}` — révocation idempotente de la session
+  courante ; le client purge ses jetons même si le réseau est indisponible.
 
 ## Mutations
 

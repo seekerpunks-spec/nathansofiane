@@ -1084,6 +1084,13 @@ Ne pas promettre que la reward augmentera automatiquement avec le nombre de joue
 
 Cette feature est **GATED / FUTURE**.
 
+Statut R24 : l'architecture locale est prête mais livrée avec `enabled=false` et
+`settlementEnabled=false`. Les allocations de district/achievement sont
+data-driven, idempotentes et bornées par un budget global verrouillé dans
+PostgreSQL. Le pending balance et le point d'entrée interne de settlement sont
+couverts par tests, y compris en concurrence. Aucune route client, transaction
+blockchain ou promesse de payout n'est exposée avant validation du provider.
+
 ---
 
 # PHASE 15 — REMOVE PET SYSTEM
@@ -1137,8 +1144,8 @@ purchase_started
 purchase_complete
 ```
 
-Statut R24 : les 25 événements ci-dessus et 27 événements rétention/social,
-soit 52 événements, sont instrumentés et couverts
+Statut R24 : les 25 événements ci-dessus, 27 événements rétention/social et
+`reward_pool_progress`, soit 53 événements, sont instrumentés et couverts
 par la gate `tools/analytics_check.ps1`. Les batches sont bornés, validés et
 dédupliqués côté serveur par `batchId` lors des retries réseau.
 
@@ -1193,7 +1200,20 @@ Faire audit explicite de :
 Gate reproductible : `tools/security_check.ps1`. La revue R24 a notamment
 corrigé la relecture idempotente sous verrou des claims finaux événement/saison ;
 le retry concurrent season renvoie désormais deux réponses 200 identiques pour
-un seul crédit de reward.
+un seul crédit de reward. Les nonces et le rate limiting sont stockés dans
+PostgreSQL et mis à jour atomiquement : un test HTTP croisé entre deux processus
+valide le challenge A / verify B, le rejet du replay et le quota commun.
+Les refresh JWT utilisent aussi une rotation one-time-use avec `jti` hashé :
+le test HTTP verify → refresh → replay confirme 200 → 200 → 401, puis le nouveau
+refresh tourne à nouveau en 200. `POST /auth/logout` révoque la session courante
+de façon idempotente et le client purge toujours access et refresh localement.
+Le test HTTP confirme logout `200/true`, replay `200/false`, puis refresh `401`.
+La passe overflow relit désormais le solde serveur après claim de set, borne la
+régénération même au-delà de `i32` intervalles et protège streak, niveau et
+progression de mission avant les additions PostgreSQL.
+Le playthrough HTTP à deux joueurs valide Firewall bloquant, Attack sans dégât,
+Raid sans fuite de plateau et débit exact, ainsi que les gains ×4 Shield/Chest/Card.
+Les invariants DB refusent auto-ciblage, statuts incohérents et double owner.
 
 Ne pas over-engineer.
 
@@ -1226,6 +1246,15 @@ L'expérience doit pouvoir être comprise avec très peu de texte.
 ---
 
 # PHASE 20 — CODE QUALITY
+
+Statut R24 : le monolithe `SpinScreen.gd` a été ramené de 1 798 à 1 067 lignes.
+Le rendu du cabinet/reels/particules, la composition Seeker Network, ses actions
+asynchrones et les overlays Attack/Raid vivent maintenant dans quatre composants
+sans logique économique cliente. Le smoke ouvre réellement Network, Attack,
+Raid et le résultat social afin de tester plus que la simple instanciation.
+L'inventaire `tools/workspace_inventory.ps1` confirme aussi que les quatre
+dossiers racine aux noms anormaux ne contiennent aucun fichier ; `server/target`
+est le seul volume majeur et reste ignoré, sans nettoyage nécessaire au runtime.
 
 Après chaque système significatif :
 

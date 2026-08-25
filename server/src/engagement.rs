@@ -7,6 +7,7 @@ use crate::entitlements;
 use crate::error::ApiError;
 use crate::game;
 use crate::progression;
+use crate::reward_pool;
 use crate::state::AppState;
 use anyhow::anyhow;
 use axum::extract::{Extension, Path, State};
@@ -297,7 +298,10 @@ pub async fn claim_daily(
         return Err(ApiError::AlreadyClaimed);
     }
     let streak = if player.last_daily_claim == Some(today - Duration::days(1)) {
-        player.daily_streak + 1
+        player
+            .daily_streak
+            .checked_add(1)
+            .ok_or_else(|| ApiError::Internal(anyhow!("overflow économique: daily.streak")))?
     } else {
         1
     };
@@ -427,11 +431,12 @@ pub async fn leaderboard(
     .fetch_optional(state.db.pool())
     .await?;
     let (player_points, cohort_id) = player_row.unwrap_or((0, 1));
-    let rows: Vec<(String, i64, i64)> = sqlx::query_as(
-        "SELECT address,points,rank FROM (\
+    let rows: Vec<(String, String, String, i64, i64)> = sqlx::query_as(
+        "SELECT pp.friend_code,pp.display_name,pp.avatar_id,ranked.points,ranked.rank FROM (\
             SELECT address,points,DENSE_RANK() OVER(ORDER BY points DESC) AS rank \
             FROM event_scores WHERE event_id=$1 AND cohort_id=$2\
-         ) ranked ORDER BY rank,address LIMIT $3",
+         ) ranked JOIN player_profiles pp ON pp.address=ranked.address \
+         ORDER BY ranked.rank,pp.friend_code LIMIT $3",
     )
     .bind(&event.event_id)
     .bind(cohort_id)
@@ -454,7 +459,7 @@ pub async fn leaderboard(
     Ok(Json(
         json!({"eventId": event.event_id, "name": event.name, "startsAtMs": event.starts_at_ms, "endsAtMs": event.ends_at_ms,
         "cohortId": cohort_id,
-        "leaders": rows.into_iter().map(|(address,points,rank)| json!({"rank": rank, "address": address, "points": points})).collect::<Vec<_>>(),
+        "leaders": rows.into_iter().map(|(player_id,display_name,avatar_id,points,rank)| json!({"rank": rank, "playerId": player_id, "displayName": display_name, "avatarId": avatar_id, "points": points})).collect::<Vec<_>>(),
         "player": {"rank": rank, "points": player_points, "cohortId": cohort_id}, "serverTimeMs": Utc::now().timestamp_millis()}),
     ))
 }
@@ -730,6 +735,14 @@ pub async fn claim_achievement(
         return Err(ApiError::AlreadyClaimed);
     }
     game::grant_reward_tx(&mut tx, &addr.0, &achievement.reward, &state.config).await?;
+    let reward_pool_allocations = reward_pool::allocate_tx(
+        &mut tx,
+        &addr.0,
+        "achievement_claim",
+        &achievement.achievement_id,
+        &state.config.reward_pool,
+    )
+    .await?;
     let global_progression = progression::refresh_score_tx(&mut tx, &addr.0, &state.config).await?;
     let balances: (i32, i64) =
         sqlx::query_as("SELECT spins,credits FROM player_state WHERE address=$1")
@@ -741,6 +754,7 @@ pub async fn claim_achievement(
         "progress":progress,
         "target":achievement.target,
         "reward":achievement.reward,
+        "rewardPoolAllocations":reward_pool_allocations,
         "spins":balances.0,
         "credits":balances.1,
         "globalProgression":progression::score_json(global_progression, &state.config),

@@ -11,6 +11,10 @@ const SPIN_BG := preload("res://assets/generated/api_gpt/spin_background.png")
 const SLOT_FRAME := preload("res://assets/generated/api_gpt/slot_machine.png")
 const BYTE_MASCOT := preload("res://assets/generated/api_gpt/byte.png")
 const SPIN_BUTTON_ART := preload("res://assets/generated/api_gpt/spin_button.png")
+const SpinVisuals := preload("res://scripts/components/SpinVisuals.gd")
+const SpinNetworkView := preload("res://scripts/components/SpinNetworkView.gd")
+const SpinEncounterView := preload("res://scripts/components/SpinEncounterView.gd")
+const SpinNetworkActions := preload("res://scripts/components/SpinNetworkActions.gd")
 const SYMBOLS := ["credits", "shield", "hack", "vault", "energy", "glitch"]
 
 var _spins_value: Label
@@ -29,8 +33,8 @@ var _no_spins_label: Label
 var _flash: ColorRect
 var _tick_timer: Timer
 var _cabinet_root: Control
-var _cabinet: SlotCabinet
-var _particles: ParticleBurst
+var _cabinet: Control
+var _particles: Control
 var _reels: Array = []
 var _reel_tweens: Array = []
 var _idle_tween: Tween
@@ -58,9 +62,15 @@ var _team_leaderboard: Dictionary = {}
 var _team_results: Array = []
 var _trades_snapshot: Dictionary = {}
 var _network_message := ""
+var _network_view: RefCounted
+var _encounter_view: RefCounted
+var _network_actions: RefCounted
 
 
 func _ready() -> void:
+	_network_view = SpinNetworkView.new(self)
+	_encounter_view = SpinEncounterView.new(self)
+	_network_actions = SpinNetworkActions.new(self)
 	_build()
 	_refresh_hud()
 	_start_idle_animation()
@@ -88,7 +98,7 @@ func _build() -> void:
 	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(bg)
 
-	var atmosphere := AnimatedBackdrop.new()
+	var atmosphere := SpinVisuals.AnimatedBackdrop.new()
 	atmosphere.set_anchors_preset(Control.PRESET_FULL_RECT)
 	atmosphere.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(atmosphere)
@@ -107,7 +117,7 @@ func _build() -> void:
 	_flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_flash)
 
-	_particles = ParticleBurst.new()
+	_particles = SpinVisuals.ParticleBurst.new()
 	_particles.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_particles.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_particles)
@@ -215,7 +225,7 @@ func _build_cabinet() -> void:
 
 	# Le contrôleur conserve l'état d'accentuation des gains, mais le contour
 	# technique R18 reste masqué au profit du véritable décor illustré.
-	_cabinet = SlotCabinet.new()
+	_cabinet = SpinVisuals.SlotCabinet.new()
 	_cabinet.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_cabinet.visible = false
 	_cabinet_root.add_child(_cabinet)
@@ -244,7 +254,7 @@ func _build_cabinet() -> void:
 
 	var reel_x := [116.0, 225.0, 337.0]
 	for i in 3:
-		var reel := SlotReel.new()
+		var reel := SpinVisuals.SlotReel.new()
 		reel.atlas = SYMBOL_ATLAS
 		reel.symbols = SYMBOLS
 		reel.position = Vector2(reel_x[i], 215)
@@ -581,20 +591,20 @@ func _animate_slots(finals: Array[String]) -> void:
 	_tick_timer.start()
 
 	for i in 3:
-		var reel: SlotReel = _reels[i]
+		var reel: Control = _reels[i]
 		reel.start_spin()
 		var duration := 0.24 + i * 0.08 if Preferences.reduced_motion else 0.92 + i * 0.30
 		if i == 2 and _anticipation and not Preferences.reduced_motion:
 			duration += 0.34
-		var travel := SlotReel.CELL_HEIGHT * float(12 + i * 4)
+		var travel := SpinVisuals.SlotReel.CELL_HEIGHT * float(12 + i * 4)
 		var tween := create_tween()
 		if Preferences.reduced_motion:
 			tween.tween_property(reel, "roll_offset", travel, duration) \
 				.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 		else:
-			tween.tween_property(reel, "roll_offset", SlotReel.CELL_HEIGHT * 2.0, 0.14) \
+			tween.tween_property(reel, "roll_offset", SpinVisuals.SlotReel.CELL_HEIGHT * 2.0, 0.14) \
 				.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-			tween.tween_property(reel, "roll_offset", travel - SlotReel.CELL_HEIGHT * 3.0, duration - 0.44) \
+			tween.tween_property(reel, "roll_offset", travel - SpinVisuals.SlotReel.CELL_HEIGHT * 3.0, duration - 0.44) \
 				.set_trans(Tween.TRANS_LINEAR).set_ease(Tween.EASE_IN_OUT)
 			tween.tween_property(reel, "roll_offset", travel, 0.30) \
 				.set_trans(Tween.TRANS_QUINT).set_ease(Tween.EASE_OUT)
@@ -605,7 +615,7 @@ func _animate_slots(finals: Array[String]) -> void:
 func _land_reel(index: int, symbol: String) -> void:
 	if _revealed:
 		return
-	var reel: SlotReel = _reels[index]
+	var reel: Control = _reels[index]
 	reel.land(symbol)
 	reel.pivot_offset = reel.size / 2.0
 	reel.scale = Vector2(1.07, 0.94)
@@ -634,7 +644,7 @@ func _skip_slots() -> void:
 		if tween != null and tween.is_running():
 			tween.kill()
 	for i in 3:
-		var reel: SlotReel = _reels[i]
+		var reel: Control = _reels[i]
 		if reel.spinning:
 			reel.land(_final_symbols[i])
 			Sfx.reel_stop(i)
@@ -907,495 +917,51 @@ func _fetch_network_data() -> void:
 
 
 func _render_network() -> void:
-	_clear_social_overlay()
-	_social_overlay = ColorRect.new()
-	_social_overlay.color = Color(0.015, 0.02, 0.07, 0.97)
-	_social_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_social_overlay.add_to_group("dismiss_on_back")
-	var center := CenterContainer.new()
-	center.set_anchors_preset(Control.PRESET_FULL_RECT)
-	var panel := Ui.panel(Ui.PANEL_HI, Ui.NEON_CYAN)
-	panel.custom_minimum_size = Vector2(0, 0)
-	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	var shell := VBoxContainer.new()
-	shell.add_theme_constant_override("separation", 10)
-	var title_row := HBoxContainer.new()
-	var title := Ui.label("SEEKER NETWORK", 28, Ui.NEON_CYAN)
-	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	title_row.add_child(title)
-	var close := Ui.button("✕", Ui.NEON_MAGENTA, true)
-	close.pressed.connect(_clear_social_overlay)
-	title_row.add_child(close)
-	shell.add_child(title_row)
-	var scroll := ScrollContainer.new()
-	scroll.custom_minimum_size = Vector2(0, 0)
-	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	Ui.style_scroll(scroll, Ui.NEON_CYAN)
-	var content := VBoxContainer.new()
-	content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	content.add_theme_constant_override("separation", 10)
-	_build_network_profile(content)
-	_build_network_search(content)
-	_build_network_requests(content)
-	_build_network_friends(content)
-	_build_network_revenge(content)
-	_build_network_team(content)
-	_build_network_trades(content)
-	_build_network_leaderboard(content)
-	scroll.add_child(content)
-	shell.add_child(scroll)
-	panel.add_child(shell)
-	center.add_child(panel)
-	_social_overlay.add_child(center)
-	add_child(_social_overlay)
-
-
-func _network_section(parent: VBoxContainer, title: String) -> void:
-	var label := Ui.label(title, 17, Ui.GOLD)
-	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-	parent.add_child(label)
-
-
-func _build_network_profile(parent: VBoxContainer) -> void:
-	_network_section(parent, "PROFILE")
-	var profile: Dictionary = Store.state.get("profile", {})
-	var progression: Dictionary = Store.state.get("progression", {})
-	parent.add_child(Ui.label("%s  •  %s" % [str(profile.get("playerId", "NO CODE")), str(progression.get("name", "NETWORK POWER")).to_upper()], 13, Ui.TEXT_DIM))
-	parent.add_child(Ui.label("%s PWR  •  DISTRICT %d" % [Ui.compact(int(progression.get("score", 0))), int(profile.get("districtIndex", 0)) + 1], 19, Ui.TEXT))
-	var edit_row := HBoxContainer.new()
-	var name_edit := LineEdit.new()
-	name_edit.text = str(profile.get("displayName", "Runner"))
-	name_edit.max_length = 24
-	name_edit.custom_minimum_size.y = 52
-	name_edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	edit_row.add_child(name_edit)
-	var save := Ui.button("SAVE", Ui.NEON_CYAN)
-	save.pressed.connect(_network_update_profile.bind(name_edit))
-	edit_row.add_child(save)
-	parent.add_child(edit_row)
-	if _network_message != "":
-		parent.add_child(Ui.label(_network_message, 13, Ui.NEON_MAGENTA))
-
-
-func _build_network_search(parent: VBoxContainer) -> void:
-	_network_section(parent, "FIND A PLAYER")
-	var row := HBoxContainer.new()
-	var query := LineEdit.new()
-	query.placeholder_text = "Friend code or name"
-	query.max_length = 24
-	query.custom_minimum_size.y = 52
-	query.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	row.add_child(query)
-	var search := Ui.button("SEARCH", Ui.NEON_CYAN)
-	search.pressed.connect(_network_search.bind(query))
-	row.add_child(search)
-	parent.add_child(row)
-	for result in _network_results:
-		if typeof(result) != TYPE_DICTIONARY:
-			continue
-		var result_row := HBoxContainer.new()
-		var result_label := Ui.label("%s  •  %s PWR" % [str(result.get("displayName", "Runner")), Ui.compact(int(result.get("score", 0)))], 13, Ui.TEXT)
-		result_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-		result_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		result_row.add_child(result_label)
-		var relationship := str(result.get("relationship", "none"))
-		var action := Ui.button("ADD" if relationship == "none" else relationship.to_upper(), Ui.NEON_MAGENTA, relationship != "none")
-		action.disabled = relationship != "none"
-		if relationship == "none":
-			action.pressed.connect(_network_friend_action.bind("/friends/request", str(result.get("playerId", "")), "friend_request_sent"))
-		result_row.add_child(action)
-		parent.add_child(result_row)
-
-
-func _build_network_requests(parent: VBoxContainer) -> void:
-	var incoming: Array = _network_snapshot.get("incoming", [])
-	if incoming.is_empty():
-		return
-	_network_section(parent, "REQUESTS")
-	for request in incoming:
-		if typeof(request) != TYPE_DICTIONARY:
-			continue
-		var row := HBoxContainer.new()
-		var label := Ui.label(str(request.get("displayName", "Runner")), 13, Ui.TEXT)
-		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-		label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		row.add_child(label)
-		var accept := Ui.button("ACCEPT", Ui.GREEN)
-		accept.pressed.connect(_network_friend_action.bind("/friends/accept", str(request.get("playerId", "")), "friend_request_accepted"))
-		row.add_child(accept)
-		var decline := Ui.button("DECLINE", Ui.NEON_MAGENTA, true)
-		decline.pressed.connect(_network_friend_action.bind("/friends/decline", str(request.get("playerId", "")), "friend_request_declined"))
-		row.add_child(decline)
-		parent.add_child(row)
-
-
-func _build_network_friends(parent: VBoxContainer) -> void:
-	var friends: Array = _network_snapshot.get("friends", [])
-	_network_section(parent, "FRIENDS  •  %d" % friends.size())
-	if friends.is_empty():
-		parent.add_child(Ui.label("Ajoute un joueur avec son code ami.", 13, Ui.TEXT_DIM))
-		return
-	for friend in friends:
-		if typeof(friend) != TYPE_DICTIONARY:
-			continue
-		var row := HBoxContainer.new()
-		var label := Ui.label("%s  •  %s PWR" % [str(friend.get("displayName", "Runner")), Ui.compact(int(friend.get("score", 0)))], 13, Ui.TEXT)
-		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-		label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		row.add_child(label)
-		var target := Ui.button("TARGET", Ui.NEON_MAGENTA)
-		target.pressed.connect(_network_select_target.bind(str(friend.get("playerId", "")), "friend"))
-		row.add_child(target)
-		parent.add_child(row)
-
-
-func _build_network_revenge(parent: VBoxContainer) -> void:
-	var attacks: Array = _network_snapshot.get("recentAttacks", [])
-	if attacks.is_empty():
-		return
-	_network_section(parent, "RECENT SIGNAL JAMS")
-	for attack in attacks.slice(0, mini(5, attacks.size())):
-		if typeof(attack) != TYPE_DICTIONARY:
-			continue
-		var row := HBoxContainer.new()
-		var label := Ui.label("%s  •  %s" % [str(attack.get("displayName", "Runner")), "BLOCKED" if bool(attack.get("blocked", false)) else "JAMMED"], 13, Ui.TEXT)
-		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-		label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		row.add_child(label)
-		var revenge := Ui.button("REVENGE", Ui.NEON_MAGENTA)
-		revenge.disabled = not bool(attack.get("canRevenge", false))
-		revenge.pressed.connect(_network_select_target.bind(str(attack.get("playerId", "")), "revenge"))
-		row.add_child(revenge)
-		parent.add_child(row)
-
-
-func _build_network_team(parent: VBoxContainer) -> void:
-	_network_section(parent, "CREW")
-	var team_rules: Dictionary = Config.social().get("teams", {})
-	var max_members := int(team_rules.get("maxMembers", 50))
-	var create_cost := int(team_rules.get("createCostCredits", 0))
-	var own: Variant = _team_snapshot.get("ownTeam", null)
-	if typeof(own) == TYPE_DICTIONARY:
-		var team: Dictionary = own
-		parent.add_child(Ui.label("%s  •  %s" % [str(team.get("name", "Crew")), str(team.get("teamCode", ""))], 16, Ui.NEON_CYAN))
-		parent.add_child(Ui.label("%d MEMBERS  •  %s PWR" % [team.get("members", []).size(), Ui.compact(int(team.get("score", 0)))], 13, Ui.TEXT_DIM))
-		var is_owner := str(team.get("role", "member")) == "owner"
-		for member in team.get("members", []):
-			if typeof(member) != TYPE_DICTIONARY:
-				continue
-			var member_row := HBoxContainer.new()
-			var role_suffix := "  •  OWNER" if str(member.get("role", "member")) == "owner" else ""
-			var member_label := Ui.label("%s  •  %s PWR%s" % [str(member.get("displayName", "Runner")), Ui.compact(int(member.get("score", 0))), role_suffix], 12, Ui.TEXT)
-			member_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-			member_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			member_row.add_child(member_label)
-			if is_owner and str(member.get("role", "member")) != "owner":
-				var transfer := Ui.button("LEAD", Ui.NEON_CYAN, true)
-				transfer.pressed.connect(_network_team_member_action.bind("/teams/transfer", str(member.get("playerId", "")), "team_owner_transferred"))
-				member_row.add_child(transfer)
-				var kick := Ui.button("KICK", Ui.NEON_MAGENTA, true)
-				kick.pressed.connect(_network_team_member_action.bind("/teams/kick", str(member.get("playerId", "")), "team_member_kicked"))
-				member_row.add_child(kick)
-			parent.add_child(member_row)
-		var leave := Ui.button("DISBAND" if is_owner and team.get("members", []).size() == 1 else "LEAVE CREW", Ui.NEON_MAGENTA, true)
-		leave.disabled = is_owner and team.get("members", []).size() > 1
-		leave.pressed.connect(_network_team_leave)
-		parent.add_child(leave)
-	else:
-		var create_row := HBoxContainer.new()
-		var team_name := LineEdit.new()
-		team_name.placeholder_text = "Crew name (%s CR)" % Ui.compact(create_cost)
-		team_name.max_length = 24
-		team_name.custom_minimum_size.y = 52
-		team_name.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		create_row.add_child(team_name)
-		var create := Ui.button("CREATE", Ui.NEON_CYAN)
-		create.pressed.connect(_network_team_create.bind(team_name))
-		create_row.add_child(create)
-		parent.add_child(create_row)
-		var search_row := HBoxContainer.new()
-		var team_query := LineEdit.new()
-		team_query.placeholder_text = "Crew name or NET-code"
-		team_query.max_length = 24
-		team_query.custom_minimum_size.y = 52
-		team_query.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		search_row.add_child(team_query)
-		var search := Ui.button("FIND", Ui.NEON_CYAN)
-		search.pressed.connect(_network_team_search.bind(team_query))
-		search_row.add_child(search)
-		parent.add_child(search_row)
-		for result in _team_results.slice(0, mini(10, _team_results.size())):
-			if typeof(result) != TYPE_DICTIONARY:
-				continue
-			var result_row := HBoxContainer.new()
-			var result_label := Ui.label("%s  •  %d/%d  •  %s PWR" % [str(result.get("name", "Crew")), int(result.get("memberCount", 0)), max_members, Ui.compact(int(result.get("score", 0)))], 12, Ui.TEXT)
-			result_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-			result_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			result_row.add_child(result_label)
-			var join := Ui.button("JOIN", Ui.GREEN)
-			join.disabled = bool(result.get("full", false))
-			join.pressed.connect(_network_team_join.bind(str(result.get("teamCode", ""))))
-			result_row.add_child(join)
-			parent.add_child(result_row)
-	var team_entries: Array = _team_leaderboard.get("entries", [])
-	if not team_entries.is_empty():
-		parent.add_child(Ui.label("TOP CREWS", 13, Ui.GOLD))
-		for entry in team_entries.slice(0, mini(5, team_entries.size())):
-			if typeof(entry) == TYPE_DICTIONARY:
-				parent.add_child(Ui.label("#%d  %s  •  %s PWR" % [int(entry.get("rank", 0)), str(entry.get("name", "Crew")), Ui.compact(int(entry.get("score", 0)))], 12, Ui.TEXT_DIM))
-
-
-func _build_network_trades(parent: VBoxContainer) -> void:
-	_network_section(parent, "CARD SWAPS")
-	var incoming: Array = _trades_snapshot.get("incoming", [])
-	var outgoing: Array = _trades_snapshot.get("outgoing", [])
-	for trade in incoming:
-		if typeof(trade) != TYPE_DICTIONARY or str(trade.get("status", "")) != "pending":
-			continue
-		var row := VBoxContainer.new()
-		row.add_child(Ui.label("%s OFFERS %s  •  WANTS %s" % [str(trade.get("counterpartyDisplayName", "Runner")), str(trade.get("offeredCardName", "Card")), str(trade.get("requestedCardName", "Card"))], 12, Ui.TEXT))
-		var actions := HBoxContainer.new()
-		var accept := Ui.button("ACCEPT", Ui.GREEN)
-		accept.pressed.connect(_network_trade_action.bind("/trades/accept", str(trade.get("tradeId", "")), "trade_accepted", true))
-		actions.add_child(accept)
-		var decline := Ui.button("DECLINE", Ui.NEON_MAGENTA, true)
-		decline.pressed.connect(_network_trade_action.bind("/trades/decline", str(trade.get("tradeId", "")), "trade_declined", false))
-		actions.add_child(decline)
-		row.add_child(actions)
-		parent.add_child(row)
-	for trade in outgoing:
-		if typeof(trade) != TYPE_DICTIONARY or str(trade.get("status", "")) != "pending":
-			continue
-		var row := HBoxContainer.new()
-		var label := Ui.label("TO %s  •  %s → %s" % [str(trade.get("counterpartyDisplayName", "Runner")), str(trade.get("offeredCardName", "Card")), str(trade.get("requestedCardName", "Card"))], 12, Ui.TEXT)
-		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-		label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		row.add_child(label)
-		var cancel := Ui.button("CANCEL", Ui.NEON_MAGENTA, true)
-		cancel.pressed.connect(_network_trade_action.bind("/trades/cancel", str(trade.get("tradeId", "")), "trade_cancelled", false))
-		row.add_child(cancel)
-		parent.add_child(row)
-	var friends: Array = _network_snapshot.get("friends", [])
-	var rules: Dictionary = _trades_snapshot.get("rules", {})
-	var minimum := int(rules.get("minQuantity", 2))
-	var tradeable: Array = rules.get("tradeableRarities", [])
-	var duplicates: Array = []
-	for owned in Store.state.get("cards", []):
-		if typeof(owned) == TYPE_DICTIONARY and int(owned.get("qty", 0)) >= minimum:
-			for card in Config.cards():
-				if typeof(card) == TYPE_DICTIONARY and str(card.get("cardId", "")) == str(owned.get("cardId", "")) and tradeable.has(str(card.get("rarity", ""))):
-					duplicates.append(card)
-					break
-	if friends.is_empty() or duplicates.is_empty():
-		parent.add_child(Ui.label("Ajoute un ami et garde au moins un doublon échangeable.", 12, Ui.TEXT_DIM))
-		return
-	var friend_menu := OptionButton.new()
-	friend_menu.custom_minimum_size.y = 52
-	for friend in friends:
-		if typeof(friend) == TYPE_DICTIONARY:
-			friend_menu.add_item(str(friend.get("displayName", "Runner")))
-			friend_menu.set_item_metadata(friend_menu.item_count - 1, str(friend.get("playerId", "")))
-	parent.add_child(friend_menu)
-	var offered_menu := OptionButton.new()
-	offered_menu.custom_minimum_size.y = 52
-	for card in duplicates:
-		offered_menu.add_item("GIVE  •  " + str(card.get("name", "Card")))
-		offered_menu.set_item_metadata(offered_menu.item_count - 1, str(card.get("cardId", "")))
-	parent.add_child(offered_menu)
-	var requested_menu := OptionButton.new()
-	requested_menu.custom_minimum_size.y = 52
-	for card in Config.cards():
-		if typeof(card) == TYPE_DICTIONARY and tradeable.has(str(card.get("rarity", ""))):
-			requested_menu.add_item("GET  •  " + str(card.get("name", "Card")))
-			requested_menu.set_item_metadata(requested_menu.item_count - 1, str(card.get("cardId", "")))
-	parent.add_child(requested_menu)
-	var propose := Ui.button("PROPOSE 1-FOR-1 SWAP", Ui.NEON_CYAN)
-	propose.pressed.connect(_network_trade_create.bind(friend_menu, offered_menu, requested_menu))
-	parent.add_child(propose)
-
-
-func _build_network_leaderboard(parent: VBoxContainer) -> void:
-	_network_section(parent, "GLOBAL NETWORK")
-	parent.add_child(Ui.label("YOUR RANK  •  #%d" % int(_network_leaderboard.get("playerRank", 0)), 14, Ui.NEON_CYAN))
-	var entries: Array = _network_leaderboard.get("entries", [])
-	for entry in entries.slice(0, mini(10, entries.size())):
-		if typeof(entry) == TYPE_DICTIONARY:
-			var line := Ui.label("#%d  %s  •  %s PWR" % [int(entry.get("rank", 0)), str(entry.get("displayName", "Runner")), Ui.compact(int(entry.get("score", 0)))], 13, Ui.TEXT_DIM)
-			line.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-			parent.add_child(line)
+	_network_view.render()
 
 
 func _network_team_create(input: LineEdit) -> void:
-	if _social_busy or input.text.strip_edges().length() < 3:
-		return
-	_social_busy = true
-	var rid := Net.request_id()
-	var response := await Net.protected_request("POST", "/teams/create", {"name": input.text, "requestId": rid}, rid)
-	if response.ok and typeof(response.data) == TYPE_DICTIONARY:
-		Events.track("team_created", {"teamCode": response.data.get("teamCode", "")})
-		Store.apply_mutation(response.data)
-	_network_message = "CREW CREATED" if response.ok else "CREW CREATION REFUSED"
-	await _fetch_network_data()
-	_social_busy = false
-	_render_network()
+	await _network_actions.team_create(input)
 
 
 func _network_team_search(input: LineEdit) -> void:
-	if _social_busy:
-		return
-	_social_busy = true
-	var response := await Net.protected_request("GET", "/teams?q=" + input.text.strip_edges().uri_encode())
-	if response.ok and typeof(response.data) == TYPE_DICTIONARY:
-		_team_snapshot = response.data
-		_team_results = response.data.get("results", [])
-		_network_message = ""
-	else:
-		_network_message = "CREW SEARCH FAILED"
-	_social_busy = false
-	_render_network()
+	await _network_actions.team_search(input)
 
 
 func _network_team_join(team_code: String) -> void:
-	if _social_busy:
-		return
-	_social_busy = true
-	var rid := Net.request_id()
-	var response := await Net.protected_request("POST", "/teams/join", {"teamCode": team_code, "requestId": rid}, rid)
-	if response.ok:
-		Events.track("team_joined", {"teamCode": team_code})
-	_network_message = "CREW JOINED" if response.ok else "JOIN REFUSED"
-	await _fetch_network_data()
-	_social_busy = false
-	_render_network()
+	await _network_actions.team_join(team_code)
 
 
 func _network_team_leave() -> void:
-	if _social_busy:
-		return
-	_social_busy = true
-	var rid := Net.request_id()
-	var response := await Net.protected_request("POST", "/teams/leave", {"requestId": rid}, rid)
-	if response.ok:
-		Events.track("team_left", {"teamDeleted": response.data.get("teamDeleted", false) if typeof(response.data) == TYPE_DICTIONARY else false})
-	_network_message = "CREW LEFT" if response.ok else "TRANSFER LEADERSHIP FIRST"
-	await _fetch_network_data()
-	_social_busy = false
-	_render_network()
+	await _network_actions.team_leave()
 
 
 func _network_team_member_action(path: String, player_id: String, event_name: String) -> void:
-	if _social_busy:
-		return
-	_social_busy = true
-	var rid := Net.request_id()
-	var response := await Net.protected_request("POST", path, {"friendCode": player_id, "requestId": rid}, rid)
-	if response.ok:
-		Events.track(event_name, {"playerId": player_id})
-	_network_message = "CREW UPDATED" if response.ok else "CREW ACTION REFUSED"
-	await _fetch_network_data()
-	_social_busy = false
-	_render_network()
+	await _network_actions.team_member_action(path, player_id, event_name)
 
 
 func _network_trade_create(friend_menu: OptionButton, offered_menu: OptionButton, requested_menu: OptionButton) -> void:
-	if _social_busy or friend_menu.item_count == 0 or offered_menu.item_count == 0 or requested_menu.item_count == 0:
-		return
-	var recipient := str(friend_menu.get_item_metadata(friend_menu.selected))
-	var offered := str(offered_menu.get_item_metadata(offered_menu.selected))
-	var requested := str(requested_menu.get_item_metadata(requested_menu.selected))
-	if offered == requested:
-		_network_message = "CHOOSE TWO DIFFERENT CARDS"
-		_render_network()
-		return
-	_social_busy = true
-	var rid := Net.request_id()
-	var response := await Net.protected_request("POST", "/trades/create", {
-		"recipientFriendCode": recipient, "offeredCardId": offered,
-		"requestedCardId": requested, "requestId": rid
-	}, rid)
-	if response.ok:
-		Events.track("trade_created", {"recipientPlayerId": recipient, "offeredCardId": offered, "requestedCardId": requested})
-	_network_message = "SWAP PROPOSED" if response.ok else "DUPLICATE NOT AVAILABLE"
-	await _fetch_network_data()
-	_social_busy = false
-	_render_network()
+	await _network_actions.trade_create(friend_menu, offered_menu, requested_menu)
 
 
 func _network_trade_action(path: String, trade_id: String, event_name: String, sync_state: bool) -> void:
-	if _social_busy:
-		return
-	_social_busy = true
-	var rid := Net.request_id()
-	var response := await Net.protected_request("POST", path, {"tradeId": trade_id, "requestId": rid}, rid)
-	if response.ok:
-		Events.track(event_name, {"tradeId": trade_id})
-		if sync_state:
-			var state_response := await Net.protected_request("GET", "/state")
-			if state_response.ok and typeof(state_response.data) == TYPE_DICTIONARY:
-				Store.apply_state(state_response.data)
-	_network_message = "SWAP UPDATED" if response.ok else "SWAP NO LONGER AVAILABLE"
-	await _fetch_network_data()
-	_social_busy = false
-	_render_network()
+	await _network_actions.trade_action(path, trade_id, event_name, sync_state)
 
 
 func _network_search(query: LineEdit) -> void:
-	if _social_busy or query.text.strip_edges().length() < 2:
-		return
-	_social_busy = true
-	var response := await Net.protected_request("GET", "/players/search?q=" + query.text.strip_edges().uri_encode())
-	_network_results = response.data.get("results", []) if response.ok and typeof(response.data) == TYPE_DICTIONARY else []
-	_network_message = "" if response.ok else "SEARCH FAILED"
-	_social_busy = false
-	_render_network()
+	await _network_actions.search(query)
 
 
 func _network_update_profile(input: LineEdit) -> void:
-	if _social_busy:
-		return
-	_social_busy = true
-	var rid := Net.request_id()
-	var response := await Net.protected_request("POST", "/profile", {"displayName": input.text, "requestId": rid}, rid)
-	if response.ok:
-		Events.track("profile_updated")
-		var state_response := await Net.protected_request("GET", "/state")
-		if state_response.ok and typeof(state_response.data) == TYPE_DICTIONARY:
-			Store.apply_state(state_response.data)
-	_network_message = "PROFILE UPDATED" if response.ok else "INVALID PROFILE NAME"
-	await _fetch_network_data()
-	_social_busy = false
-	_render_network()
+	await _network_actions.update_profile(input)
 
 
 func _network_friend_action(path: String, player_id: String, event_name: String) -> void:
-	if _social_busy:
-		return
-	_social_busy = true
-	var rid := Net.request_id()
-	var response := await Net.protected_request("POST", path, {"friendCode": player_id, "requestId": rid}, rid)
-	if response.ok:
-		Events.track(event_name, {"playerId": player_id})
-	_network_message = "NETWORK UPDATED" if response.ok else "ACTION REFUSED"
-	_network_results.clear()
-	await _fetch_network_data()
-	_social_busy = false
-	_render_network()
+	await _network_actions.friend_action(path, player_id, event_name)
 
 
 func _network_select_target(player_id: String, source: String) -> void:
-	if _social_busy:
-		return
-	_social_busy = true
-	var rid := Net.request_id()
-	var response := await Net.protected_request("POST", "/social/target", {"friendCode": player_id, "source": source, "requestId": rid}, rid)
-	if response.ok:
-		Events.track("social_target_selected", {"playerId": player_id, "source": source})
-	_network_message = "TARGET ARMED FOR NEXT SIGNAL JAM" if response.ok else "TARGET NOT AVAILABLE"
-	await _fetch_network_data()
-	_social_busy = false
-	_render_network()
+	await _network_actions.select_target(player_id, source)
 
 
 func _clear_social_overlay() -> void:
@@ -1406,61 +972,17 @@ func _clear_social_overlay() -> void:
 
 
 func _show_social_encounter(encounter: Dictionary, banner: String = "") -> void:
-	_clear_social_overlay()
-	_social_busy = false
-	_social_overlay = ColorRect.new()
-	_social_overlay.color = Color(0.015, 0.02, 0.07, 0.97)
-	_social_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_social_overlay.add_to_group("dismiss_on_back")
-	var center := CenterContainer.new()
-	center.set_anchors_preset(Control.PRESET_FULL_RECT)
-	var panel := Ui.panel(Ui.PANEL_HI, Ui.NEON_MAGENTA)
-	panel.custom_minimum_size = Vector2(0, 0)
-	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 12)
 	var kind := str(encounter.get("kind", ""))
 	var encounter_id := str(encounter.get("encounterId", ""))
-	box.add_child(Ui.label("SIGNAL JAM" if kind == "attack" else "GHOST VAULT", 31, Ui.NEON_MAGENTA if kind == "attack" else Ui.GOLD))
-	box.add_child(Ui.label("TARGET  •  " + str(encounter.get("target", "NEON CORP")), 14, Ui.TEXT_DIM))
-	if banner != "":
-		box.add_child(Ui.label(banner, 18, Ui.NEON_CYAN))
 	if kind == "attack":
-		box.add_child(Ui.label("Choisis le nœud à brouiller. Un Firewall adverse peut absorber l'impulsion.", 14, Ui.TEXT))
-		var choices: Array = encounter.get("choices", [])
-		for element_id in choices:
-			var attack := Ui.button("JAM NODE %d" % int(element_id), Ui.NEON_MAGENTA)
-			attack.pressed.connect(_resolve_attack.bind(encounter, int(element_id), box))
-			box.add_child(attack)
 		if not _tracked_social_starts.has(encounter_id):
 			_tracked_social_starts[encounter_id] = true
 			Events.track("attack_started", {"encounterId": encounter_id, "multiplier": encounter.get("multiplier", 1), "corporate": encounter.get("corporate", false)})
-	else:
-		var unbanked := int(encounter.get("unbankedCredits", 0))
-		box.add_child(Ui.label("UNBANKED  •  %s CR" % Ui.compact(unbanked), 19, Ui.GOLD))
-		box.add_child(Ui.label("Chaque cache augmente le butin. Une TRACE détruit tout le non-encaissé.", 14, Ui.TEXT))
-		var grid := GridContainer.new()
-		grid.columns = 3
-		var picked: Array = encounter.get("picked", [])
-		for node_index in int(encounter.get("nodeCount", 6)):
-			var node := Ui.button("NODE %d" % (node_index + 1), Ui.NEON_CYAN, true)
-			node.disabled = picked.has(node_index)
-			node.pressed.connect(_raid_pick.bind(encounter, node_index))
-			grid.add_child(node)
-		box.add_child(grid)
-		if bool(encounter.get("canCashout", false)):
-			var cashout := Ui.button("CASH OUT  %s CR" % Ui.compact(unbanked), Ui.GOLD)
-			cashout.pressed.connect(_raid_cashout.bind(encounter, box))
-			box.add_child(cashout)
+	elif kind == "raid":
 		if not _tracked_social_starts.has(encounter_id):
 			_tracked_social_starts[encounter_id] = true
 			Events.track("raid_started", {"encounterId": encounter_id, "multiplier": encounter.get("multiplier", 1), "corporate": encounter.get("corporate", false)})
-	var later := Ui.button("REVENIR PLUS TARD", Ui.TEXT_DIM, true)
-	later.pressed.connect(_clear_social_overlay)
-	box.add_child(later)
-	panel.add_child(box)
-	center.add_child(panel)
-	_social_overlay.add_child(center)
-	add_child(_social_overlay)
+	_encounter_view.show_encounter(encounter, banner)
 
 
 func _resolve_attack(encounter: Dictionary, element_id: int, box: VBoxContainer) -> void:
@@ -1536,263 +1058,10 @@ func _raid_cashout(encounter: Dictionary, box: VBoxContainer) -> void:
 
 
 func _show_social_result(message: String, failed: bool) -> void:
-	_clear_social_overlay()
-	_social_busy = false
-	_social_overlay = ColorRect.new()
-	_social_overlay.color = Color(0.015, 0.02, 0.07, 0.97)
-	_social_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_social_overlay.add_to_group("dismiss_on_back")
-	var center := CenterContainer.new()
-	center.set_anchors_preset(Control.PRESET_FULL_RECT)
-	var box := VBoxContainer.new()
-	box.custom_minimum_size.x = 0
-	box.add_theme_constant_override("separation", 16)
-	box.add_child(Ui.label(message, 25, Ui.NEON_MAGENTA if failed else Ui.GOLD))
-	var close := Ui.button("CONTINUE", Ui.NEON_CYAN)
-	close.pressed.connect(_clear_social_overlay)
-	box.add_child(close)
-	center.add_child(box)
-	_social_overlay.add_child(center)
-	add_child(_social_overlay)
+	_encounter_view.show_result(message, failed)
 
 
 func _sync_social_state() -> void:
 	var state_response := await Net.protected_request("GET", "/state")
 	if state_response.ok and typeof(state_response.data) == TYPE_DICTIONARY:
 		Store.apply_state(state_response.data)
-
-
-class SlotCabinet extends Control:
-	var accent := Ui.NEON_CYAN
-	var win_mode := false
-	var _time := 0.0
-
-	func _ready() -> void:
-		set_process(true)
-
-	func set_mode(color: Color, winning: bool) -> void:
-		accent = color
-		win_mode = winning
-		queue_redraw()
-
-	func _process(delta: float) -> void:
-		if Preferences.reduced_motion:
-			return
-		_time += delta
-		queue_redraw()
-
-	func _box(color: Color, border: Color, radius: int, width: int) -> StyleBoxFlat:
-		return Ui.style_box(color, border, radius, width)
-
-	func _draw() -> void:
-		var breathe := 0.60 + sin(_time * (4.0 if win_mode else 1.8)) * 0.18
-		var outer := _box(Color("#080D1D"), Color(accent, breathe), 34, 4)
-		outer.shadow_color = Color(accent, 0.35 + breathe * 0.20)
-		outer.shadow_size = 24 if not win_mode else 34
-		draw_style_box(outer, Rect2(4, 4, size.x - 8, size.y - 8))
-
-		draw_style_box(
-			_box(Color("#151E3D"), Color(accent, 0.88), 22, 2),
-			Rect2(30, 22, size.x - 60, 58)
-		)
-		draw_style_box(
-			_box(Color("#050712"), Color("#35446E"), 26, 2),
-			Rect2(24, 96, size.x - 48, 342)
-		)
-
-		draw_rect(Rect2(30, 265, size.x - 60, 3), Color(accent, 0.92))
-		draw_line(Vector2(30, 266), Vector2(size.x - 30, 266), Color(accent, 0.9), 3.0)
-
-		for i in 7:
-			var energy := 0.16 + 0.10 * sin(_time * 3.0 + i)
-			draw_rect(Rect2(18 + i * 72, 92, 34, 3), Color(accent, energy))
-
-		var corner := 18.0
-		var corners := [
-			Vector2(18, 18), Vector2(size.x - 18, 18),
-			Vector2(18, size.y - 18), Vector2(size.x - 18, size.y - 18),
-		]
-		for point in corners:
-			draw_circle(point, 4.0 + sin(_time * 2.0) * 1.2, Color(accent, 0.85))
-			draw_arc(point, corner, 0, TAU, 20, Color(accent, 0.20), 2.0)
-
-
-class SlotReel extends Control:
-	const CELL_HEIGHT := 58.0
-
-	var atlas: Texture2D
-	var symbols: Array = []
-	var reel_index := 0
-	var spinning := false
-	var final_symbol := "credits"
-	var roll_offset := 0.0:
-		set(value):
-			roll_offset = value
-			queue_redraw()
-	var tick_flash := 0.0
-	var _time := 0.0
-
-	func _ready() -> void:
-		set_process(true)
-
-	func start_spin() -> void:
-		spinning = true
-		roll_offset = 0.0
-		queue_redraw()
-
-	func land(symbol: String) -> void:
-		spinning = false
-		final_symbol = symbol
-		roll_offset = 0.0
-		tick_flash = 1.0
-		queue_redraw()
-
-	func _process(delta: float) -> void:
-		if not Preferences.reduced_motion or spinning:
-			_time += delta
-		tick_flash = maxf(0.0, tick_flash - delta * 6.0)
-		if not Preferences.reduced_motion or spinning or tick_flash > 0.0:
-			queue_redraw()
-
-	func _draw() -> void:
-		var panel := StyleBoxFlat.new()
-		panel.bg_color = Color(1, 1, 1, 0.015)
-		panel.set_corner_radius_all(8)
-		draw_style_box(panel, Rect2(0, 0, size.x, size.y))
-
-		var row_height := (size.y - 16.0) / 3.0
-		for row in 3:
-			var cell := StyleBoxFlat.new()
-			cell.bg_color = Color("#FFFDF4", 0.105) if row == 1 else Color("#FFFDF4", 0.065)
-			cell.border_color = Color(Ui.GOLD, 0.32)
-			cell.set_border_width_all(1)
-			cell.set_corner_radius_all(7)
-			draw_style_box(
-				cell,
-				Rect2(4, 5 + row * row_height, size.x - 8, row_height - 2)
-			)
-
-		if spinning:
-			_draw_scrolling()
-		else:
-			_draw_resting()
-
-		var center_y := size.y / 2.0
-		draw_rect(Rect2(4, center_y - 34, size.x - 8, 68), Color(Ui.GOLD, 0.045 + tick_flash * 0.09))
-		var center_box := StyleBoxFlat.new()
-		center_box.bg_color = Color(1, 1, 1, 0.018)
-		center_box.border_color = Color("#FFB82E", 0.90)
-		center_box.set_border_width_all(2)
-		center_box.set_corner_radius_all(8)
-		draw_style_box(
-			center_box,
-			Rect2(4, center_y - 34, size.x - 8, 68)
-		)
-
-	func _draw_resting() -> void:
-		var index := symbols.find(final_symbol)
-		if index < 0:
-			index = 0
-		var top: String = symbols[posmod(index - 1, symbols.size())]
-		var bottom: String = symbols[posmod(index + 1, symbols.size())]
-		var bob := sin(_time * 1.7 + reel_index) * (1.8 if not Preferences.reduced_motion else 0.0)
-		var center_y := size.y / 2.0
-		_draw_symbol(top, Rect2(14, center_y - CELL_HEIGHT - 23 + bob, size.x - 28, 46), Color(1, 1, 1, 0.76))
-		_draw_symbol(final_symbol, Rect2(9, center_y - 32 + bob, size.x - 18, 64), Color.WHITE)
-		_draw_symbol(bottom, Rect2(14, center_y + CELL_HEIGHT - 23 + bob, size.x - 28, 46), Color(1, 1, 1, 0.76))
-
-	func _draw_scrolling() -> void:
-		var phase := roll_offset / CELL_HEIGHT
-		var base := floori(phase)
-		var fraction := phase - float(base)
-		for slot in range(-2, 4):
-			var symbol: String = symbols[posmod(base + slot + reel_index, symbols.size())]
-			var y := size.y / 2.0 - 32.0 + (float(slot) - fraction) * CELL_HEIGHT
-			var alpha := 1.0 if y > 26 and y < size.y - 58 else 0.45
-			_draw_symbol(symbol, Rect2(9, y, size.x - 18, 64), Color(1, 1, 1, alpha))
-		for streak in 5:
-			var streak_y := 18.0 + streak * 32.0 + fmod(roll_offset * 0.42, 16.0)
-			draw_rect(Rect2(14, streak_y, size.x - 28, 3), Color(Ui.GOLD, 0.14 + streak % 2 * 0.10))
-
-	func _draw_symbol(symbol: String, destination: Rect2, tint: Color) -> void:
-		if atlas == null or symbols.is_empty():
-			return
-		var index := symbols.find(symbol)
-		if index < 0:
-			index = 0
-		var column := index % 3
-		var row := index / 3
-		var cell_width := float(atlas.get_width()) / 3.0
-		var cell_height := float(atlas.get_height()) / 2.0
-		var source := Rect2(column * cell_width, row * cell_height, cell_width, cell_height)
-		draw_texture_rect_region(atlas, destination, source, tint, false, true)
-
-
-class AnimatedBackdrop extends Control:
-	var _time := 0.0
-
-	func _ready() -> void:
-		set_process(true)
-
-	func _process(delta: float) -> void:
-		if Preferences.reduced_motion:
-			return
-		_time += delta
-		queue_redraw()
-
-	func _draw() -> void:
-		for i in 16:
-			var px := fmod(float(i * 97) + _time * (7.0 + i % 4), 570.0) - 15.0
-			var py := fmod(float(i * 67) + sin(_time * 0.7 + i) * 22.0, 990.0)
-			var glow := Color.WHITE if i % 3 else Ui.NEON_MAGENTA
-			draw_circle(Vector2(px, py), 1.6 + i % 3, Color(glow, 0.18))
-		for i in 5:
-			var x := 40.0 + i * 122.0 + sin(_time * 0.45 + i) * 16.0
-			var y := 170.0 + i * 178.0 + cos(_time * 0.38 + i) * 14.0
-			draw_arc(Vector2(x, y), 18.0 + i * 3.0, 0, TAU, 24, Color(Ui.NEON_CYAN, 0.12), 2.0)
-
-
-class ParticleBurst extends Control:
-	var _particles: Array = []
-
-	func emit_burst(origin: Vector2, color: Color, count: int) -> void:
-		_particles.clear()
-		for i in count:
-			var angle := randf_range(-PI, 0.0)
-			if i % 3 == 0:
-				angle = randf_range(0.0, TAU)
-			var speed := randf_range(85.0, 360.0)
-			_particles.append({
-				"position": origin + Vector2(randf_range(-35, 35), randf_range(-25, 25)),
-				"velocity": Vector2(cos(angle), sin(angle)) * speed,
-				"life": randf_range(0.55, 1.25),
-				"max_life": 1.25,
-				"size": randf_range(2.5, 8.0),
-				"color": color.lerp(Ui.NEON_MAGENTA if i % 2 else Ui.GOLD, randf_range(0.0, 0.45)),
-			})
-		set_process(true)
-		queue_redraw()
-
-	func _process(delta: float) -> void:
-		for particle in _particles:
-			particle.position += particle.velocity * delta
-			particle.velocity.y += 420.0 * delta
-			particle.velocity *= 0.985
-			particle.life -= delta
-		_particles = _particles.filter(func(particle: Dictionary) -> bool: return particle.life > 0.0)
-		if _particles.is_empty():
-			set_process(false)
-		queue_redraw()
-
-	func _draw() -> void:
-		for particle in _particles:
-			var alpha := clampf(particle.life / particle.max_life, 0.0, 1.0)
-			var color: Color = particle.color
-			color.a = alpha
-			draw_circle(particle.position, particle.size * alpha, color)
-			draw_line(
-				particle.position,
-				particle.position - particle.velocity.normalized() * particle.size * 2.2,
-				Color(color, alpha * 0.55),
-				maxf(1.0, particle.size * 0.30)
-			)

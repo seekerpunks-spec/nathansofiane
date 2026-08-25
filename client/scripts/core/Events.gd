@@ -14,6 +14,7 @@ var _timer: Timer
 var _flushing: bool = false
 var _active_batch_id := ""
 var _active_batch_size := 0
+var _session_generation := 0
 
 func _ready() -> void:
 	_timer = Timer.new()
@@ -39,17 +40,29 @@ func _flush() -> void:
 	if not Net.has_token():
 		return
 	_flushing = true
+	var generation := _session_generation
 	if _active_batch_id == "":
 		_active_batch_id = Net.request_id()
 		_active_batch_size = min(_buffer.size(), 100)
 	var batch := _buffer.slice(0, _active_batch_size)
-	var r := await Net.post("/analytics", { "batchId": _active_batch_id, "events": batch }, true, _active_batch_id)
+	var r := await Net.protected_request("POST", "/analytics", { "batchId": _active_batch_id, "events": batch }, _active_batch_id)
+	if generation != _session_generation:
+		_flushing = false
+		return
 	if r.ok:
 		_buffer = _buffer.slice(batch.size())
 		_active_batch_id = ""
 		_active_batch_size = 0
 	_flushing = false
 	# Sinon : on garde le buffer (re-queue), nouvel essai au prochain flush.
+
+## Une session expirée ne doit jamais transmettre son buffer sous l'identité du
+## prochain joueur connecté sur l'appareil.
+func reset_session() -> void:
+	_session_generation += 1
+	_buffer.clear()
+	_active_batch_id = ""
+	_active_batch_size = 0
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_CLOSE_REQUEST:
