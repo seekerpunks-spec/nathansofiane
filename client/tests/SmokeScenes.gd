@@ -1,5 +1,11 @@
 extends Node
 ## Smoke test sans réseau : instancie chaque scène avec un état représentatif.
+##
+## Durci en R26 : `assert()` n'interrompt PAS l'exécution en headless (le run
+## continuait, imprimait SMOKE_SCENES_OK et sortait en 0 malgré un échec) et
+## disparaît des builds release. Chaque vérification passe donc par `_check`,
+## qui compte les échecs, et le harnais sort en quit(1) si au moins une
+## vérification a échoué. SMOKE_SCENES_OK n'est imprimé qu'à zéro échec.
 
 const SCENES := [
 	"res://scenes/screens/OnboardingScreen.tscn",
@@ -10,8 +16,19 @@ const SCENES := [
 	"res://scenes/screens/StoreScreen.tscn",
 ]
 
+var _failures: int = 0
+
 func _ready() -> void:
 	call_deferred("_run")
+
+## Remplace assert() : signale, compte, et laisse le run aller au bout pour
+## rapporter TOUS les échecs d'un coup au lieu du premier seulement.
+func _check(condition: bool, message: String) -> bool:
+	if not condition:
+		_failures += 1
+		print("SMOKE_CHECK_FAILED: ", message)
+		push_error("SMOKE_CHECK_FAILED: " + message)
+	return condition
 
 func _json(relative: String) -> Variant:
 	var path := ProjectSettings.globalize_path("res://../config/" + relative)
@@ -69,12 +86,12 @@ func _run() -> void:
 	})
 	for path in SCENES:
 		var packed: PackedScene = load(path)
-		assert(packed != null, "Scène introuvable: " + path)
+		if not _check(packed != null, "Scène introuvable: " + path):
+			continue
 		var instance := packed.instantiate()
-		if instance.get_script() == null:
-			push_error("Script non chargé: " + path)
-			get_tree().quit(1)
-			return
+		if not _check(instance.get_script() != null, "Script non chargé: " + path):
+			instance.queue_free()
+			continue
 		add_child(instance)
 		await get_tree().process_frame
 		if path.ends_with("DistrictScreen.tscn"):
@@ -84,18 +101,22 @@ func _run() -> void:
 		if path.ends_with("SpinScreen.tscn"):
 			instance._render_network()
 			await get_tree().process_frame
-			assert(is_instance_valid(instance._social_overlay), "Modale Seeker Network absente")
+			_check(is_instance_valid(instance._social_overlay), "Modale Seeker Network absente")
 			instance._clear_social_overlay()
 			instance._show_social_encounter({"kind":"attack","encounterId":"smoke-attack","target":"Runner","choices":[1,2],"multiplier":4})
 			await get_tree().process_frame
-			assert(is_instance_valid(instance._social_overlay), "Modale Attack absente")
+			_check(is_instance_valid(instance._social_overlay), "Modale Attack absente")
 			instance._show_social_encounter({"kind":"raid","encounterId":"smoke-raid","target":"Vault","nodeCount":6,"picked":[0],"unbankedCredits":1000,"canCashout":true})
 			await get_tree().process_frame
-			assert(is_instance_valid(instance._social_overlay), "Modale Raid absente")
+			_check(is_instance_valid(instance._social_overlay), "Modale Raid absente")
 			instance._show_social_result("SMOKE RESULT", false)
 			instance._clear_social_overlay()
 		instance.queue_free()
 		await get_tree().process_frame
+	if _failures > 0:
+		print("SMOKE_SCENES_FAILED: ", _failures)
+		get_tree().quit(1)
+		return
 	print("SMOKE_SCENES_OK: ", SCENES.size())
 	get_tree().quit(0)
 
@@ -104,7 +125,8 @@ func _run() -> void:
 ## sans que rien ne le signale.
 func _check_collection_screen(instance: Node) -> void:
 	var sets := Config.sets()
-	assert(not sets.is_empty(), "aucun set dans la config")
+	if not _check(not sets.is_empty(), "aucun set dans la config"):
+		return
 	var saw_legacy := false
 	var saw_object := false
 	var saw_lock := false
@@ -112,11 +134,11 @@ func _check_collection_screen(instance: Node) -> void:
 		if typeof(set_data) != TYPE_DICTIONARY:
 			continue
 		var reward: Dictionary = instance._set_reward(set_data)
-		assert(
+		_check(
 			int(reward.get("spins", 0)) > 0 or int(reward.get("credits", 0)) > 0,
 			"récompense de set nulle: " + str(set_data.get("setId", ""))
 		)
-		assert(
+		_check(
 			instance._reward_label(reward).contains("RÉCLAMER"),
 			"libellé de récompense vide: " + str(set_data.get("setId", ""))
 		)
@@ -128,18 +150,18 @@ func _check_collection_screen(instance: Node) -> void:
 			saw_lock = true
 		# Un thème inconnu doit rester lisible plutôt que transparent.
 		var color: Color = instance._theme_color(str(set_data.get("visualTheme", "")))
-		assert(color.a > 0.0, "thème de set sans couleur")
-	assert(saw_object, "aucun set en completionReward")
-	assert(saw_legacy, "aucun set en completionSpins, compatibilité non couverte")
-	assert(saw_lock, "aucun set verrouillé, prérequis non couvert")
+		_check(color.a > 0.0, "thème de set sans couleur")
+	_check(saw_object, "aucun set en completionReward")
+	_check(saw_legacy, "aucun set en completionSpins, compatibilité non couverte")
+	_check(saw_lock, "aucun set verrouillé, prérequis non couvert")
 
 	var chests := Config.chests()
-	assert(chests.size() == 4, "quatre paliers de coffres attendus")
+	_check(chests.size() == 4, "quatre paliers de coffres attendus")
 	for chest in chests:
 		if typeof(chest) != TYPE_DICTIONARY:
 			continue
 		var art := str(chest.get("image", ""))
-		assert(
+		_check(
 			art != "" and ResourceLoader.exists(art),
 			"art de coffre introuvable: " + art
 		)
@@ -148,10 +170,11 @@ func _check_collection_screen(instance: Node) -> void:
 ## orthographié tomberait sinon sur le repli sans que rien ne le signale.
 func _check_district_screen(instance: Node) -> void:
 	var districts := Config.districts()
-	assert(districts.size() >= 2, "au moins deux districts attendus dans la config")
+	if not _check(districts.size() >= 2, "au moins deux districts attendus dans la config"):
+		return
 	for district in districts:
 		var background := str(district.get("background", ""))
-		assert(
+		_check(
 			instance._asset_texture(background) != null,
 			"Fond de district introuvable: " + background
 		)
@@ -163,8 +186,8 @@ func _check_district_screen(instance: Node) -> void:
 	instance._apply_background()
 	instance._rebuild_hero()
 	await get_tree().process_frame
-	assert(instance._background.texture == expected, "Le décor ne suit pas le district actif")
-	assert(instance._hero_holder.get_child_count() == 1, "Carte héros non reconstruite")
+	_check(instance._background.texture == expected, "Le décor ne suit pas le district actif")
+	_check(instance._hero_holder.get_child_count() == 1, "Carte héros non reconstruite")
 
 	# Les silhouettes procédurales doivent couvrir n'importe quel identifiant
 	# d'élément, pas seulement les cinq premiers. On passe par le rendu réel
@@ -187,7 +210,7 @@ func _check_district_screen(instance: Node) -> void:
 	Store.state["districtIndex"] = districts.size()
 	instance._refresh()
 	await get_tree().process_frame
-	assert(
+	_check(
 		instance._list.get_child_count() == probe["elements"].size(),
 		"Éléments au-delà de cinq non rendus"
 	)

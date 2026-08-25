@@ -64,8 +64,8 @@ if ($LASTEXITCODE -ne 0 -or $importLog -match "SCRIPT ERROR|Parse Error|Failed t
 foreach ($resolution in @("360x800", "540x1170", "720x1280")) {
     $smokeLog = (& $GodotPath --headless --resolution $resolution --path $client "res://tests/SmokeScenes.tscn" 2>&1 | Out-String)
     Write-Host $smokeLog
-    if ($LASTEXITCODE -ne 0 -or $smokeLog -match "SCRIPT ERROR|Parse Error|Failed to load script" -or $smokeLog -notmatch "SMOKE_SCENES_OK") {
-        throw "Smoke test Godot échoué à la résolution $resolution"
+    if ($LASTEXITCODE -ne 0 -or $smokeLog -match "SCRIPT ERROR|Parse Error|Failed to load script|SMOKE_SCENES_FAILED|SMOKE_CHECK_FAILED" -or $smokeLog -notmatch "SMOKE_SCENES_OK") {
+        throw "Smoke test Godot echoue a la resolution $resolution"
     }
 }
 
