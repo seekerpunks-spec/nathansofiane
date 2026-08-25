@@ -366,14 +366,14 @@ mod tests {
 
     #[tokio::test]
     async fn postgres_reward_preserves_unpersisted_regen() -> anyhow::Result<()> {
-        let Ok(database_url) = std::env::var("CYBERSEEKER_TEST_DATABASE_URL") else {
+        let Some(db) = crate::testdb::connect("postgres_reward_preserves_unpersisted_regen").await
+        else {
             return Ok(());
         };
         let config = crate::config::RemoteConfig::load(
             &std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../config"),
         )?;
-        let pool = sqlx::PgPool::connect(&database_url).await?;
-        let mut tx = pool.begin().await?;
+        let mut tx = db.begin().await?;
         let address = format!("qa-regen-{}", uuid::Uuid::new_v4());
         let interval = i64::try_from(config.economy.spin_regen_ms)?;
         let last = Utc::now() - chrono::Duration::milliseconds(interval * 2 + 1_000);

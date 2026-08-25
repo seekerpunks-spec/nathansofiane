@@ -322,10 +322,11 @@ mod tests {
 
     #[tokio::test]
     async fn postgres_nonce_is_shared_single_use_and_expires() -> anyhow::Result<()> {
-        let Ok(database_url) = std::env::var("CYBERSEEKER_TEST_DATABASE_URL") else {
+        let Some(db) =
+            crate::testdb::connect("postgres_nonce_is_shared_single_use_and_expires").await
+        else {
             return Ok(());
         };
-        let db = super::Db::connect(&database_url).await?;
         let address = format!("nonce-test-{}", uuid::Uuid::new_v4());
         let nonce = "a".repeat(64);
         db.store_auth_nonce(&address, &nonce, Utc::now() + Duration::minutes(1))
@@ -361,10 +362,11 @@ mod tests {
 
     #[tokio::test]
     async fn postgres_refresh_rotation_has_one_concurrent_winner() -> anyhow::Result<()> {
-        let Ok(database_url) = std::env::var("CYBERSEEKER_TEST_DATABASE_URL") else {
+        let Some(db) =
+            crate::testdb::connect("postgres_refresh_rotation_has_one_concurrent_winner").await
+        else {
             return Ok(());
         };
-        let db = super::Db::connect(&database_url).await?;
         let address = format!("refresh-test-{}", uuid::Uuid::new_v4());
         db.ensure_player(&address, 1).await?;
         let old = uuid::Uuid::new_v4().simple().to_string().repeat(2);
@@ -429,10 +431,11 @@ mod tests {
 
     #[tokio::test]
     async fn postgres_rejects_self_target_and_two_team_owners() -> anyhow::Result<()> {
-        let Ok(database_url) = std::env::var("CYBERSEEKER_TEST_DATABASE_URL") else {
+        let Some(db) =
+            crate::testdb::connect("postgres_rejects_self_target_and_two_team_owners").await
+        else {
             return Ok(());
         };
-        let db = super::Db::connect(&database_url).await?;
         let first = format!("invariant-a-{}", uuid::Uuid::new_v4());
         let second = format!("invariant-b-{}", uuid::Uuid::new_v4());
         db.ensure_player(&first, 1).await?;

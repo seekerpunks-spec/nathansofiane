@@ -30,6 +30,8 @@ mod social;
 mod spin;
 mod state;
 mod teams;
+#[cfg(test)]
+mod testdb;
 mod trading;
 
 use crate::error::ApiError;

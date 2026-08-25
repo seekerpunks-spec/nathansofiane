@@ -2,6 +2,7 @@ param(
     [string]$GodotPath = "",
     [string]$ApiBaseUrl = "",
     [string]$ApiDevAddress = "dev-player-0001",
+    [string]$TestDatabaseUrl = "postgres://postgres:postgres@localhost:5432/cyberseeker_test",
     [switch]$BuildAndroid
 )
 
@@ -22,8 +23,26 @@ Push-Location (Join-Path $workspace "server")
 try {
     & $cargo fmt --all -- --check
     if ($LASTEXITCODE -ne 0) { throw "cargo fmt a échoué" }
-    & $cargo test
-    if ($LASTEXITCODE -ne 0) { throw "cargo test a échoué" }
+    # Tests DB fail-closed : sans base de test les tests Postgres paniquent au
+    # lieu de passer au vert en silence (bug corrige en R26). La gate prouve en
+    # plus que chaque test DB s'est execute en comptant les marqueurs emis.
+    $env:CYBERSEEKER_TEST_DATABASE_URL = $TestDatabaseUrl
+    Remove-Item Env:\CYBERSEEKER_ALLOW_DB_TEST_SKIP -ErrorAction SilentlyContinue
+    # EAP=Stop transforme le stderr anodin de cargo (Compiling/Finished) en
+    # erreur fatale des qu'on redirige 2>&1 : on detend le temps de la capture.
+    $ErrorActionPreference = "Continue"
+    $testLog = (& $cargo test -- --nocapture 2>&1 | Out-String)
+    $ErrorActionPreference = "Stop"
+    Write-Host $testLog
+    if ($LASTEXITCODE -ne 0) { throw "cargo test a echoue" }
+    $expectedDbTests = (Select-String -Path (Join-Path $workspace "server\src\*.rs") `
+        -Pattern "testdb::connect\(" -AllMatches | ForEach-Object { $_.Matches.Count } | Measure-Object -Sum).Sum
+    if (-not $expectedDbTests -or $expectedDbTests -lt 1) { throw "aucun appel au helper de test DB dans les sources - gate invalide" }
+    $ranDbTests = ([regex]::Matches($testLog, "DB_TEST_RAN: ")).Count
+    $skippedDbTests = ([regex]::Matches($testLog, "DB_TEST_SKIPPED: ")).Count
+    if ($skippedDbTests -gt 0) { throw "$skippedDbTests test(s) Postgres sautes - la gate exige une base de test reelle" }
+    if ($ranDbTests -ne $expectedDbTests) { throw "tests Postgres executes : $ranDbTests/$expectedDbTests - execution vacueuse detectee" }
+    Write-Host "DB_TESTS_PROVEN: $ranDbTests/$expectedDbTests" -ForegroundColor Green
 } finally { Pop-Location }
 
 if (-not $GodotPath) {

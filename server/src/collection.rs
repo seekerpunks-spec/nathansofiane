@@ -361,10 +361,318 @@ pub async fn claim_set(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::RemoteConfig;
+    use crate::rate_limit::RateLimiter;
+    use std::sync::Arc;
 
     #[test]
     fn empty_weight_list_returns_none() {
         let cards: Vec<CardConfig> = Vec::new();
         assert!(pick_weighted(&cards, |c| c.drop_weight).is_none());
+    }
+
+    /// AppState complet pour appeler les handlers axum comme en production
+    /// (mêmes transactions, même config de lancement, même idempotence).
+    fn state_for_tests(db: Db) -> anyhow::Result<AppState> {
+        let config = RemoteConfig::load(
+            &std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../config"),
+        )?;
+        Ok(AppState {
+            rate: Arc::new(RateLimiter::new(
+                db.pool().clone(),
+                std::time::Duration::from_secs(60),
+                10_000,
+            )),
+            db,
+            config: Arc::new(config),
+            jwt_secret: "qa-secret-0123456789-0123456789-012".to_string(),
+            dev_auth: false,
+            dev_address: None,
+            started_at: std::time::Instant::now(),
+        })
+    }
+
+    async fn grant_cards(db: &Db, address: &str, cards: &[String]) -> anyhow::Result<()> {
+        for card_id in cards {
+            sqlx::query(
+                "INSERT INTO player_cards(address,card_id,qty) VALUES($1,$2,1) \
+                 ON CONFLICT(address,card_id) DO UPDATE SET qty=player_cards.qty+1",
+            )
+            .bind(address)
+            .bind(card_id)
+            .execute(db.pool())
+            .await?;
+        }
+        Ok(())
+    }
+
+    async fn balances(db: &Db, address: &str) -> anyhow::Result<(i32, i64)> {
+        Ok(
+            sqlx::query_as("SELECT spins,credits FROM player_state WHERE address=$1")
+                .bind(address)
+                .fetch_one(db.pool())
+                .await?,
+        )
+    }
+
+    #[tokio::test]
+    async fn postgres_claim_set_enforces_unlock_then_pays_once() -> anyhow::Result<()> {
+        let Some(db) =
+            crate::testdb::connect("postgres_claim_set_enforces_unlock_then_pays_once").await
+        else {
+            return Ok(());
+        };
+        let state = state_for_tests(db.clone())?;
+        let address = format!("qa-set-{}", uuid::Uuid::new_v4());
+        db.ensure_player(&address, 5).await?;
+
+        let locked_set = state
+            .config
+            .sets
+            .iter()
+            .find(|set| {
+                set.unlock_requirement
+                    .as_ref()
+                    .is_some_and(|requirement| requirement.completed_district_id.is_some())
+            })
+            .expect("la config de lancement doit contenir un set verrouillé par district")
+            .clone();
+        grant_cards(&db, &address, &locked_set.cards).await?;
+
+        // Cartes complètes mais district insuffisant : le serveur arbitre.
+        let locked = claim_set(
+            State(state.clone()),
+            Extension(Addr(address.clone())),
+            HeaderMap::new(),
+            Json(SetReq {
+                set_id: locked_set.set_id.clone(),
+                request_id: Some(uuid::Uuid::new_v4().to_string()),
+            }),
+        )
+        .await;
+        assert!(matches!(locked, Err(ApiError::Unavailable(_))));
+        let untouched = balances(&db, &address).await?;
+        assert_eq!(untouched, (5, 0));
+
+        let required_district = locked_set
+            .unlock_requirement
+            .as_ref()
+            .and_then(|requirement| requirement.completed_district_id)
+            .expect("prérequis district du set verrouillé");
+        sqlx::query("UPDATE player_state SET district_index=$1 WHERE address=$2")
+            .bind(required_district as i32)
+            .bind(&address)
+            .execute(db.pool())
+            .await?;
+
+        let before = balances(&db, &address).await?;
+        let reward = locked_set.effective_reward();
+        let rid = uuid::Uuid::new_v4().to_string();
+        let paid = claim_set(
+            State(state.clone()),
+            Extension(Addr(address.clone())),
+            HeaderMap::new(),
+            Json(SetReq {
+                set_id: locked_set.set_id.clone(),
+                request_id: Some(rid.clone()),
+            }),
+        )
+        .await
+        .map_err(|error| anyhow!("claim débloqué refusé : {error:?}"))?
+        .0;
+        let after = balances(&db, &address).await?;
+        assert_eq!(after.0, before.0 + reward.spins as i32);
+        assert_eq!(after.1, before.1 + i64::try_from(reward.credits)?);
+        if let Some(chest_id) = &reward.chest {
+            let qty: i64 = sqlx::query_scalar(
+                "SELECT qty FROM player_chests WHERE address=$1 AND chest_id=$2",
+            )
+            .bind(&address)
+            .bind(chest_id)
+            .fetch_one(db.pool())
+            .await?;
+            assert_eq!(qty, 1);
+        }
+
+        // Rejeu du même requestId : réponse identique octet pour octet,
+        // aucun second versement.
+        let replayed = claim_set(
+            State(state.clone()),
+            Extension(Addr(address.clone())),
+            HeaderMap::new(),
+            Json(SetReq {
+                set_id: locked_set.set_id.clone(),
+                request_id: Some(rid),
+            }),
+        )
+        .await
+        .map_err(|error| anyhow!("rejeu idempotent refusé : {error:?}"))?
+        .0;
+        assert_eq!(paid, replayed);
+        assert_eq!(balances(&db, &address).await?, after);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn postgres_claim_set_has_single_concurrent_winner() -> anyhow::Result<()> {
+        let Some(db) =
+            crate::testdb::connect("postgres_claim_set_has_single_concurrent_winner").await
+        else {
+            return Ok(());
+        };
+        let state = state_for_tests(db.clone())?;
+        let address = format!("qa-race-{}", uuid::Uuid::new_v4());
+        db.ensure_player(&address, 0).await?;
+
+        let open_set = state
+            .config
+            .sets
+            .iter()
+            .find(|set| set.unlock_requirement.is_none())
+            .expect("la config de lancement doit contenir un set sans prérequis")
+            .clone();
+        grant_cards(&db, &address, &open_set.cards).await?;
+
+        let first_call = claim_set(
+            State(state.clone()),
+            Extension(Addr(address.clone())),
+            HeaderMap::new(),
+            Json(SetReq {
+                set_id: open_set.set_id.clone(),
+                request_id: Some(uuid::Uuid::new_v4().to_string()),
+            }),
+        );
+        let second_call = claim_set(
+            State(state.clone()),
+            Extension(Addr(address.clone())),
+            HeaderMap::new(),
+            Json(SetReq {
+                set_id: open_set.set_id.clone(),
+                request_id: Some(uuid::Uuid::new_v4().to_string()),
+            }),
+        );
+        let (first, second) = tokio::join!(first_call, second_call);
+        let outcomes = [first, second];
+        assert_eq!(
+            outcomes.iter().filter(|outcome| outcome.is_ok()).count(),
+            1,
+            "exactement un claim concurrent doit gagner"
+        );
+        assert!(outcomes
+            .iter()
+            .any(|outcome| matches!(outcome, Err(ApiError::AlreadyClaimed))));
+
+        let reward = open_set.effective_reward();
+        let after = balances(&db, &address).await?;
+        assert_eq!(after.0, reward.spins as i32, "un seul versement de spins");
+        assert_eq!(after.1, i64::try_from(reward.credits)?);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn postgres_open_chest_consumes_stock_once_and_replays() -> anyhow::Result<()> {
+        let Some(db) =
+            crate::testdb::connect("postgres_open_chest_consumes_stock_once_and_replays").await
+        else {
+            return Ok(());
+        };
+        let state = state_for_tests(db.clone())?;
+        let address = format!("qa-chest-{}", uuid::Uuid::new_v4());
+        db.ensure_player(&address, 0).await?;
+        let chest = state.config.chests[0].clone();
+        sqlx::query("INSERT INTO player_chests(address,chest_id,qty) VALUES($1,$2,1)")
+            .bind(&address)
+            .bind(&chest.chest_id)
+            .execute(db.pool())
+            .await?;
+
+        // Stock de 1 : deux ouvertures concurrentes ne peuvent pas consommer
+        // deux coffres.
+        let first_rid = uuid::Uuid::new_v4().to_string();
+        let second_rid = uuid::Uuid::new_v4().to_string();
+        let first_call = open_chest(
+            State(state.clone()),
+            Extension(Addr(address.clone())),
+            HeaderMap::new(),
+            Json(ChestReq {
+                chest_id: chest.chest_id.clone(),
+                request_id: Some(first_rid.clone()),
+            }),
+        );
+        let second_call = open_chest(
+            State(state.clone()),
+            Extension(Addr(address.clone())),
+            HeaderMap::new(),
+            Json(ChestReq {
+                chest_id: chest.chest_id.clone(),
+                request_id: Some(second_rid.clone()),
+            }),
+        );
+        let (first, second) = tokio::join!(first_call, second_call);
+        let (winner, winner_rid) = match (first, second) {
+            (Ok(response), Err(ApiError::Unavailable(_))) => (response.0, first_rid),
+            (Err(ApiError::Unavailable(_)), Ok(response)) => (response.0, second_rid),
+            other => anyhow::bail!("attendu un gagnant et un refus, obtenu {other:?}"),
+        };
+        assert_eq!(winner["remaining"], 0);
+        let drops = winner["cards"]
+            .as_array()
+            .ok_or_else(|| anyhow!("réponse sans cartes"))?;
+        assert_eq!(drops.len(), chest.cards_per_open as usize);
+
+        // Chaque rareté tirée doit être tirable dans la table résolue pour ce
+        // joueur (district 0, événements actifs du moment) : c'est bien la
+        // table centralisée qui gouverne le tirage.
+        let active = state
+            .config
+            .active_event_ids(chrono::Utc::now().timestamp_millis());
+        let allowed: Vec<Value> = state
+            .config
+            .resolved_loot_table(&chest, 0, &active)
+            .iter()
+            .filter(|weight| weight.weight > 0)
+            .map(|weight| serde_json::to_value(weight.rarity).unwrap())
+            .collect();
+        for drop in drops {
+            assert!(
+                allowed.contains(&drop["rarity"]),
+                "rareté {} hors table résolue",
+                drop["rarity"]
+            );
+        }
+
+        // Rejeu du requestId gagnant : même réponse, inventaire intact.
+        let total_before_replay: i64 = sqlx::query_scalar(
+            "SELECT COALESCE(SUM(qty),0)::bigint FROM player_cards WHERE address=$1",
+        )
+        .bind(&address)
+        .fetch_one(db.pool())
+        .await?;
+        let replayed = open_chest(
+            State(state.clone()),
+            Extension(Addr(address.clone())),
+            HeaderMap::new(),
+            Json(ChestReq {
+                chest_id: chest.chest_id.clone(),
+                request_id: Some(winner_rid),
+            }),
+        )
+        .await
+        .map_err(|error| anyhow!("rejeu idempotent refusé : {error:?}"))?
+        .0;
+        assert_eq!(winner, replayed);
+        let total_after_replay: i64 = sqlx::query_scalar(
+            "SELECT COALESCE(SUM(qty),0)::bigint FROM player_cards WHERE address=$1",
+        )
+        .bind(&address)
+        .fetch_one(db.pool())
+        .await?;
+        assert_eq!(total_before_replay, total_after_replay);
+        assert_eq!(
+            total_after_replay,
+            i64::from(chest.cards_per_open),
+            "le stock d'un seul coffre ne produit qu'une ouverture"
+        );
+        Ok(())
     }
 }

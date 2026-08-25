@@ -58,10 +58,10 @@ mod tests {
 
     #[tokio::test]
     async fn postgres_instances_share_the_same_limit() -> anyhow::Result<()> {
-        let Ok(database_url) = std::env::var("CYBERSEEKER_TEST_DATABASE_URL") else {
+        let Some(db) = crate::testdb::connect("postgres_instances_share_the_same_limit").await
+        else {
             return Ok(());
         };
-        let db = crate::db::Db::connect(&database_url).await?;
         let first = RateLimiter::new(db.pool().clone(), Duration::from_secs(60), 2);
         let second = RateLimiter::new(db.pool().clone(), Duration::from_secs(60), 2);
         let key = format!("test:{}", uuid::Uuid::new_v4());

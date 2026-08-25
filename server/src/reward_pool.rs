@@ -303,10 +303,12 @@ mod tests {
 
     #[tokio::test]
     async fn postgres_pool_is_budgeted_idempotent_and_settled_internally() -> anyhow::Result<()> {
-        let Ok(database_url) = std::env::var("CYBERSEEKER_TEST_DATABASE_URL") else {
+        let Some(db) =
+            crate::testdb::connect("postgres_pool_is_budgeted_idempotent_and_settled_internally")
+                .await
+        else {
             return Ok(());
         };
-        let db = crate::db::Db::connect(&database_url).await?;
         let address = format!("pool-test-{}", uuid::Uuid::new_v4());
         let pool_id = format!("pool-{}", uuid::Uuid::new_v4());
         db.ensure_player(&address, 1).await?;
@@ -351,10 +353,11 @@ mod tests {
 
     #[tokio::test]
     async fn postgres_pool_budget_is_global_under_concurrency() -> anyhow::Result<()> {
-        let Ok(database_url) = std::env::var("CYBERSEEKER_TEST_DATABASE_URL") else {
+        let Some(db) =
+            crate::testdb::connect("postgres_pool_budget_is_global_under_concurrency").await
+        else {
             return Ok(());
         };
-        let db = crate::db::Db::connect(&database_url).await?;
         let first_address = format!("pool-a-{}", uuid::Uuid::new_v4());
         let second_address = format!("pool-b-{}", uuid::Uuid::new_v4());
         let pool_id = format!("pool-{}", uuid::Uuid::new_v4());

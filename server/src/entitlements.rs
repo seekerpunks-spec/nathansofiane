@@ -183,15 +183,15 @@ mod tests {
 
     #[tokio::test]
     async fn postgres_expired_ownership_fails_closed() -> anyhow::Result<()> {
-        let Ok(database_url) = std::env::var("CYBERSEEKER_TEST_DATABASE_URL") else {
+        let Some(db) = crate::testdb::connect("postgres_expired_ownership_fails_closed").await
+        else {
             return Ok(());
         };
         let mut config = crate::config::RemoteConfig::load(
             &std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../config"),
         )?;
         config.entitlements[0].enabled = true;
-        let pool = sqlx::PgPool::connect(&database_url).await?;
-        let mut tx = pool.begin().await?;
+        let mut tx = db.begin().await?;
         let address = format!("qa-entitlement-{}", uuid::Uuid::new_v4());
         sqlx::query("INSERT INTO players(address) VALUES($1)")
             .bind(&address)
