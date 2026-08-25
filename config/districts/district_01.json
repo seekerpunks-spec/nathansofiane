@@ -2,7 +2,7 @@
   "note": "PROVISIONAL — District 1 'Neon Slums' (données M2 : la logique d'upgrades arrive avec M2, les données sont prêtes dès M1).",
   "id": 1,
   "name": "Neon Slums",
-  "background": "districts/district_01_bg",
+  "background": "districts/neon_slums_bg",
   "elements": [
     {
       "id": 1, "name": "Apartment",

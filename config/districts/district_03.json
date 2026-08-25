@@ -1,0 +1,65 @@
+{
+  "note": "PROVISIONAL — District 3 'Rust Harbor'. Cout total 298,54 M CR, soit 0,35 % d'ecart avec l'enveloppe progression.districtCurve (64,81 M x 2,15^2).",
+  "id": 3,
+  "name": "Rust Harbor",
+  "background": "districts/district_03_bg",
+  "unlockRequirements": { "completedDistrictId": 2 },
+  "elements": [
+    {
+      "id": 1, "name": "Cargo Cradle",
+      "levels": [
+        { "level": 0, "cost": 0,        "asset": "district_03_cradle_lv0" },
+        { "level": 1, "cost": 430000,   "asset": "district_03_cradle_lv1" },
+        { "level": 2, "cost": 1500000,  "asset": "district_03_cradle_lv2" },
+        { "level": 3, "cost": 4700000,  "asset": "district_03_cradle_lv3" },
+        { "level": 4, "cost": 14000000, "asset": "district_03_cradle_lv4" },
+        { "level": 5, "cost": 36000000, "asset": "district_03_cradle_lv5" }
+      ]
+    },
+    {
+      "id": 2, "name": "Tidal Rig",
+      "levels": [
+        { "level": 0, "cost": 0,        "asset": "district_03_rig_lv0" },
+        { "level": 1, "cost": 400000,   "asset": "district_03_rig_lv1" },
+        { "level": 2, "cost": 1400000,  "asset": "district_03_rig_lv2" },
+        { "level": 3, "cost": 4300000,  "asset": "district_03_rig_lv3" },
+        { "level": 4, "cost": 13000000, "asset": "district_03_rig_lv4" },
+        { "level": 5, "cost": 34000000, "asset": "district_03_rig_lv5" }
+      ]
+    },
+    {
+      "id": 3, "name": "Salvage Yard",
+      "levels": [
+        { "level": 0, "cost": 0,        "asset": "district_03_salvage_lv0" },
+        { "level": 1, "cost": 520000,   "asset": "district_03_salvage_lv1" },
+        { "level": 2, "cost": 1700000,  "asset": "district_03_salvage_lv2" },
+        { "level": 3, "cost": 5200000,  "asset": "district_03_salvage_lv3" },
+        { "level": 4, "cost": 15000000, "asset": "district_03_salvage_lv4" },
+        { "level": 5, "cost": 39000000, "asset": "district_03_salvage_lv5" }
+      ]
+    },
+    {
+      "id": 4, "name": "Freight Spine",
+      "levels": [
+        { "level": 0, "cost": 0,        "asset": "district_03_freight_lv0" },
+        { "level": 1, "cost": 450000,   "asset": "district_03_freight_lv1" },
+        { "level": 2, "cost": 1550000,  "asset": "district_03_freight_lv2" },
+        { "level": 3, "cost": 4500000,  "asset": "district_03_freight_lv3" },
+        { "level": 4, "cost": 13800000, "asset": "district_03_freight_lv4" },
+        { "level": 5, "cost": 36500000, "asset": "district_03_freight_lv5" }
+      ]
+    },
+    {
+      "id": 5, "name": "Harbor Lantern",
+      "levels": [
+        { "level": 0, "cost": 0,        "asset": "district_03_lantern_lv0" },
+        { "level": 1, "cost": 640000,   "asset": "district_03_lantern_lv1" },
+        { "level": 2, "cost": 1950000,  "asset": "district_03_lantern_lv2" },
+        { "level": 3, "cost": 6000000,  "asset": "district_03_lantern_lv3" },
+        { "level": 4, "cost": 17000000, "asset": "district_03_lantern_lv4" },
+        { "level": 5, "cost": 45000000, "asset": "district_03_lantern_lv5" }
+      ]
+    }
+  ],
+  "completionReward": { "spins": 1400, "credits": 12000000, "chest": "elite" }
+}

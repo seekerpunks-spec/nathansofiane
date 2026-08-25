@@ -3,42 +3,77 @@ extends Control
 
 signal navigate_requested(tab: String)
 
+## Décor de secours quand un district n'a pas encore son art propre.
+const FALLBACK_BACKGROUND := "res://assets/generated/districts/neon_slums_bg.png"
+const HERO_ART := "res://assets/generated/api_gpt/heroes/district_hero.png"
+const ASSET_ROOT := "res://assets/generated/"
+
 var _credits: Label
 var _progress: ProgressBar
 var _progress_label: Label
 var _list: VBoxContainer
+var _background: TextureRect
+var _hero_holder: VBoxContainer
 var _busy := false
 var _district: Dictionary = {}
 
 func _ready() -> void:
+	_district = _active_district()
 	_build_background()
 	_build()
 	Store.state_changed.connect(_refresh)
 	_refresh()
 
+## Résout un nom d'asset de config en texture. Les configs stockent des noms
+## relatifs sans extension ; un asset absent renvoie null plutôt que d'échouer,
+## donc un district peut être livré par config avant son art.
+##
+## Le nom vient d'une config distante mise en cache sur l'appareil, donc il est
+## traité comme une donnée non fiable : il reste confiné sous ASSET_ROOT et le
+## résultat doit être une texture, jamais un script ou une scène.
+func _asset_texture(name: String) -> Texture2D:
+	var trimmed := name.strip_edges()
+	if trimmed.is_empty() or trimmed.contains("..") or trimmed.contains(":") or trimmed.begins_with("/"):
+		return null
+	var path := ASSET_ROOT + trimmed + ".png"
+	if not ResourceLoader.exists(path):
+		return null
+	var resource := load(path)
+	return resource if resource is Texture2D else null
+
 func _build_background() -> void:
-	var texture := TextureRect.new()
-	texture.texture = load("res://assets/generated/districts/neon_slums_bg.png")
-	texture.set_anchors_preset(Control.PRESET_FULL_RECT)
-	texture.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	texture.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
-	texture.modulate = Color(0.38, 0.42, 0.58, 0.56)
-	texture.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(texture)
+	_background = TextureRect.new()
+	_background.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_background.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_background.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	_background.modulate = Color(0.38, 0.42, 0.58, 0.56)
+	_background.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_background)
+	_apply_background()
 	var veil := ColorRect.new()
 	veil.color = Color(0.025, 0.035, 0.08, 0.54)
 	veil.set_anchors_preset(Control.PRESET_FULL_RECT)
 	veil.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(veil)
 
+func _apply_background() -> void:
+	if _background == null:
+		return
+	var texture := _asset_texture(str(_district.get("background", "")))
+	if texture == null:
+		texture = load(FALLBACK_BACKGROUND)
+	_background.texture = texture
+
 func _build() -> void:
 	var districts := Config.districts()
 	if districts.is_empty():
 		add_child(Ui.label("AUCUN DISTRICT CONFIGURÉ", 20, Ui.DANGER))
 		return
-	_district = _active_district()
 	var body := Ui.screen_body()
-	body.add_child(Ui.hero_card("res://assets/generated/api_gpt/heroes/district_hero.png", "DISTRICT 01  •  REBUILD", str(_district.get("name", "Neon Slums")), "Améliore chaque bâtiment et rallume la ville.", Ui.NEON_CYAN))
+	_hero_holder = VBoxContainer.new()
+	_hero_holder.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	body.add_child(_hero_holder)
+	_rebuild_hero()
 
 	var stats := HBoxContainer.new()
 	stats.add_theme_constant_override("separation", 10)
@@ -70,10 +105,32 @@ func _build() -> void:
 	body.add_child(scroll)
 	add_child(body)
 
+## La carte héros annonce le district réel. Elle est reconstruite quand le joueur
+## change de district, sinon un district 3 s'afficherait comme le district 1.
+func _rebuild_hero() -> void:
+	if _hero_holder == null:
+		return
+	for child in _hero_holder.get_children():
+		child.queue_free()
+	var total := Config.districts().size()
+	var index := int(_district.get("id", 1))
+	var kicker := "DISTRICT %02d  •  REBUILD" % index
+	if total > 1:
+		kicker = "DISTRICT %02d / %02d  •  REBUILD" % [index, total]
+	_hero_holder.add_child(Ui.hero_card(
+		HERO_ART,
+		kicker,
+		str(_district.get("name", "Neon Slums")),
+		"Améliore chaque bâtiment et rallume la ville.",
+		Ui.NEON_CYAN
+	))
+
 func _refresh() -> void:
 	var active := _active_district()
 	if not active.is_empty() and int(active.get("id", 0)) != int(_district.get("id", 0)):
 		_district = active
+		_apply_background()
+		_rebuild_hero()
 	if _district.is_empty() or _list == null:
 		return
 	_credits.text = Ui.compact(Store.credits()) + " CR"
@@ -114,11 +171,7 @@ func _element_card(element: Dictionary, current: int, max_level: int) -> PanelCo
 	var card := Ui.panel(Color(Ui.PANEL, 0.94), Ui.BORDER if current < max_level else Ui.GREEN)
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 12)
-	var glyph := StructureGlyph.new()
-	glyph.kind = int(element.get("id", 1))
-	glyph.level = current
-	glyph.custom_minimum_size = Vector2(76, 76)
-	row.add_child(glyph)
+	row.add_child(_element_visual(element, current))
 	var text := VBoxContainer.new()
 	text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var name := Ui.label(str(element.get("name", "Structure")), 18, Ui.TEXT)
@@ -153,6 +206,27 @@ func _element_card(element: Dictionary, current: int, max_level: int) -> PanelCo
 	row.add_child(button)
 	card.add_child(row)
 	return card
+
+## Visuel d'un élément au niveau courant : le PNG du niveau s'il a été livré,
+## sinon le glyphe procédural. Les deux chemins gardent la même taille, donc la
+## carte ne bouge pas selon la présence de l'art.
+func _element_visual(element: Dictionary, current: int) -> Control:
+	var levels: Array = element.get("levels", [])
+	if current >= 0 and current < levels.size() and typeof(levels[current]) == TYPE_DICTIONARY:
+		var texture := _asset_texture(str(levels[current].get("asset", "")))
+		if texture != null:
+			var art := TextureRect.new()
+			art.texture = texture
+			art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			art.custom_minimum_size = Vector2(76, 76)
+			return art
+	var glyph := StructureGlyph.new()
+	glyph.kind = int(element.get("id", 1))
+	glyph.variant = int(_district.get("id", 1))
+	glyph.level = current
+	glyph.custom_minimum_size = Vector2(76, 76)
+	return glyph
 
 func _repair(element_id: int) -> void:
 	if _busy:
@@ -260,16 +334,46 @@ func _show_complete(reward: Dictionary, district_id: int, next_district_id: int,
 ## Cinq silhouettes × six états, dessinées sans dépendance à un sprite. Chaque
 ## niveau ajoute énergie, néons et détails, donc l'amélioration reste visible
 ## même si un pack d'art distant n'est pas encore téléchargé.
+##
+## `kind` accepte n'importe quel identifiant d'élément : les silhouettes tournent
+## en boucle et un bandeau de série marque les identifiants au-delà de cinq, donc
+## un district ajouté par config ne peut plus produire de plateforme nue.
+## `variant` décale la palette par district pour qu'ils ne se ressemblent pas.
 class StructureGlyph extends Control:
 	var kind := 1
 	var level := 0
+	var variant := 1
+
+	func _shape() -> int:
+		return posmod(maxi(kind, 1) - 1, 5) + 1
+
+	func _series() -> int:
+		return (maxi(kind, 1) - 1) / 5
+
+	func _accent() -> Color:
+		match posmod(maxi(variant, 1) - 1, 5):
+			1: return Ui.NEON_MAGENTA
+			2: return Ui.GREEN
+			3: return Ui.GOLD
+			4: return Ui.NEON_CYAN
+			_: return Ui.NEON_CYAN
+
+	func _secondary() -> Color:
+		match posmod(maxi(variant, 1) - 1, 5):
+			1: return Ui.GOLD
+			2: return Ui.NEON_CYAN
+			3: return Ui.NEON_MAGENTA
+			4: return Ui.GREEN
+			_: return Ui.NEON_MAGENTA
 
 	func _draw() -> void:
+		var accent := _accent()
+		var secondary := _secondary()
 		var base := Rect2(8, 50, 60, 18)
 		draw_rect(base, Color(0.08, 0.10, 0.18), true)
 		draw_rect(base, Ui.BORDER, false, 2.0)
 		var shell := Color(0.16, 0.19, 0.30) if level > 0 else Color(0.09, 0.10, 0.14)
-		match kind:
+		match _shape():
 			1:
 				draw_rect(Rect2(17, 16, 42, 38), shell, true)
 				for y in range(23, 49, 10):
@@ -277,27 +381,29 @@ class StructureGlyph extends Control:
 					draw_rect(Rect2(43, y, 8, 5), _light(level - 1, y), true)
 			2:
 				draw_rect(Rect2(12, 24, 52, 31), shell, true)
-				draw_rect(Rect2(19, 30, 38, 17), Color(Ui.NEON_CYAN, 0.15 + level * 0.12), true)
-				draw_line(Vector2(38, 24), Vector2(38, 11), Ui.NEON_MAGENTA if level >= 4 else Ui.BORDER, 3)
+				draw_rect(Rect2(19, 30, 38, 17), Color(accent, 0.15 + level * 0.12), true)
+				draw_line(Vector2(38, 24), Vector2(38, 11), secondary if level >= 4 else Ui.BORDER, 3)
 			3:
 				draw_circle(Vector2(38, 35), 20, shell)
 				for ring in range(1, mini(level, 3) + 1):
-					draw_arc(Vector2(38, 35), 5.0 + ring * 5.0, 0, TAU, 24, Color(Ui.NEON_CYAN, 0.35 + ring * 0.15), 2)
+					draw_arc(Vector2(38, 35), 5.0 + ring * 5.0, 0, TAU, 24, Color(accent, 0.35 + ring * 0.15), 2)
 				draw_line(Vector2(38, 15), Vector2(38, 7), Ui.GOLD if level >= 5 else Ui.BORDER, 3)
 			4:
 				draw_rect(Rect2(12, 27, 52, 29), shell, true)
-				draw_colored_polygon(PackedVector2Array([Vector2(9,27),Vector2(67,27),Vector2(59,17),Vector2(17,17)]), Ui.NEON_MAGENTA if level >= 2 else Ui.BORDER)
+				draw_colored_polygon(PackedVector2Array([Vector2(9,27),Vector2(67,27),Vector2(59,17),Vector2(17,17)]), secondary if level >= 2 else Ui.BORDER)
 				draw_rect(Rect2(21, 35, 34, 8), Color(Ui.GOLD, 0.18 + level * 0.12), true)
 			5:
 				draw_line(Vector2(38, 54), Vector2(38, 9), shell.lightened(0.4), 6)
 				draw_line(Vector2(38, 18), Vector2(20, 30), Ui.BORDER, 3)
 				draw_line(Vector2(38, 18), Vector2(56, 30), Ui.BORDER, 3)
 				for ring in range(mini(level, 3)):
-					draw_arc(Vector2(38, 14), 8.0 + ring * 6.0, PI + 0.3, TAU - 0.3, 18, Color(Ui.NEON_CYAN, 0.45), 2)
+					draw_arc(Vector2(38, 14), 8.0 + ring * 6.0, PI + 0.3, TAU - 0.3, 18, Color(accent, 0.45), 2)
+		for series in range(mini(_series(), 3)):
+			draw_rect(Rect2(10 + series * 7, 46, 5, 3), Color(secondary, 0.85), true)
 		if level == 0:
 			draw_line(Vector2(11, 61), Vector2(64, 19), Color(Ui.DANGER, 0.45), 3)
 		elif level >= 5:
 			draw_arc(Vector2(38, 37), 31, 0, TAU, 36, Color(Ui.GOLD, 0.75), 2)
 
 	func _light(required: int, seed: int) -> Color:
-		return Color(Ui.NEON_CYAN, 0.85) if level >= maxi(1, required % 5) else Color(Ui.BORDER, 0.35)
+		return Color(_accent(), 0.85) if level >= maxi(1, required % 5) else Color(Ui.BORDER, 0.35)

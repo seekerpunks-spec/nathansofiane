@@ -1,0 +1,65 @@
+{
+  "note": "PROVISIONAL — District 4 'Spire Exchange'. Cout total 642,29 M CR, soit 0,28 % d'ecart avec l'enveloppe progression.districtCurve (64,81 M x 2,15^3).",
+  "id": 4,
+  "name": "Spire Exchange",
+  "background": "districts/district_04_bg",
+  "unlockRequirements": { "completedDistrictId": 3 },
+  "elements": [
+    {
+      "id": 1, "name": "Ledger Vault",
+      "levels": [
+        { "level": 0, "cost": 0,        "asset": "district_04_ledger_lv0" },
+        { "level": 1, "cost": 930000,   "asset": "district_04_ledger_lv1" },
+        { "level": 2, "cost": 3200000,  "asset": "district_04_ledger_lv2" },
+        { "level": 3, "cost": 10000000, "asset": "district_04_ledger_lv3" },
+        { "level": 4, "cost": 30000000, "asset": "district_04_ledger_lv4" },
+        { "level": 5, "cost": 78000000, "asset": "district_04_ledger_lv5" }
+      ]
+    },
+    {
+      "id": 2, "name": "Trade Atrium",
+      "levels": [
+        { "level": 0, "cost": 0,        "asset": "district_04_atrium_lv0" },
+        { "level": 1, "cost": 860000,   "asset": "district_04_atrium_lv1" },
+        { "level": 2, "cost": 3000000,  "asset": "district_04_atrium_lv2" },
+        { "level": 3, "cost": 9300000,  "asset": "district_04_atrium_lv3" },
+        { "level": 4, "cost": 28000000, "asset": "district_04_atrium_lv4" },
+        { "level": 5, "cost": 73000000, "asset": "district_04_atrium_lv5" }
+      ]
+    },
+    {
+      "id": 3, "name": "Sky Bridge",
+      "levels": [
+        { "level": 0, "cost": 0,        "asset": "district_04_bridge_lv0" },
+        { "level": 1, "cost": 1100000,  "asset": "district_04_bridge_lv1" },
+        { "level": 2, "cost": 3700000,  "asset": "district_04_bridge_lv2" },
+        { "level": 3, "cost": 11200000, "asset": "district_04_bridge_lv3" },
+        { "level": 4, "cost": 32000000, "asset": "district_04_bridge_lv4" },
+        { "level": 5, "cost": 84000000, "asset": "district_04_bridge_lv5" }
+      ]
+    },
+    {
+      "id": 4, "name": "Arbitrage Suite",
+      "levels": [
+        { "level": 0, "cost": 0,        "asset": "district_04_arbitrage_lv0" },
+        { "level": 1, "cost": 970000,   "asset": "district_04_arbitrage_lv1" },
+        { "level": 2, "cost": 3350000,  "asset": "district_04_arbitrage_lv2" },
+        { "level": 3, "cost": 9700000,  "asset": "district_04_arbitrage_lv3" },
+        { "level": 4, "cost": 29500000, "asset": "district_04_arbitrage_lv4" },
+        { "level": 5, "cost": 78500000, "asset": "district_04_arbitrage_lv5" }
+      ]
+    },
+    {
+      "id": 5, "name": "Signal Crown",
+      "levels": [
+        { "level": 0, "cost": 0,        "asset": "district_04_crown_lv0" },
+        { "level": 1, "cost": 1380000,  "asset": "district_04_crown_lv1" },
+        { "level": 2, "cost": 4200000,  "asset": "district_04_crown_lv2" },
+        { "level": 3, "cost": 12900000, "asset": "district_04_crown_lv3" },
+        { "level": 4, "cost": 36500000, "asset": "district_04_crown_lv4" },
+        { "level": 5, "cost": 97000000, "asset": "district_04_crown_lv5" }
+      ]
+    }
+  ],
+  "completionReward": { "spins": 2100, "credits": 26000000, "chest": "elite" }
+}

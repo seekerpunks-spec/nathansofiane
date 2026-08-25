@@ -1,0 +1,65 @@
+{
+  "note": "PROVISIONAL — District 5 'Nullzone Core', dernier district de lancement. Cout total 1 380,38 M CR, soit 0,32 % d'ecart avec l'enveloppe progression.districtCurve (64,81 M x 2,15^4).",
+  "id": 5,
+  "name": "Nullzone Core",
+  "background": "districts/district_05_bg",
+  "unlockRequirements": { "completedDistrictId": 4 },
+  "elements": [
+    {
+      "id": 1, "name": "Cold Lattice",
+      "levels": [
+        { "level": 0, "cost": 0,         "asset": "district_05_lattice_lv0" },
+        { "level": 1, "cost": 2000000,   "asset": "district_05_lattice_lv1" },
+        { "level": 2, "cost": 6900000,   "asset": "district_05_lattice_lv2" },
+        { "level": 3, "cost": 21500000,  "asset": "district_05_lattice_lv3" },
+        { "level": 4, "cost": 64500000,  "asset": "district_05_lattice_lv4" },
+        { "level": 5, "cost": 168000000, "asset": "district_05_lattice_lv5" }
+      ]
+    },
+    {
+      "id": 2, "name": "Null Reactor",
+      "levels": [
+        { "level": 0, "cost": 0,         "asset": "district_05_reactor_lv0" },
+        { "level": 1, "cost": 1850000,   "asset": "district_05_reactor_lv1" },
+        { "level": 2, "cost": 6450000,   "asset": "district_05_reactor_lv2" },
+        { "level": 3, "cost": 20000000,  "asset": "district_05_reactor_lv3" },
+        { "level": 4, "cost": 60000000,  "asset": "district_05_reactor_lv4" },
+        { "level": 5, "cost": 157000000, "asset": "district_05_reactor_lv5" }
+      ]
+    },
+    {
+      "id": 3, "name": "Cipher Vault",
+      "levels": [
+        { "level": 0, "cost": 0,         "asset": "district_05_cipher_lv0" },
+        { "level": 1, "cost": 2370000,   "asset": "district_05_cipher_lv1" },
+        { "level": 2, "cost": 7950000,   "asset": "district_05_cipher_lv2" },
+        { "level": 3, "cost": 24000000,  "asset": "district_05_cipher_lv3" },
+        { "level": 4, "cost": 69000000,  "asset": "district_05_cipher_lv4" },
+        { "level": 5, "cost": 180000000, "asset": "district_05_cipher_lv5" }
+      ]
+    },
+    {
+      "id": 4, "name": "Recursion Spine",
+      "levels": [
+        { "level": 0, "cost": 0,         "asset": "district_05_recursion_lv0" },
+        { "level": 1, "cost": 2090000,   "asset": "district_05_recursion_lv1" },
+        { "level": 2, "cost": 7200000,   "asset": "district_05_recursion_lv2" },
+        { "level": 3, "cost": 20900000,  "asset": "district_05_recursion_lv3" },
+        { "level": 4, "cost": 63500000,  "asset": "district_05_recursion_lv4" },
+        { "level": 5, "cost": 169000000, "asset": "district_05_recursion_lv5" }
+      ]
+    },
+    {
+      "id": 5, "name": "Zero Beacon",
+      "levels": [
+        { "level": 0, "cost": 0,         "asset": "district_05_beacon_lv0" },
+        { "level": 1, "cost": 2970000,   "asset": "district_05_beacon_lv1" },
+        { "level": 2, "cost": 9000000,   "asset": "district_05_beacon_lv2" },
+        { "level": 3, "cost": 27700000,  "asset": "district_05_beacon_lv3" },
+        { "level": 4, "cost": 78500000,  "asset": "district_05_beacon_lv4" },
+        { "level": 5, "cost": 208000000, "asset": "district_05_beacon_lv5" }
+      ]
+    }
+  ],
+  "completionReward": { "spins": 3200, "credits": 55000000, "chest": "elite" }
+}

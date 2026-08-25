@@ -237,8 +237,18 @@ mod tests {
             &Path::new(env!("CARGO_MANIFEST_DIR")).join("../config"),
         )
         .unwrap();
-        assert_eq!(active_district_id(&config, 0), Some(1));
-        assert_eq!(active_district_id(&config, 1), Some(2));
-        assert_eq!(active_district_id(&config, 2), None);
+        // Dérivé du contenu livré : ajouter un district par config ne doit pas
+        // demander de retoucher ce test.
+        let total = config.districts.len() as i32;
+        assert!(total >= 2, "au moins deux districts attendus");
+        for completed in 0..total {
+            assert_eq!(
+                active_district_id(&config, completed),
+                Some(completed as u32 + 1),
+                "district actif après {} complétions",
+                completed
+            );
+        }
+        assert_eq!(active_district_id(&config, total), None);
     }
 }

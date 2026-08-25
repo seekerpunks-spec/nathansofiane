@@ -21,6 +21,20 @@ func _json(relative: String) -> Variant:
 		return {}
 	return JSON.parse_string(file.get_as_text())
 
+## Tous les districts livrés, scannés comme le fait le serveur. Charger seulement
+## le district 1 laisserait le contenu suivant sans aucune couverture.
+func _districts() -> Array:
+	var result: Array = []
+	var names := DirAccess.get_files_at(ProjectSettings.globalize_path("res://../config/districts"))
+	names.sort()
+	for name in names:
+		if not name.ends_with(".json"):
+			continue
+		var parsed: Variant = _json("districts/" + name)
+		if typeof(parsed) == TYPE_DICTIONARY:
+			result.append(parsed)
+	return result
+
 func _run() -> void:
 	Config.raw = {
 		"economy": _json("economy.json"),
@@ -31,7 +45,7 @@ func _run() -> void:
 		"achievements": _json("achievements.json").get("items", []),
 		"entitlements": _json("entitlements.json").get("items", []),
 		"rewardPool": _json("reward_pool.json"),
-		"districts": [_json("districts/district_01.json")],
+		"districts": _districts(),
 		"cards": _json("cards.json").get("items", []),
 		"sets": _json("sets.json").get("items", []),
 		"chests": _json("chests.json").get("items", []),
@@ -63,6 +77,8 @@ func _run() -> void:
 			return
 		add_child(instance)
 		await get_tree().process_frame
+		if path.ends_with("DistrictScreen.tscn"):
+			await _check_district_screen(instance)
 		if path.ends_with("SpinScreen.tscn"):
 			instance._render_network()
 			await get_tree().process_frame
@@ -80,3 +96,53 @@ func _run() -> void:
 		await get_tree().process_frame
 	print("SMOKE_SCENES_OK: ", SCENES.size())
 	get_tree().quit(0)
+
+## L'écran de district doit vraiment consommer la config : un `background` mal
+## orthographié tomberait sinon sur le repli sans que rien ne le signale.
+func _check_district_screen(instance: Node) -> void:
+	var districts := Config.districts()
+	assert(districts.size() >= 2, "au moins deux districts attendus dans la config")
+	for district in districts:
+		var background := str(district.get("background", ""))
+		assert(
+			instance._asset_texture(background) != null,
+			"Fond de district introuvable: " + background
+		)
+
+	# Changer de district doit changer le décor ET la carte héros.
+	var last: Dictionary = districts[districts.size() - 1]
+	var expected: Texture2D = instance._asset_texture(str(last.get("background", "")))
+	instance._district = last
+	instance._apply_background()
+	instance._rebuild_hero()
+	await get_tree().process_frame
+	assert(instance._background.texture == expected, "Le décor ne suit pas le district actif")
+	assert(instance._hero_holder.get_child_count() == 1, "Carte héros non reconstruite")
+
+	# Les silhouettes procédurales doivent couvrir n'importe quel identifiant
+	# d'élément, pas seulement les cinq premiers. On passe par le rendu réel
+	# plutôt que par la classe, pour couvrir le chemin que le joueur emprunte.
+	var probe := {
+		"id": districts.size() + 1,
+		"name": "Overflow Probe",
+		"background": str(last.get("background", "")),
+		"elements": [],
+	}
+	for element_id in range(6, 13):
+		probe["elements"].append({
+			"id": element_id,
+			"name": "Probe %d" % element_id,
+			"levels": [{"level": 0, "cost": 0}, {"level": 1, "cost": 1000}],
+		})
+	var restore_districts: Array = districts.duplicate()
+	var restore_index: int = int(Store.state.get("districtIndex", 0))
+	Config.raw["districts"] = restore_districts + [probe]
+	Store.state["districtIndex"] = districts.size()
+	instance._refresh()
+	await get_tree().process_frame
+	assert(
+		instance._list.get_child_count() == probe["elements"].size(),
+		"Éléments au-delà de cinq non rendus"
+	)
+	Config.raw["districts"] = restore_districts
+	Store.state["districtIndex"] = restore_index
