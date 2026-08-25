@@ -79,6 +79,8 @@ func _run() -> void:
 		await get_tree().process_frame
 		if path.ends_with("DistrictScreen.tscn"):
 			await _check_district_screen(instance)
+		if path.ends_with("CollectionScreen.tscn"):
+			_check_collection_screen(instance)
 		if path.ends_with("SpinScreen.tscn"):
 			instance._render_network()
 			await get_tree().process_frame
@@ -96,6 +98,51 @@ func _run() -> void:
 		await get_tree().process_frame
 	print("SMOKE_SCENES_OK: ", SCENES.size())
 	get_tree().quit(0)
+
+## Les sets existent sous deux formes de récompense et peuvent être verrouillés.
+## Sans cette couverture, un set en completionReward afficherait « +0 SPINS »
+## sans que rien ne le signale.
+func _check_collection_screen(instance: Node) -> void:
+	var sets := Config.sets()
+	assert(not sets.is_empty(), "aucun set dans la config")
+	var saw_legacy := false
+	var saw_object := false
+	var saw_lock := false
+	for set_data in sets:
+		if typeof(set_data) != TYPE_DICTIONARY:
+			continue
+		var reward: Dictionary = instance._set_reward(set_data)
+		assert(
+			int(reward.get("spins", 0)) > 0 or int(reward.get("credits", 0)) > 0,
+			"récompense de set nulle: " + str(set_data.get("setId", ""))
+		)
+		assert(
+			instance._reward_label(reward).contains("RÉCLAMER"),
+			"libellé de récompense vide: " + str(set_data.get("setId", ""))
+		)
+		if set_data.has("completionReward"):
+			saw_object = true
+		else:
+			saw_legacy = true
+		if instance._set_lock_reason(set_data) != "":
+			saw_lock = true
+		# Un thème inconnu doit rester lisible plutôt que transparent.
+		var color: Color = instance._theme_color(str(set_data.get("visualTheme", "")))
+		assert(color.a > 0.0, "thème de set sans couleur")
+	assert(saw_object, "aucun set en completionReward")
+	assert(saw_legacy, "aucun set en completionSpins, compatibilité non couverte")
+	assert(saw_lock, "aucun set verrouillé, prérequis non couvert")
+
+	var chests := Config.chests()
+	assert(chests.size() == 4, "quatre paliers de coffres attendus")
+	for chest in chests:
+		if typeof(chest) != TYPE_DICTIONARY:
+			continue
+		var art := str(chest.get("image", ""))
+		assert(
+			art != "" and ResourceLoader.exists(art),
+			"art de coffre introuvable: " + art
+		)
 
 ## L'écran de district doit vraiment consommer la config : un `background` mal
 ## orthographié tomberait sinon sur le repli sans que rien ne le signale.

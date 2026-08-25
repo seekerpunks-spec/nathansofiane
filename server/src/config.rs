@@ -21,6 +21,7 @@ const TOP_LEVEL_FILES: &[&str] = &[
     "economy.json",
     "entitlements.json",
     "events.json",
+    "loot_tables.json",
     "offers.json",
     "progression.json",
     "reward_pool.json",
@@ -60,7 +61,7 @@ pub enum OutcomeType {
     None,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Tier {
     Common,
@@ -371,13 +372,47 @@ pub struct CardConfig {
     pub image: String,
 }
 
+/// Prérequis de déblocage d'un set. Vide = disponible dès le départ.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetUnlockRequirement {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub completed_district_id: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub completed_set_id: Option<String>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SetConfig {
     pub set_id: String,
     pub name: String,
     pub cards: Vec<String>,
-    pub completion_spins: u32,
+    /// Forme historique : uniquement des spins. Conservée pour ne pas invalider
+    /// une config déjà déployée.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub completion_spins: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub completion_reward: Option<Reward>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub unlock_requirement: Option<SetUnlockRequirement>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub visual_theme: Option<String>,
+}
+
+impl SetConfig {
+    /// Récompense effective : la forme objet prime, sinon on retombe sur les
+    /// spins historiques. Un seul point de vérité pour le serveur ET le client.
+    pub fn effective_reward(&self) -> Reward {
+        if let Some(reward) = &self.completion_reward {
+            return reward.clone();
+        }
+        Reward {
+            spins: self.completion_spins.unwrap_or(0),
+            credits: 0,
+            chest: None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -385,6 +420,42 @@ pub struct SetConfig {
 pub struct LootWeight {
     pub rarity: Tier,
     pub weight: u32,
+}
+
+/// Multiplicateur de poids appliqué à une rareté, en points de base.
+/// 10000 = neutre, 15000 = +50 %, 5000 = -50 %.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TierMultiplier {
+    pub rarity: Tier,
+    pub multiplier_bps: u32,
+}
+
+/// Modifier conditionnel d'une loot table. Toutes les conditions renseignées
+/// doivent être satisfaites pour qu'il s'applique.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LootModifier {
+    pub modifier_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub min_district_index: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_district_index: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub event_id: Option<String>,
+    pub multipliers: Vec<TierMultiplier>,
+}
+
+/// Registre central de loot tables. Plusieurs coffres peuvent partager la même
+/// table, et une table s'ajuste par progression ou par événement sans toucher
+/// aux coffres qui la référencent.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LootTableConfig {
+    pub loot_table_id: String,
+    pub entries: Vec<LootWeight>,
+    #[serde(default)]
+    pub modifiers: Vec<LootModifier>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -395,7 +466,11 @@ pub struct ChestConfig {
     pub image: String,
     pub price_credits: u64,
     pub cards_per_open: u32,
+    /// Table inline historique. Ignorée dès que `lootTableId` est renseigné.
+    #[serde(default)]
     pub loot_table: Vec<LootWeight>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub loot_table_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -583,10 +658,103 @@ pub struct RemoteConfig {
     pub cards: Vec<CardConfig>,
     pub sets: Vec<SetConfig>,
     pub chests: Vec<ChestConfig>,
+    pub loot_tables: Vec<LootTableConfig>,
     pub events: Vec<EventConfig>,
     pub offers: Vec<OfferConfig>,
     pub seasons: Vec<SeasonConfig>,
 }
+
+impl RemoteConfig {
+    /// Identifiants des événements en cours à `now_ms`.
+    pub fn active_event_ids(&self, now_ms: i64) -> Vec<&str> {
+        self.events
+            .iter()
+            .filter(|event| event.starts_at_ms <= now_ms && now_ms < event.ends_at_ms)
+            .map(|event| event.event_id.as_str())
+            .collect()
+    }
+
+    /// Table de base d'un coffre : le registre s'il est référencé, sinon la
+    /// table inline historique.
+    fn base_loot_table<'a>(&'a self, chest: &'a ChestConfig) -> Option<&'a [LootWeight]> {
+        match chest.loot_table_id.as_deref() {
+            Some(id) => self
+                .loot_tables
+                .iter()
+                .find(|table| table.loot_table_id == id)
+                .map(|table| table.entries.as_slice()),
+            None if !chest.loot_table.is_empty() => Some(chest.loot_table.as_slice()),
+            None => None,
+        }
+    }
+
+    fn loot_modifiers(&self, chest: &ChestConfig) -> &[LootModifier] {
+        chest
+            .loot_table_id
+            .as_deref()
+            .and_then(|id| {
+                self.loot_tables
+                    .iter()
+                    .find(|table| table.loot_table_id == id)
+            })
+            .map(|table| table.modifiers.as_slice())
+            .unwrap_or(&[])
+    }
+
+    /// Poids effectifs d'un coffre après application des modifiers qui
+    /// correspondent à la progression du joueur et aux événements en cours.
+    ///
+    /// Les poids sont bornés : un modifier ne peut ni annuler entièrement une
+    /// table ni faire déborder l'addition côté tirage.
+    pub fn resolved_loot_table(
+        &self,
+        chest: &ChestConfig,
+        district_index: u32,
+        active_event_ids: &[&str],
+    ) -> Vec<LootWeight> {
+        let Some(base) = self.base_loot_table(chest) else {
+            return Vec::new();
+        };
+        let mut weights: Vec<LootWeight> = base.to_vec();
+        for modifier in self.loot_modifiers(chest) {
+            let district_ok = modifier
+                .min_district_index
+                .is_none_or(|minimum| district_index >= minimum)
+                && modifier
+                    .max_district_index
+                    .is_none_or(|maximum| district_index <= maximum);
+            let event_ok = modifier
+                .event_id
+                .as_deref()
+                .is_none_or(|id| active_event_ids.contains(&id));
+            if !district_ok || !event_ok {
+                continue;
+            }
+            for multiplier in &modifier.multipliers {
+                for entry in weights.iter_mut().filter(|e| e.rarity == multiplier.rarity) {
+                    entry.weight = (u64::from(entry.weight) * u64::from(multiplier.multiplier_bps)
+                        / 10_000)
+                        .min(u64::from(MAX_LOOT_WEIGHT)) as u32;
+                }
+            }
+        }
+        // Un modifier agressif ne doit pas produire une table intirable : on
+        // retombe sur la base plutôt que de refuser l'ouverture d'un coffre.
+        if weights
+            .iter()
+            .map(|entry| u64::from(entry.weight))
+            .sum::<u64>()
+            == 0
+        {
+            return base.to_vec();
+        }
+        weights
+    }
+}
+
+/// Plafond par entrée de loot table. La somme d'une table reste très en dessous
+/// de u32::MAX même avec de nombreuses raretés.
+const MAX_LOOT_WEIGHT: u32 = 100_000_000;
 
 fn reward_fits_storage(reward: &Reward) -> bool {
     reward.spins <= i32::MAX as u32 && reward.credits <= i64::MAX as u64
@@ -698,6 +866,8 @@ impl RemoteConfig {
         let cards = parse_items("cards.json", get_entry(&entries, "cards.json")?)?;
         let sets = parse_items("sets.json", get_entry(&entries, "sets.json")?)?;
         let chests = parse_items("chests.json", get_entry(&entries, "chests.json")?)?;
+        let loot_tables =
+            parse_items("loot_tables.json", get_entry(&entries, "loot_tables.json")?)?;
         let events = parse_items("events.json", get_entry(&entries, "events.json")?)?;
         let offers = parse_items("offers.json", get_entry(&entries, "offers.json")?)?;
         let seasons = parse_items("seasons.json", get_entry(&entries, "seasons.json")?)?;
@@ -717,6 +887,7 @@ impl RemoteConfig {
             cards,
             sets,
             chests,
+            loot_tables,
             events,
             offers,
             seasons,
@@ -1187,15 +1358,106 @@ impl RemoteConfig {
             }
         }
         for set in &self.sets {
-            if set.completion_spins > i32::MAX as u32 {
+            if set.completion_spins.is_none() && set.completion_reward.is_none() {
                 problems.push(format!(
-                    "set {} : récompense spins hors INTEGER",
+                    "set {} : ni completionSpins ni completionReward",
                     set.set_id
                 ));
+            }
+            let reward = set.effective_reward();
+            if !reward_fits_storage(&reward) || (reward.spins == 0 && reward.credits == 0) {
+                problems.push(format!(
+                    "set {} : récompense nulle ou hors stockage",
+                    set.set_id
+                ));
+            }
+            if reward
+                .chest
+                .as_deref()
+                .is_some_and(|chest| !self.chests.iter().any(|c| c.chest_id == chest))
+            {
+                problems.push(format!("set {} : coffre de récompense inconnu", set.set_id));
+            }
+            if set
+                .visual_theme
+                .as_deref()
+                .is_some_and(|theme| theme.trim().is_empty() || theme.len() > 32)
+            {
+                problems.push(format!("set {} : visualTheme invalide", set.set_id));
+            }
+            if let Some(requirement) = &set.unlock_requirement {
+                if requirement.completed_district_id.is_none()
+                    && requirement.completed_set_id.is_none()
+                {
+                    problems.push(format!("set {} : unlockRequirement vide", set.set_id));
+                }
+                if requirement
+                    .completed_district_id
+                    .is_some_and(|id| id == 0 || !self.districts.iter().any(|d| d.id == id))
+                {
+                    problems.push(format!(
+                        "set {} : district de déblocage inconnu",
+                        set.set_id
+                    ));
+                }
+                match requirement.completed_set_id.as_deref() {
+                    Some(required) if required == set.set_id => {
+                        problems.push(format!("set {} : se débloque lui-même", set.set_id));
+                    }
+                    Some(required) if !set_ids.contains(required) => {
+                        problems.push(format!("set {} : set de déblocage inconnu", set.set_id));
+                    }
+                    _ => {}
+                }
+            }
+            if set.cards.is_empty() {
+                problems.push(format!("set {} : aucune carte", set.set_id));
+            }
+            let unique_cards: BTreeSet<&str> = set.cards.iter().map(|c| c.as_str()).collect();
+            if unique_cards.len() != set.cards.len() {
+                problems.push(format!("set {} : carte en double", set.set_id));
             }
             for card in &set.cards {
                 if !card_ids.contains(card.as_str()) {
                     problems.push(format!("set {} : carte inconnue {}", set.set_id, card));
+                }
+            }
+        }
+        // Une carte appartenant à un set qui ne la liste pas serait intirable
+        // par la vue collection tout en polluant les tirages.
+        for card in &self.cards {
+            if !self.sets.iter().any(|set| {
+                set.set_id == card.set_id && set.cards.iter().any(|c| c == &card.card_id)
+            }) {
+                problems.push(format!(
+                    "carte {} : absente de la liste de son set {}",
+                    card.card_id, card.set_id
+                ));
+            }
+        }
+        // Les chaînes de déblocage de sets ne doivent pas boucler.
+        for set in &self.sets {
+            let mut seen: BTreeSet<&str> = BTreeSet::new();
+            let mut cursor = set;
+            while let Some(next_id) = cursor
+                .unlock_requirement
+                .as_ref()
+                .and_then(|requirement| requirement.completed_set_id.as_deref())
+            {
+                if !seen.insert(next_id) {
+                    problems.push(format!(
+                        "set {} : chaîne de déblocage circulaire",
+                        set.set_id
+                    ));
+                    break;
+                }
+                match self
+                    .sets
+                    .iter()
+                    .find(|candidate| candidate.set_id == next_id)
+                {
+                    Some(next) => cursor = next,
+                    None => break,
                 }
             }
         }
@@ -1220,11 +1482,128 @@ impl RemoteConfig {
                 ));
             }
         }
-        for chest in &self.chests {
-            if chest.cards_per_open == 0
-                || chest.loot_table.iter().map(|l| l.weight).sum::<u32>() == 0
+        let loot_table_ids: BTreeSet<&str> = self
+            .loot_tables
+            .iter()
+            .map(|table| table.loot_table_id.as_str())
+            .collect();
+        if loot_table_ids.len() != self.loot_tables.len() {
+            problems.push("lootTables : lootTableId en double".to_string());
+        }
+        for table in &self.loot_tables {
+            if table.entries.is_empty()
+                || table
+                    .entries
+                    .iter()
+                    .map(|entry| u64::from(entry.weight))
+                    .sum::<u64>()
+                    == 0
             {
-                problems.push(format!("chest {} : loot table invalide", chest.chest_id));
+                problems.push(format!(
+                    "lootTable {} : poids total nul",
+                    table.loot_table_id
+                ));
+            }
+            let rarities: BTreeSet<&Tier> =
+                table.entries.iter().map(|entry| &entry.rarity).collect();
+            if rarities.len() != table.entries.len() {
+                problems.push(format!(
+                    "lootTable {} : rareté en double",
+                    table.loot_table_id
+                ));
+            }
+            for entry in &table.entries {
+                if entry.weight > MAX_LOOT_WEIGHT {
+                    problems.push(format!(
+                        "lootTable {} : poids {} au-dessus du plafond",
+                        table.loot_table_id, entry.weight
+                    ));
+                }
+                if !self.cards.iter().any(|card| card.rarity == entry.rarity) {
+                    problems.push(format!(
+                        "lootTable {} : aucune carte pour la rareté {:?}",
+                        table.loot_table_id, entry.rarity
+                    ));
+                }
+            }
+            let modifier_ids: BTreeSet<&str> = table
+                .modifiers
+                .iter()
+                .map(|modifier| modifier.modifier_id.as_str())
+                .collect();
+            if modifier_ids.len() != table.modifiers.len() {
+                problems.push(format!(
+                    "lootTable {} : modifierId en double",
+                    table.loot_table_id
+                ));
+            }
+            for modifier in &table.modifiers {
+                if modifier.multipliers.is_empty() {
+                    problems.push(format!(
+                        "lootTable {} / modifier {} : aucun multiplicateur",
+                        table.loot_table_id, modifier.modifier_id
+                    ));
+                }
+                if modifier
+                    .min_district_index
+                    .zip(modifier.max_district_index)
+                    .is_some_and(|(minimum, maximum)| minimum > maximum)
+                {
+                    problems.push(format!(
+                        "lootTable {} / modifier {} : fenêtre de district inversée",
+                        table.loot_table_id, modifier.modifier_id
+                    ));
+                }
+                if modifier
+                    .event_id
+                    .as_deref()
+                    .is_some_and(|id| !self.events.iter().any(|event| event.event_id == id))
+                {
+                    problems.push(format!(
+                        "lootTable {} / modifier {} : événement inconnu",
+                        table.loot_table_id, modifier.modifier_id
+                    ));
+                }
+                for multiplier in &modifier.multipliers {
+                    if multiplier.multiplier_bps == 0 || multiplier.multiplier_bps > 100_000 {
+                        problems.push(format!(
+                            "lootTable {} / modifier {} : multiplicateur {} hors bornes",
+                            table.loot_table_id, modifier.modifier_id, multiplier.multiplier_bps
+                        ));
+                    }
+                    if !table
+                        .entries
+                        .iter()
+                        .any(|entry| entry.rarity == multiplier.rarity)
+                    {
+                        problems.push(format!(
+                            "lootTable {} / modifier {} : rareté {:?} absente de la table",
+                            table.loot_table_id, modifier.modifier_id, multiplier.rarity
+                        ));
+                    }
+                }
+            }
+        }
+        for chest in &self.chests {
+            let inline_weight: u64 = chest
+                .loot_table
+                .iter()
+                .map(|entry| u64::from(entry.weight))
+                .sum();
+            match chest.loot_table_id.as_deref() {
+                Some(id) if !loot_table_ids.contains(id) => {
+                    problems.push(format!(
+                        "chest {} : lootTableId inconnu {}",
+                        chest.chest_id, id
+                    ));
+                }
+                None if inline_weight == 0 => {
+                    problems.push(format!("chest {} : loot table invalide", chest.chest_id));
+                }
+                _ => {}
+            }
+            if chest.cards_per_open == 0 {
+                problems.push(format!("chest {} : cardsPerOpen nul", chest.chest_id));
             }
             if chest.price_credits > i64::MAX as u64 {
                 problems.push(format!("chest {} : prix hors BIGINT", chest.chest_id));
@@ -1528,6 +1907,7 @@ impl RemoteConfig {
             "cards": self.cards,
             "sets": self.sets,
             "chests": self.chests,
+            "lootTables": self.loot_tables,
             "events": self.events,
             "offers": self.offers,
             "seasons": self.seasons,
@@ -1600,6 +1980,119 @@ mod tests {
             "message inattendu : {}",
             problems
         );
+    }
+
+    fn bundled() -> RemoteConfig {
+        RemoteConfig::load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../config"))
+            .expect("la config livrée doit rester valide")
+    }
+
+    fn weight_of(table: &[LootWeight], rarity: Tier) -> u32 {
+        table
+            .iter()
+            .find(|entry| entry.rarity == rarity)
+            .map(|entry| entry.weight)
+            .unwrap_or(0)
+    }
+
+    #[test]
+    fn loot_modifiers_react_to_progression_and_events() {
+        let cfg = bundled();
+        let elite = cfg
+            .chests
+            .iter()
+            .find(|chest| chest.chest_id == "elite")
+            .expect("coffre elite");
+
+        // Sous le seuil du modifier, la table reste celle du registre.
+        let early = cfg.resolved_loot_table(elite, 0, &[]);
+        assert_eq!(weight_of(&early, Tier::Legendary), 250);
+        assert_eq!(weight_of(&early, Tier::Uncommon), 4000);
+
+        // Au-delà, l'endgame remonte le haut de table et baisse le bas.
+        let late = cfg.resolved_loot_table(elite, 4, &[]);
+        assert_eq!(weight_of(&late, Tier::Legendary), 350);
+        assert_eq!(weight_of(&late, Tier::Uncommon), 3000);
+
+        // Un événement actif s'ajoute sans que la progression change.
+        let standard = cfg
+            .chests
+            .iter()
+            .find(|chest| chest.chest_id == "neon")
+            .expect("coffre neon");
+        let neutral = cfg.resolved_loot_table(standard, 2, &[]);
+        let boosted = cfg.resolved_loot_table(standard, 2, &["neon_rush_r17"]);
+        assert!(
+            weight_of(&boosted, Tier::Epic) > weight_of(&neutral, Tier::Epic),
+            "l'événement doit remonter la rareté épique"
+        );
+        // Un événement inconnu ne doit rien déclencher.
+        let unrelated = cfg.resolved_loot_table(standard, 2, &["evenement_inexistant"]);
+        assert_eq!(
+            weight_of(&unrelated, Tier::Epic),
+            weight_of(&neutral, Tier::Epic)
+        );
+    }
+
+    #[test]
+    fn inline_loot_table_stays_supported_and_never_becomes_undrawable() {
+        let cfg = bundled();
+        // Forme historique : aucun lootTableId, table inline. Elle doit encore
+        // fonctionner pour ne pas invalider une config déjà déployée.
+        let legacy = ChestConfig {
+            chest_id: "legacy".to_string(),
+            name: "Legacy".to_string(),
+            image: String::new(),
+            price_credits: 1,
+            cards_per_open: 1,
+            loot_table: vec![LootWeight {
+                rarity: Tier::Common,
+                weight: 500,
+            }],
+            loot_table_id: None,
+        };
+        let resolved = cfg.resolved_loot_table(&legacy, 4, &["neon_rush_r17"]);
+        assert_eq!(weight_of(&resolved, Tier::Common), 500);
+
+        // Un coffre qui référence une table absente ne doit pas paniquer.
+        let dangling = ChestConfig {
+            loot_table_id: Some("inexistant".to_string()),
+            loot_table: Vec::new(),
+            ..legacy
+        };
+        assert!(cfg.resolved_loot_table(&dangling, 0, &[]).is_empty());
+    }
+
+    #[test]
+    fn set_rewards_support_both_config_shapes() {
+        let cfg = bundled();
+        // La config livrée exerce les deux formes, sinon la compatibilité
+        // ascendante ne serait vérifiée par rien.
+        let legacy = cfg
+            .sets
+            .iter()
+            .find(|set| set.completion_spins.is_some() && set.completion_reward.is_none())
+            .expect("un set doit rester sur la forme historique");
+        assert_eq!(
+            legacy.effective_reward().spins,
+            legacy.completion_spins.unwrap()
+        );
+        assert_eq!(legacy.effective_reward().credits, 0);
+
+        let modern = cfg
+            .sets
+            .iter()
+            .find(|set| set.completion_reward.is_some())
+            .expect("un set doit utiliser completionReward");
+        assert!(modern.effective_reward().credits > 0);
+
+        // Le volume de lancement : 5 sets de 9 cartes.
+        assert_eq!(cfg.sets.len(), 5);
+        for set in &cfg.sets {
+            assert_eq!(set.cards.len(), 9, "set {}", set.set_id);
+        }
+        assert_eq!(cfg.cards.len(), 45);
+        assert_eq!(cfg.chests.len(), 4);
     }
 
     /// La croissance par niveau n'est vérifiée qu'ici (la gate PowerShell ne la

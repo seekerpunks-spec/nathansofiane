@@ -86,13 +86,81 @@ func _chest_card(chest: Dictionary) -> PanelContainer:
 	panel.add_child(row)
 	return panel
 
+## Couleur d'accent d'un set. Le thème vient de la config, donc un set ajouté
+## sans thème connu retombe sur l'accent neutre au lieu d'être invisible.
+func _theme_color(theme: String) -> Color:
+	match theme:
+		"cyan": return Ui.NEON_CYAN
+		"magenta": return Ui.NEON_MAGENTA
+		"rust": return Ui.GOLD
+		"gold": return Ui.GOLD
+		"void": return Ui.NEON_CYAN
+		_: return Ui.NEON_CYAN
+
+## Prérequis de déblocage lisible, vide si le set est accessible. Le serveur
+## refait ce contrôle au claim : ici c'est de l'affichage.
+func _set_lock_reason(set_data: Dictionary) -> String:
+	var requirement: Variant = set_data.get("unlockRequirement", null)
+	if typeof(requirement) != TYPE_DICTIONARY:
+		return ""
+	var district_id := int(requirement.get("completedDistrictId", 0))
+	if district_id > 0 and int(Store.state.get("districtIndex", 0)) < district_id:
+		return "VERROUILLÉ  •  TERMINE LE DISTRICT %02d" % district_id
+	var required_set := str(requirement.get("completedSetId", ""))
+	if required_set != "":
+		var claimed: Array = Store.state.get("completedSets", [])
+		if not claimed.has(required_set):
+			return "VERROUILLÉ  •  COMPLÈTE %s" % _set_name(required_set).to_upper()
+	return ""
+
+func _set_name(set_id: String) -> String:
+	for candidate in Config.sets():
+		if typeof(candidate) == TYPE_DICTIONARY and str(candidate.get("setId", "")) == set_id:
+			return str(candidate.get("name", set_id))
+	return set_id
+
+## Récompense effective d'un set : la forme objet prime, sinon les spins
+## historiques. Même règle que SetConfig::effective_reward côté serveur.
+func _set_reward(set_data: Dictionary) -> Dictionary:
+	var reward: Variant = set_data.get("completionReward", null)
+	if typeof(reward) == TYPE_DICTIONARY:
+		return {
+			"spins": int(reward.get("spins", 0)),
+			"credits": int(reward.get("credits", 0)),
+			"chest": str(reward.get("chest", "")),
+		}
+	return {"spins": int(set_data.get("completionSpins", 0)), "credits": 0, "chest": ""}
+
+func _reward_label(reward: Dictionary) -> String:
+	var parts: Array[String] = []
+	if int(reward.get("spins", 0)) > 0:
+		parts.append("+%s SPINS" % Ui.compact(int(reward.get("spins", 0))))
+	if int(reward.get("credits", 0)) > 0:
+		parts.append("+%s CR" % Ui.compact(int(reward.get("credits", 0))))
+	var chest_id := str(reward.get("chest", ""))
+	if chest_id != "":
+		parts.append("+1 " + _chest_name(chest_id).to_upper())
+	return "RÉCLAMER  " + " ".join(parts) if not parts.is_empty() else "RÉCLAMER"
+
+func _chest_name(chest_id: String) -> String:
+	for chest in Config.chests():
+		if typeof(chest) == TYPE_DICTIONARY and str(chest.get("chestId", "")) == chest_id:
+			return str(chest.get("name", chest_id))
+	return chest_id
+
 func _set_card(set_data: Dictionary) -> PanelContainer:
-	var panel := Ui.panel()
+	var accent := _theme_color(str(set_data.get("visualTheme", "")))
+	var lock_reason := _set_lock_reason(set_data)
+	var panel := Ui.panel(Color(Ui.PANEL, 0.94), accent if lock_reason == "" else Ui.BORDER)
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 8)
-	var title := Ui.label(str(set_data.get("name", "Set")), 19, Ui.TEXT)
+	var title := Ui.label(str(set_data.get("name", "Set")), 19, Ui.TEXT if lock_reason == "" else Ui.TEXT_DIM)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	box.add_child(title)
+	if lock_reason != "":
+		var lock := Ui.label(lock_reason, 11, Ui.NEON_MAGENTA)
+		lock.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+		box.add_child(lock)
 	var owned := _owned_map()
 	var card_ids: Array = set_data.get("cards", [])
 	var complete := true
@@ -116,8 +184,8 @@ func _set_card(set_data: Dictionary) -> PanelContainer:
 		grid.add_child(slot)
 	box.add_child(grid)
 	var claimed: Array = Store.state.get("completedSets", [])
-	var claim := Ui.button("RÉCLAMER +%s SPINS" % Ui.compact(int(set_data.get("completionSpins", 0))), Ui.GOLD, not complete)
-	claim.disabled = _busy or not complete or claimed.has(set_data.get("setId", ""))
+	var claim := Ui.button(_reward_label(_set_reward(set_data)), Ui.GOLD, not complete or lock_reason != "")
+	claim.disabled = _busy or not complete or lock_reason != "" or claimed.has(set_data.get("setId", ""))
 	claim.pressed.connect(_claim_set.bind(str(set_data.get("setId", ""))))
 	box.add_child(claim)
 	panel.add_child(box)

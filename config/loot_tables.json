@@ -1,0 +1,93 @@
+{
+  "note": "PROVISIONAL — registre central de loot tables. Les coffres referencent une table par lootTableId ; les modifiers ajustent les poids selon la progression (districtIndex = nombre de districts completes) et les evenements actifs. multiplierBps : 10000 = neutre.",
+  "items": [
+    {
+      "lootTableId": "cache_entry",
+      "entries": [
+        { "rarity": "common", "weight": 7600 },
+        { "rarity": "uncommon", "weight": 1800 },
+        { "rarity": "rare", "weight": 550 },
+        { "rarity": "epic", "weight": 50 }
+      ],
+      "modifiers": [
+        {
+          "modifierId": "entry_late_game_relief",
+          "minDistrictIndex": 3,
+          "multipliers": [
+            { "rarity": "common", "multiplierBps": 8000 },
+            { "rarity": "rare", "multiplierBps": 13000 },
+            { "rarity": "epic", "multiplierBps": 16000 }
+          ]
+        }
+      ]
+    },
+    {
+      "lootTableId": "cache_standard",
+      "entries": [
+        { "rarity": "common", "weight": 4800 },
+        { "rarity": "uncommon", "weight": 3000 },
+        { "rarity": "rare", "weight": 1700 },
+        { "rarity": "epic", "weight": 450 },
+        { "rarity": "legendary", "weight": 50 }
+      ],
+      "modifiers": [
+        {
+          "modifierId": "standard_early_game_floor",
+          "maxDistrictIndex": 1,
+          "multipliers": [
+            { "rarity": "common", "multiplierBps": 11000 },
+            { "rarity": "legendary", "multiplierBps": 6000 }
+          ]
+        },
+        {
+          "modifierId": "standard_neon_rush",
+          "eventId": "neon_rush_r17",
+          "multipliers": [
+            { "rarity": "epic", "multiplierBps": 13000 },
+            { "rarity": "legendary", "multiplierBps": 15000 }
+          ]
+        }
+      ]
+    },
+    {
+      "lootTableId": "cache_rare",
+      "entries": [
+        { "rarity": "common", "weight": 2600 },
+        { "rarity": "uncommon", "weight": 3800 },
+        { "rarity": "rare", "weight": 2700 },
+        { "rarity": "epic", "weight": 800 },
+        { "rarity": "legendary", "weight": 100 }
+      ],
+      "modifiers": [
+        {
+          "modifierId": "rare_neon_rush",
+          "eventId": "neon_rush_r17",
+          "multipliers": [
+            { "rarity": "epic", "multiplierBps": 12500 },
+            { "rarity": "legendary", "multiplierBps": 14000 }
+          ]
+        }
+      ]
+    },
+    {
+      "lootTableId": "cache_elite",
+      "entries": [
+        { "rarity": "uncommon", "weight": 4000 },
+        { "rarity": "rare", "weight": 4000 },
+        { "rarity": "epic", "weight": 1750 },
+        { "rarity": "legendary", "weight": 250 }
+      ],
+      "modifiers": [
+        {
+          "modifierId": "elite_endgame_lift",
+          "minDistrictIndex": 4,
+          "multipliers": [
+            { "rarity": "uncommon", "multiplierBps": 7500 },
+            { "rarity": "epic", "multiplierBps": 12000 },
+            { "rarity": "legendary", "multiplierBps": 14000 }
+          ]
+        }
+      ]
+    }
+  ]
+}

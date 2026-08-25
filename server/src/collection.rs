@@ -1,7 +1,7 @@
 //! Coffres, cartes, doublons et récompenses de collection.
 
 use crate::auth::Addr;
-use crate::config::{CardConfig, ChestConfig, Reward};
+use crate::config::{CardConfig, LootWeight};
 use crate::db::Db;
 use crate::error::ApiError;
 use crate::game;
@@ -48,8 +48,8 @@ where
     })
 }
 
-fn draw_card<'a>(chest: &ChestConfig, cards: &'a [CardConfig]) -> Option<&'a CardConfig> {
-    let rarity = pick_weighted(&chest.loot_table, |l| l.weight).map(|l| l.rarity)?;
+fn draw_card<'a>(loot_table: &[LootWeight], cards: &'a [CardConfig]) -> Option<&'a CardConfig> {
+    let rarity = pick_weighted(loot_table, |l| l.weight).map(|l| l.rarity)?;
     let eligible: Vec<&CardConfig> = cards.iter().filter(|c| c.rarity == rarity).collect();
     if eligible.is_empty() {
         return pick_weighted(cards, |c| c.drop_weight);
@@ -192,7 +192,7 @@ pub async fn open_chest(
         .find(|c| c.chest_id == body.chest_id)
         .ok_or(ApiError::NotFound)?;
     let mut tx = state.db.begin().await?;
-    let _player = state
+    let player = state
         .db
         .fetch_state_locked(&mut tx, &addr.0)
         .await?
@@ -201,6 +201,16 @@ pub async fn open_chest(
         tx.rollback().await?;
         return Ok(Json(v));
     }
+    // Table résolue une fois par ouverture : la progression et les événements
+    // en cours sont figés pour toutes les cartes du même coffre.
+    let active_events = state
+        .config
+        .active_event_ids(chrono::Utc::now().timestamp_millis());
+    let loot_table = state.config.resolved_loot_table(
+        chest,
+        player.district_index.max(0) as u32,
+        &active_events,
+    );
     let qty: i64 = sqlx::query_scalar(
         "SELECT qty FROM player_chests WHERE address=$1 AND chest_id=$2 FOR UPDATE",
     )
@@ -220,7 +230,7 @@ pub async fn open_chest(
         .await?;
     let mut drops = Vec::new();
     for _ in 0..chest.cards_per_open {
-        let card = draw_card(chest, &state.config.cards)
+        let card = draw_card(&loot_table, &state.config.cards)
             .ok_or_else(|| ApiError::Internal(anyhow!("loot table sans carte compatible")))?;
         let new_qty: Option<i64> = sqlx::query_scalar(
             "INSERT INTO player_cards(address,card_id,qty) VALUES($1,$2,1) \
@@ -286,6 +296,30 @@ pub async fn claim_set(
         tx.rollback().await?;
         return Err(ApiError::AlreadyClaimed);
     }
+    // Le prérequis de déblocage est arbitré ici : côté client il n'est
+    // qu'un affichage, donc le laisser hors du serveur le rendrait décoratif.
+    if let Some(requirement) = &set.unlock_requirement {
+        if requirement
+            .completed_district_id
+            .is_some_and(|id| player.district_index < id as i32)
+        {
+            tx.rollback().await?;
+            return Err(ApiError::Unavailable("set verrouillé".to_string()));
+        }
+        if let Some(required_set) = requirement.completed_set_id.as_deref() {
+            let claimed: Option<bool> = sqlx::query_scalar(
+                "SELECT claimed FROM set_completion WHERE address=$1 AND set_id=$2",
+            )
+            .bind(&addr.0)
+            .bind(required_set)
+            .fetch_optional(&mut *tx)
+            .await?;
+            if !claimed.unwrap_or(false) {
+                tx.rollback().await?;
+                return Err(ApiError::Unavailable("set verrouillé".to_string()));
+            }
+        }
+    }
     let owned: Vec<String> =
         sqlx::query_scalar("SELECT card_id FROM player_cards WHERE address=$1 AND qty>0")
             .bind(&addr.0)
@@ -297,25 +331,24 @@ pub async fn claim_set(
     }
     sqlx::query("INSERT INTO set_completion(address,set_id,claimed) VALUES($1,$2,true) ON CONFLICT(address,set_id) DO UPDATE SET claimed=true")
         .bind(&addr.0).bind(&set.set_id).execute(&mut *tx).await?;
-    let reward = Reward {
-        spins: set.completion_spins,
-        credits: 0,
-        chest: None,
-    };
+    let reward = set.effective_reward();
     game::grant_reward_tx(&mut tx, &addr.0, &reward, &state.config).await?;
     let global_progression = progression::refresh_score_tx(&mut tx, &addr.0, &state.config).await?;
     // Relire le solde autoritaire : `grant_reward_tx` applique aussi la regen
     // non persistée et vérifie l'overflow. Recalculer ici divergeait.
-    let spins: i32 = sqlx::query_scalar("SELECT spins FROM player_state WHERE address=$1")
-        .bind(&addr.0)
-        .fetch_one(&mut *tx)
-        .await?;
-    let response = json!({"setId": set.set_id, "reward": reward, "spins": spins, "globalProgression":progression::score_json(global_progression,&state.config), "serverTimeMs": chrono::Utc::now().timestamp_millis()});
+    let balances: (i32, i64) =
+        sqlx::query_as("SELECT spins,credits FROM player_state WHERE address=$1")
+            .bind(&addr.0)
+            .fetch_one(&mut *tx)
+            .await?;
+    let response = json!({"setId": set.set_id, "reward": reward, "spins": balances.0, "credits": balances.1, "globalProgression":progression::score_json(global_progression,&state.config), "serverTimeMs": chrono::Utc::now().timestamp_millis()});
+    // Les sets accordent désormais spins, crédits et coffre : journaliser le
+    // seul solde de spins laisserait la trace économique incomplète.
     Db::audit_tx(
         &mut tx,
         &addr.0,
         "set_complete",
-        &json!({"spins": player.spins}),
+        &json!({"spins": player.spins, "credits": player.credits, "districtIndex": player.district_index}),
         &response,
         Some(&rid),
     )
