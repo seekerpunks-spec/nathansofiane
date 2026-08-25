@@ -41,10 +41,12 @@ Hiérarchie de vérité : `server/src/*.rs` = contrat API définitif > `docs/` (
   résolvait la surcharge PowerShell `char[]` et tronquait le runtime analysé à
   6 caractères, rendant deux checks négatifs vacuous. `validate_all.ps1` est vert
   (28 tests Rust, 53 événements analytics, smoke 6 scènes × 3 ratios).
-- Quirks machine : le shell Cursor exige `required_permissions: ["all"]`, et
-  **`git` n'est pas installé** malgré la présence de `.git/`.
-- Prochain lot : installer git, monter le volume de contenu par config, rejouer
-  `api_contract_check` sur une instance DEV_AUTH.
+- Quirks machine : le shell Cursor exige `required_permissions: ["all"]` (aucun
+  backend sandbox Windows). Git 2.55 installé, `.git` réapproprié depuis le
+  compte sandbox Codex, `core.autocrlf=false` local, 15 commits, arbre propre.
+- Prochain lot : monter le volume de contenu par config (2 districts / 8 cartes /
+  2 sets / 3 coffres aujourd'hui), rejouer `api_contract_check` sur une instance
+  DEV_AUTH locale.
 
 ## Roadmap (condensé)
 M1 spin+auth (**GREEN** R16) → **M2 districts/upgrades (prochain)** → M3 coffres/cartes/collections → M4 rétention (dailies, leaderboards, events) → M5 monétisation SKR (packs, paiements SPL vérifiés on-chain) → M6/M7 polish + build Android + dApp Store. Détails : `memory/TODO.md` + `memory/GDD.md`.

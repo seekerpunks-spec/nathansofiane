@@ -17,9 +17,7 @@
 
 ## Prochain lot proposé
 
-- [ ] **Installer `git`** : `.git/` existe mais le binaire est absent de la
-      machine, donc aucun commit/diff/rollback n'est possible. Bloquant avant
-      tout gros refactor.
+- [x] Git installé, `.git` réapproprié, travail R24 commité (15 commits).
 - [ ] **Volume de contenu** : prouver les claims data-driven à l'échelle. On a
       2 districts, 8 cartes, 2 sets, 3 coffres alors que le MASTER TODO cible
       N districts (§6) et des catégories de coffres Basic→Elite (§12). Ajouter

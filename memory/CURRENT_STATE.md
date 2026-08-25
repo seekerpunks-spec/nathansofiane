@@ -15,6 +15,9 @@
   Corrigé en `-split '#\[cfg\(test\)\]'` + garde-fou de longueur. Aucune
   violation réelle n'était masquée (vérifié après correction).
 - `tools/validate_all.ps1` repasse **CYBERSEEKER_VALIDATION_OK**.
+- Versioning réparé : le travail R24 (migrations 0016→0019, reward pool, rotation
+  des refresh tokens, refactor Spin, nouvelles gates) n'avait jamais été commité.
+  Historique porté de 13 à 15 commits, arbre propre.
 
 ## Validation exécutée R25
 
@@ -47,9 +50,13 @@ rate-limit atomiques en PostgreSQL. Détail : `docs/ROADMAP.md` et
 
 - Le shell Cursor exige `required_permissions: ["all"]` sur cette machine
   (aucun backend sandbox Windows) ; sans ça toute commande échoue à se lancer.
-- **`git` n'est pas installé** (absent du PATH et de `Program Files`) alors que
-  `.git/` existe. Aucun versioning n'est donc possible pour l'instant : à
-  installer avant le prochain gros lot.
+- Git 2.55.0.3 installé (`C:\Program Files\Git`). Le `.git/` avait été créé par
+  le compte sandbox `CodexSandboxOnline` : propriété réattribuée à `danbi` sur
+  921 fichiers avec `icacls /setowner`, donc plus besoin d'exception
+  `safe.directory`. Historique intact, `git fsck` propre.
+- `core.autocrlf=false` en config locale : l'installateur Git for Windows force
+  `true` au niveau système alors que l'historique est en LF.
+- Identité git globale : Sofiane Deroide <sofiane.deroide1@gmail.com>.
 - Postgres 16 opérationnel (les tests d'intégration passent).
 
 ## Ce qui dépend encore de l'extérieur
