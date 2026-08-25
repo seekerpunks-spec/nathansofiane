@@ -98,5 +98,20 @@
       collection et provider restent désactivés jusqu'à configuration externe.
 - [x] Audit Pets négatif, gate sécurité, safe areas, Retour Android, touch targets
       et smoke des six scènes sur trois ratios portrait.
+- [x] Nonces single-use et rate limiting PostgreSQL atomiques, partagés entre
+      plusieurs instances et validés par test HTTP croisé.
+- [x] Architecture SKR future fail-closed : budget saisonnier global, allocations
+      idempotentes, pending balance et settlement provider interne sans payout client.
+- [x] Refactor Spin : composants de rendu, Network et rencontres extraits ;
+      smoke interactif des overlays en plus des six scènes.
+- [x] Inventaire reproductible des caches et dossiers racine corrompus ; aucun
+      nettoyage destructif requis pour le runtime.
+- [x] Rotation one-time-use des refresh tokens avec `jti` hashé, concurrence
+      PostgreSQL, replay HTTP rejeté et logout avec révocation idempotente.
+- [x] Gate sécurité réparée : l'extraction du runtime `auth.rs` utilisait
+      `String.Split("#[cfg(test)]")`, résolu par PowerShell vers la surcharge
+      `char[]`, ce qui tronquait l'analyse à six caractères et neutralisait les
+      checks négatifs Base58/nonce. Remplacé par un `-split` regex avec
+      garde-fou de longueur ; `validate_all.ps1` repasse vert.
 - [ ] Autres systèmes restants du MASTER TODO.
 - [ ] Design et Wallet Adapter différés explicitement pour ce lot.

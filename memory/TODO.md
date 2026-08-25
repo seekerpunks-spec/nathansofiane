@@ -1,68 +1,52 @@
-# MÉMOIRE — TODO / PROCHAINES TÂCHES R24
+# MÉMOIRE — TODO / PROCHAINES TÂCHES R25
 
-> MAJ R20 (22/08/2026). La roadmap détaillée est `docs/ROADMAP.md` et la
-> checklist de publication est `docs/RELEASE_CHECKLIST.md`.
+> MAJ 25/08/2026. Roadmap détaillée : `docs/ROADMAP.md`. Checklist de
+> publication : `docs/RELEASE_CHECKLIST.md`. Spec produit : `MASTER TODO`.
 
-## Réalisé localement
+## Fait (cumul)
 
-- [x] Baseline Git, intégrité économique, auth Base58, regen à reliquat.
-- [x] Multiplicateur data-driven ×1 à ×100K serveur/client/analytics.
+- [x] M1→M9 : auth, spin, districts, collection, rétention, monétisation,
+      refonte cyberpunk, slot trois rouleaux, direction 2.5D Blender.
+- [x] Expansion gameplay R24 : multiplicateurs ×1→×100K, 2 districts, liveops,
+      analytics 53 événements, social Signal Jam / Ghost Vault / Firewalls,
+      Network Power, amis, crews, trading de doublons, Crew Uplink,
+      achievements, entitlements NFT fail-closed, reward pool SKR désactivée,
+      garde-fous distribués, rotation des refresh tokens, invariants SQL.
+- [x] R25 : root cause de la gate sécurité rouge corrigée
+      (`String.Split` char[] en PowerShell) et `validate_all.ps1` revert.
 
-- [x] M1 : auth dev, état autoritaire, spin, regen, idempotence et analytics.
-- [x] M2 : District 1, cinq éléments, six états visuels par élément, upgrades et
-      récompense de complétion.
-- [x] M3 : coffres, cartes, doublons, sets et claim anti double-récompense.
-- [x] M4 : daily, missions, événement, classement et paliers.
-- [x] M5 : offres, publicité via adaptateur, achats vérifiés via provider et
-      season pass data-driven.
-- [x] M6 : refonte cyberpunk mobile, navigation cinq onglets, accessibilité,
-      préférences, retry réseau et assets originaux.
-- [x] M7 local : tests Rust, smoke des six scènes, intégration API, build serveur
-      release et APK Android arm64 signé/debug vérifié.
-- [x] M8 : Figma MCP installé, slot trois rouleaux conçu puis intégré avec atlas
-      original, animations multi-phases, anticipation, jackpot, SFX et haptique.
-- [x] M9a : Blender 5.2 LTS portable, scène maître 2.5D, rendu transparent et
-      cabinet final intégré dans Godot.
-- [x] M9b : dioramas Blender District/Collection/Missions/Store, mascotte BYTE,
-      onboarding illustré, fond vivant, transitions et QA visuelle desktop.
+## Prochain lot proposé
+
+- [ ] **Installer `git`** : `.git/` existe mais le binaire est absent de la
+      machine, donc aucun commit/diff/rollback n'est possible. Bloquant avant
+      tout gros refactor.
+- [ ] **Volume de contenu** : prouver les claims data-driven à l'échelle. On a
+      2 districts, 8 cartes, 2 sets, 3 coffres alors que le MASTER TODO cible
+      N districts (§6) et des catégories de coffres Basic→Elite (§12). Ajouter
+      du contenu par config uniquement, sans toucher le moteur, et vérifier
+      l'économie avec `economy_check`.
+- [ ] **Gate `api_contract_check.ps1`** : jamais rejouée dans cette session,
+      elle exige une instance locale `DEV_AUTH` dédiée. À lancer via
+      `validate_all.ps1 -ApiBaseUrl ... -ApiDevAddress ...`.
+
+## Décisions produit encore ouvertes (ne pas inventer)
+
+- [ ] §19 MASTER TODO : envoi de ressources entre amis. Actuellement fermé par
+      D9/T29 (aucun transfert libre de richesse). À confirmer ou rouvrir.
+- [ ] Phase 9 : chat d'équipe limité (différé, demande de la modération) et
+      donations (écartées au profit du swap 1-pour-1).
+- [ ] Design final et Wallet Adapter natif : différés explicitement.
 
 ## Reste externe avant publication
 
-- [ ] Optionnel : authentifier Tripo localement pour remplacer certains volumes
-      procéduraux ; ne jamais stocker la clé API dans le dépôt ou les logs.
-
-- [ ] Brancher Solana Mobile Wallet Adapter sur un appareil Seeker réel.
-- [ ] Choisir le RPC/indexeur, le mint SKR et l'adresse de trésorerie.
-- [ ] Brancher les providers réels de publicité et de paiement avec leurs secrets.
-- [ ] Configurer domaine/API HTTPS de production et observabilité hébergée.
-- [ ] Créer et sauvegarder le keystore de publication appartenant à l'éditeur.
-- [ ] Effectuer QA Seeker 30 minutes : haptique, reprise, réseau mobile, batterie,
-      mémoire et température.
-- [ ] Fournir comptes, textes légaux et fiche dApp Store pour la soumission.
-
-Ces tâches demandent un appareil, des identifiants, des choix commerciaux ou une
-infrastructure que le dépôt ne peut ni inventer ni certifier.
+- [ ] Solana Mobile Wallet Adapter sur un appareil Seeker réel.
+- [ ] RPC/indexeur, mint SKR et adresse de trésorerie.
+- [ ] Providers réels de publicité et de paiement avec leurs secrets.
+- [ ] Domaine/API HTTPS de production et observabilité hébergée.
+- [ ] Keystore de publication appartenant à l'éditeur.
+- [ ] QA Seeker 30 min : haptique, reprise, réseau mobile, batterie, thermique.
+- [ ] Comptes, textes légaux et fiche dApp Store.
+- [ ] Optionnel : authentifier Tripo localement (jamais de clé dans le dépôt).
 
 Le prochain APK/AAB n'est généré qu'une fois cette gate shippable fermée. Les
 itérations intermédiaires utilisent uniquement Godot desktop, captures et tests.
-
-## Exécution gameplay en cours
-
-- [x] Multi-districts avec transition et exigences de déblocage.
-- [x] Milestones événementiels et cohortes/égalités de leaderboard.
-- [x] Funnel analytics complet et vérifié de bout en bout.
-- [x] Attack, Raid et défense originaux dans une boucle sociale type Coin Master.
-- [x] Network Power, profils, amis, classement, ciblage ami et revanche.
-- [x] Crews, leaderboard d'équipe et échanges directs de doublons entre amis.
-- [x] Signal Cache quotidien, RNG pondéré et anti-double-claim.
-- [x] Catalogue d'offres autoritaire et éligibilités commerciales data-driven.
-- [x] Événement coopératif Crew Uplink : score partagé, contribution minimale,
-      milestones et claim personnel anti-changement d'équipe.
-- [x] Achievements permanents, sept objectifs data-driven, progression cumulative
-      et intégration Network Power.
-- [x] Entitlements NFT fail-closed, expiration serveur et point d'entrée interne
-      pour un provider futur ; aucun self-claim client.
-- [x] Audit Pets/sécurité/mobile : aucun Pets runtime, idempotence finale corrigée,
-      safe areas, Retour Android et trois ratios sous gate automatique.
-- [ ] Systèmes restants du MASTER TODO compatibles avec les exclusions utilisateur.
-- [ ] Design et Wallet Adapter explicitement différés par l'utilisateur.

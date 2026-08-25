@@ -23,16 +23,18 @@
 
 ## API autoritaire
 
-- Auth : `/auth/challenge`, `/auth/verify`, `/auth/refresh`.
-- Lecture : `/health`, `/config`, `/state`, `/events/:event_id/leaderboard`.
+- Auth : `/auth/challenge`, `/auth/verify`, `/auth/refresh`, `/auth/logout`.
+- Lecture : `/health`, `/ready`, `/config`, `/state`, `/offers`, `/friends`,
+  `/players/search`, `/teams`, `/teams/leaderboard`, `/trades`,
+  `/progression/leaderboard`, `/events/:event_id/leaderboard`.
 - Économie : `/spin`, `/district/upgrade`, `/chest/buy`, `/chest/open`,
-  `/set/claim`, `/daily/claim`, `/mission/claim`,
+  `/set/claim`, `/daily/claim`, `/daily/bonus/claim`, `/mission/claim`,
   `/district/repair`, `/attack/resolve`, `/raid/pick`, `/raid/cashout`,
-  `/profile`, `/players/search`, `/friends/*`, `/social/target`,
-  `/progression/leaderboard`,
+  `/profile`, `/friends/*`, `/social/target`, `/teams/*`, `/trades/*`,
   `/events/:event_id/milestones/:milestone_index/claim`,
   `/events/:event_id/claim`, `/season/claim`, `/ad/reward`,
   `/purchase/verify`, `/analytics`.
+- Aucune route client d'ownership NFT ni de payout reward pool (fail-closed).
 - Chaque mutation économique reçoit un identifiant d'idempotence et relit la
   config côté serveur dans une transaction atomique.
 
@@ -50,6 +52,14 @@
   Attack/Raid pending avec plateau Raid secret.
 - `0007_profiles_friends_progression.sql` : profils, codes amis, demandes,
   amitiés, cibles sociales et score global décomposé.
+- `0008`→`0015` : crews/trading, inventaire `BIGINT`, Signal Cache, éligibilités
+  d'offres, événements d'équipe, achievements et progression, entitlements.
+- `0016_distributed_guards.sql` : `auth_nonces` et `api_rate_limits` atomiques,
+  partagés entre instances.
+- `0017_reward_pool_ledger.sql` : allocations et settlements SKR (désactivés).
+- `0018_refresh_rotation.sql` : `refresh_sessions`, `jti` hashé, usage unique.
+- `0019_relational_invariants.sql` : anti auto-ciblage, cohérence
+  statut/timestamp des rencontres et trades, un seul owner par équipe.
 - Configs typées : économie, roue, district, cartes, sets, coffres, daily,
   missions, événements, saisons et offres.
 
