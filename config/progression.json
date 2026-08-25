@@ -11,5 +11,16 @@
     "epic": 7,
     "legendary": 12
   },
-  "globalLeaderboardLimit": 50
+  "globalLeaderboardLimit": 50,
+  "districtCurve": {
+    "note": "PROVISIONAL — enveloppe de progression. Les coûts restent écrits dans chaque district, mais doivent tomber dans cette enveloppe sinon le serveur refuse de démarrer. baseDistrictCostCredits = coût total du district 1 ; districtCostGrowth = facteur mesuré entre District 1 et District 2 (2,1494).",
+    "baseDistrictCostCredits": 64810000,
+    "districtCostGrowth": 2.15,
+    "districtCostTolerance": 0.3,
+    "levelCostGrowthMin": 2.0,
+    "levelCostGrowthMax": 4.5,
+    "expectedSpinsMin": 80,
+    "expectedSpinsMax": 400,
+    "expectedSpinsGrowth": 2.15
+  }
 }

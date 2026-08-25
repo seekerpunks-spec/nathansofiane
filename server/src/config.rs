@@ -167,6 +167,72 @@ impl RarityPointsConfig {
     }
 }
 
+/// Enveloppe de progression des districts. Les coûts restent écrits dans chaque
+/// fichier de district ; cette courbe borne ce qui est acceptable pour éviter
+/// qu'un nouveau district dérive silencieusement de l'équilibrage.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DistrictCurveConfig {
+    pub base_district_cost_credits: u64,
+    pub district_cost_growth: f64,
+    pub district_cost_tolerance: f64,
+    pub level_cost_growth_min: f64,
+    pub level_cost_growth_max: f64,
+    pub expected_spins_min: f64,
+    pub expected_spins_max: f64,
+    pub expected_spins_growth: f64,
+}
+
+impl DistrictCurveConfig {
+    /// Coût total attendu pour un district, `id` étant 1-indexé.
+    pub fn expected_district_cost(&self, id: u32) -> f64 {
+        self.base_district_cost_credits as f64 * self.district_cost_growth.powi(id as i32 - 1)
+    }
+
+    /// Écart relatif entre un coût total observé et la courbe attendue.
+    /// C'est la forme unique de comparaison : borner puis comparer donnerait un
+    /// résultat différent au bord de la tolérance en flottant.
+    pub fn cost_deviation(&self, id: u32, total_credits: u128) -> f64 {
+        let expected = self.expected_district_cost(id);
+        if !(expected > 0.0) || !expected.is_finite() {
+            return f64::INFINITY;
+        }
+        (total_credits as f64 - expected).abs() / expected
+    }
+
+    /// Fenêtre de spins attendue pour compléter un district, `id` étant 1-indexé.
+    pub fn expected_spins_window(&self, id: u32) -> (f64, f64) {
+        let factor = self.expected_spins_growth.powi(id as i32 - 1);
+        (
+            self.expected_spins_min * factor,
+            self.expected_spins_max * factor,
+        )
+    }
+
+    fn parameters_are_sane(&self) -> bool {
+        self.base_district_cost_credits > 0
+            && self.base_district_cost_credits <= i64::MAX as u64
+            && self.district_cost_growth.is_finite()
+            && self.district_cost_growth >= 1.0
+            && self.district_cost_growth <= 10.0
+            && self.district_cost_tolerance.is_finite()
+            && self.district_cost_tolerance > 0.0
+            && self.district_cost_tolerance < 1.0
+            && self.level_cost_growth_min.is_finite()
+            && self.level_cost_growth_min > 1.0
+            && self.level_cost_growth_max.is_finite()
+            && self.level_cost_growth_max > self.level_cost_growth_min
+            && self.level_cost_growth_max <= 100.0
+            && self.expected_spins_min.is_finite()
+            && self.expected_spins_min > 0.0
+            && self.expected_spins_max.is_finite()
+            && self.expected_spins_max > self.expected_spins_min
+            && self.expected_spins_growth.is_finite()
+            && self.expected_spins_growth >= 1.0
+            && self.expected_spins_growth <= 10.0
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ProgressionConfig {
@@ -177,6 +243,7 @@ pub struct ProgressionConfig {
     pub achievement_points: u32,
     pub rarity_points: RarityPointsConfig,
     pub global_leaderboard_limit: u32,
+    pub district_curve: DistrictCurveConfig,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -842,6 +909,10 @@ impl RemoteConfig {
         {
             problems.push("progression.json : paramètres hors limites".to_string());
         }
+        let curve = &self.progression.district_curve;
+        if !curve.parameters_are_sane() {
+            problems.push("progression.districtCurve : paramètres hors limites".to_string());
+        }
 
         let mut days = BTreeSet::new();
         if self.daily.cycle.is_empty() {
@@ -1038,6 +1109,68 @@ impl RemoteConfig {
         }
         if !(1..=self.districts.len() as u32).all(|id| district_ids.contains(&id)) {
             problems.push("districts : ids attendus contigus à partir de 1".to_string());
+        }
+
+        // Enveloppe de progression : un district ajouté par config ne doit pas
+        // pouvoir casser l'équilibrage sans que le boot le refuse.
+        if curve.parameters_are_sane() {
+            let mut previous_total: u128 = 0;
+            for id in 1..=self.districts.len() as u32 {
+                let Some(district) = self.districts.iter().find(|d| d.id == id) else {
+                    continue;
+                };
+                let mut total: u128 = 0;
+                for element in &district.elements {
+                    let mut levels: Vec<&DistrictLevel> = element.levels.iter().collect();
+                    levels.sort_by_key(|level| level.level);
+                    let mut previous_cost: u64 = 0;
+                    for level in levels {
+                        total += level.cost as u128;
+                        if previous_cost > 0 && level.cost > 0 {
+                            let growth = level.cost as f64 / previous_cost as f64;
+                            if growth < curve.level_cost_growth_min
+                                || growth > curve.level_cost_growth_max
+                            {
+                                problems.push(format!(
+                                    "district {} / élément {} niveau {} : croissance {:.2} hors enveloppe [{:.2}, {:.2}]",
+                                    district.id,
+                                    element.id,
+                                    level.level,
+                                    growth,
+                                    curve.level_cost_growth_min,
+                                    curve.level_cost_growth_max
+                                ));
+                            }
+                        }
+                        if level.cost > 0 {
+                            previous_cost = level.cost;
+                        }
+                    }
+                }
+                if total > i64::MAX as u128 {
+                    problems.push(format!(
+                        "district {} : coût total {} hors BIGINT",
+                        district.id, total
+                    ));
+                }
+                let deviation = curve.cost_deviation(id, total);
+                if deviation > curve.district_cost_tolerance {
+                    problems.push(format!(
+                        "district {} : coût total {} hors enveloppe, écart {:.1} % pour une tolérance de {:.1} %",
+                        district.id,
+                        total,
+                        deviation * 100.0,
+                        curve.district_cost_tolerance * 100.0
+                    ));
+                }
+                if total <= previous_total {
+                    problems.push(format!(
+                        "district {} : coût total {} doit dépasser celui du district précédent ({})",
+                        district.id, total, previous_total
+                    ));
+                }
+                previous_total = total;
+            }
         }
 
         let card_ids: BTreeSet<&str> = self.cards.iter().map(|c| c.card_id.as_str()).collect();
@@ -1414,5 +1547,91 @@ mod tests {
         assert!(!cfg.districts.is_empty());
         assert_eq!(cfg.economy.spin_multipliers.first(), Some(&1));
         assert_eq!(cfg.economy.spin_multipliers.last(), Some(&100_000));
+    }
+
+    /// L'enveloppe doit rejeter un district ajouté par config qui dérive de la
+    /// courbe, sinon ajouter du contenu casse l'équilibrage en silence.
+    #[test]
+    fn district_curve_envelope_rejects_off_curve_content() {
+        let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../config");
+        let mut cfg = RemoteConfig::load(&path).expect("la config livrée doit rester valide");
+        let curve = &cfg.progression.district_curve;
+
+        // La config livrée doit rester dans son propre couloir.
+        for id in 1..=cfg.districts.len() as u32 {
+            let district = cfg
+                .districts
+                .iter()
+                .find(|d| d.id == id)
+                .expect("districts contigus");
+            let total: u128 = district
+                .elements
+                .iter()
+                .flat_map(|element| element.levels.iter())
+                .map(|level| level.cost as u128)
+                .sum();
+            let deviation = curve.cost_deviation(id, total);
+            assert!(
+                deviation <= curve.district_cost_tolerance,
+                "district {} hors enveloppe : écart {:.3} pour une tolérance de {:.3}",
+                id,
+                deviation,
+                curve.district_cost_tolerance
+            );
+        }
+
+        // La fenêtre de spins doit s'élargir avec l'index, pas rester figée.
+        let (first_min, first_max) = curve.expected_spins_window(1);
+        let (second_min, second_max) = curve.expected_spins_window(2);
+        assert!(second_min > first_min && second_max > first_max);
+
+        // Un dernier district dix fois trop cher doit faire échouer la validation.
+        let last = cfg.districts.len() - 1;
+        for element in &mut cfg.districts[last].elements {
+            for level in &mut element.levels {
+                level.cost = level.cost.saturating_mul(10);
+            }
+        }
+        let problems = cfg
+            .validate()
+            .expect_err("un district hors courbe doit échouer");
+        assert!(
+            problems.to_string().contains("hors enveloppe"),
+            "message inattendu : {}",
+            problems
+        );
+    }
+
+    /// La croissance par niveau n'est vérifiée qu'ici (la gate PowerShell ne la
+    /// rejuge pas), donc elle a besoin de sa propre preuve.
+    #[test]
+    fn district_curve_rejects_flat_level_progression() {
+        let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../config");
+        let mut cfg = RemoteConfig::load(&path).expect("la config livrée doit rester valide");
+
+        // Aplatir un élément : tous les niveaux payants au même prix. Le coût
+        // total reste plausible mais la marche entre niveaux disparaît.
+        let element = &mut cfg.districts[0].elements[0];
+        let reference = element
+            .levels
+            .iter()
+            .filter(|level| level.cost > 0)
+            .map(|level| level.cost)
+            .max()
+            .expect("un niveau payant");
+        for level in &mut element.levels {
+            if level.cost > 0 {
+                level.cost = reference;
+            }
+        }
+
+        let problems = cfg
+            .validate()
+            .expect_err("une progression plate doit échouer");
+        assert!(
+            problems.to_string().contains("croissance"),
+            "message inattendu : {}",
+            problems
+        );
     }
 }

@@ -3,6 +3,8 @@ $workspace = Split-Path -Parent $PSScriptRoot
 $spin = Get-Content -LiteralPath (Join-Path $workspace "config\spin_table.json") -Raw | ConvertFrom-Json
 $social = Get-Content -LiteralPath (Join-Path $workspace "config\social.json") -Raw | ConvertFrom-Json
 $chests = (Get-Content -LiteralPath (Join-Path $workspace "config\chests.json") -Raw | ConvertFrom-Json).items
+$curve = (Get-Content -LiteralPath (Join-Path $workspace "config\progression.json") -Raw | ConvertFrom-Json).districtCurve
+if ($null -eq $curve) { throw "progression.json : districtCurve absent" }
 $districtFiles = Get-ChildItem -LiteralPath (Join-Path $workspace "config\districts") -Filter "district_*.json" |
     Sort-Object Name
 if ($districtFiles.Count -lt 2) { throw "Au moins deux districts sont requis pour valider la progression" }
@@ -40,7 +42,6 @@ $glitchRate = [double]$glitchWeight / [double]$weight
 if ($glitchRate -gt 0.25) { throw "Taux de spin vide trop élevé: $glitchRate" }
 
 $districtResults = @()
-$previousCost = 0.0
 foreach ($districtFile in $districtFiles) {
     $district = Get-Content -LiteralPath $districtFile.FullName -Raw | ConvertFrom-Json
     $districtCost = 0.0
@@ -48,21 +49,33 @@ foreach ($districtFile in $districtFiles) {
         foreach ($level in $element.levels) { $districtCost += [double]$level.cost }
     }
     $spinsToComplete = $districtCost / $expected
-    $minimumSpins = if ([int]$district.id -eq 1) { 80 } else { 150 }
-    $maximumSpins = if ([int]$district.id -eq 1) { 400 } else { 800 }
+    # Fenetre derivee de l'enveloppe config, pas de seuil code en dur : elle
+    # croit avec l'index du district comme la courbe de couts.
+    $growthFactor = [math]::Pow([double]$curve.expectedSpinsGrowth, [int]$district.id - 1)
+    $minimumSpins = [double]$curve.expectedSpinsMin * $growthFactor
+    $maximumSpins = [double]$curve.expectedSpinsMax * $growthFactor
     if ($spinsToComplete -lt $minimumSpins -or $spinsToComplete -gt $maximumSpins) {
-        throw "District $($district.id) hors fenêtre cible: $spinsToComplete spins attendus"
+        throw ("District $($district.id) hors fenetre cible: " +
+            "$([math]::Round($spinsToComplete,1)) spins attendus, fenetre " +
+            "[$([math]::Round($minimumSpins,1)), $([math]::Round($maximumSpins,1))]")
     }
-    if ($districtCost -le $previousCost) {
-        throw "La courbe de coût doit croître: district $($district.id) coûte $districtCost après $previousCost"
-    }
+    # L'enveloppe de cout (ecart a la courbe, croissance par niveau, monotonie)
+    # est arbitree UNIQUEMENT par RemoteConfig::validate au boot, exerce par le
+    # test cargo bundled_config_is_valid. On l'affiche ici sans la rejuger : deux
+    # implementations du meme seuil finiraient par se contredire au bord.
+    $expectedCost = [double]$curve.baseDistrictCostCredits *
+        [math]::Pow([double]$curve.districtCostGrowth, [int]$district.id - 1)
+    $deviation = if ($expectedCost -gt 0) {
+        [math]::Abs($districtCost - $expectedCost) / $expectedCost
+    } else { 0.0 }
     $districtResults += [pscustomobject]@{
         District = [int]$district.id
         Name = [string]$district.name
         TotalCost = [math]::Round($districtCost)
         ExpectedSpins = [math]::Round($spinsToComplete, 1)
+        SpinWindow = "$([math]::Round($minimumSpins)) - $([math]::Round($maximumSpins))"
+        CostDeviationPercent = [math]::Round($deviation * 100, 1)
     }
-    $previousCost = $districtCost
 }
 
 [pscustomobject]@{
