@@ -169,10 +169,21 @@ func _event_card(event: Dictionary) -> PanelContainer:
 	var panel := Ui.panel(Ui.PANEL, Ui.NEON_MAGENTA)
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 8)
-	box.add_child(Ui.label(str(event.get("name", "Event")), 21, Ui.NEON_MAGENTA))
-	var remain := int(event.get("endsAtMs", 0)) - Store.now_ms()
+	var title := str(event.get("name", "Event"))
+	if bool(event.get("recurring", false)):
+		title += "  •  VAGUE %d" % (int(event.get("occurrence", 0)) + 1)
+	box.add_child(Ui.label(title, 21, Ui.NEON_MAGENTA))
+	var now := Store.now_ms()
+	var starts := int(event.get("startsAtMs", 0))
+	var remain := int(event.get("endsAtMs", 0)) - now
 	var points := int(event.get("points", 0))
-	box.add_child(Ui.label("%s RESTANT  •  %s POINTS" % [Ui.mmss_long(remain), Ui.compact(points)], 14, Ui.TEXT_DIM))
+	var upcoming := starts > now
+	if upcoming:
+		box.add_child(Ui.label("PROCHAINE VAGUE DANS %s" % Ui.mmss_long(starts - now), 14, Ui.TEXT_DIM))
+	elif remain > 0:
+		box.add_child(Ui.label("%s RESTANT  •  %s POINTS" % [Ui.mmss_long(remain), Ui.compact(points)], 14, Ui.TEXT_DIM))
+	else:
+		box.add_child(Ui.label("VAGUE TERMINÉE  •  %s POINTS" % Ui.compact(points), 14, Ui.TEXT_DIM))
 	for milestone in event.get("milestones", []):
 		if typeof(milestone) != TYPE_DICTIONARY:
 			continue
@@ -192,19 +203,32 @@ func _event_card(event: Dictionary) -> PanelContainer:
 		elif auto_claim:
 			claim_text = "AUTO  •  " + claim_text
 		var claim := Ui.button(claim_text, Ui.GOLD, true)
-		claim.disabled = _busy or claimed or auto_claim or points < target
+		claim.disabled = _busy or claimed or auto_claim or upcoming or points < target
 		claim.pressed.connect(_claim_event_milestone.bind(
 			str(event.get("eventId", "")), int(milestone.get("index", 0))
 		))
 		box.add_child(claim)
-	var leaderboard := Ui.button("VOIR LE CLASSEMENT", Ui.NEON_MAGENTA, true)
-	leaderboard.pressed.connect(_show_leaderboard.bind(str(event.get("eventId", ""))))
-	box.add_child(leaderboard)
-	if remain <= 0 and points > 0 and not bool(event.get("rewardClaimed", false)):
-		var finish := Ui.button("RÉCUPÉRER LE CLASSEMENT", Ui.GOLD)
-		finish.disabled = _busy
-		finish.pressed.connect(_claim_event_finish.bind(str(event.get("eventId", ""))))
-		box.add_child(finish)
+	if not upcoming:
+		var leaderboard := Ui.button("VOIR LE CLASSEMENT", Ui.NEON_MAGENTA, true)
+		leaderboard.pressed.connect(_show_leaderboard.bind(str(event.get("eventId", ""))))
+		box.add_child(leaderboard)
+	# Récompense de rang : matérialisée par le serveur à la fin de la vague,
+	# réclamable pendant une fenêtre bornée. Avant distribution, on l'annonce.
+	var rank_reward: Variant = event.get("rankReward")
+	if typeof(rank_reward) == TYPE_DICTIONARY and not bool(rank_reward.get("claimed", false)):
+		var claim_remain := int(rank_reward.get("claimUntilMs", 0)) - now
+		if claim_remain > 0:
+			var rank_prize: Dictionary = rank_reward.get("reward", {})
+			var finish := Ui.button("RANG #%d  •  +%s SPINS  •  EXPIRE %s" % [
+				int(rank_reward.get("rank", 0)),
+				Ui.compact(int(rank_prize.get("spins", 0))),
+				Ui.mmss_long(claim_remain),
+			], Ui.GOLD)
+			finish.disabled = _busy
+			finish.pressed.connect(_claim_event_finish.bind(str(event.get("eventId", ""))))
+			box.add_child(finish)
+	elif remain <= 0 and not upcoming and points > 0 and not bool(event.get("rewardClaimed", false)):
+		box.add_child(Ui.label("CALCUL DES RANGS EN COURS…", 13, Ui.TEXT_DIM))
 	panel.add_child(box)
 	return panel
 
@@ -252,18 +276,44 @@ func _team_event_card(event: Dictionary) -> PanelContainer:
 func _season_card(season: Dictionary) -> PanelContainer:
 	var panel := Ui.panel()
 	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 8)
 	box.add_child(Ui.label(str(season.get("name", "Season")), 20, Ui.GOLD))
 	var points := int(season.get("points", 0))
-	box.add_child(Ui.label("%s POINTS  •  %s" % [Ui.compact(points), "PREMIUM" if season.get("premium", false) else "FREE"], 13, Ui.TEXT_DIM))
-	var config := _season_config(str(season.get("seasonId", "")))
+	var premium := bool(season.get("premium", false))
+	var remain := int(season.get("endsAtMs", 0)) - Store.now_ms()
+	var status := "PREMIUM" if premium else "FREE"
+	if remain > 0:
+		box.add_child(Ui.label("%s POINTS  •  %s  •  FIN DANS %s" % [Ui.compact(points), status, Ui.mmss_long(remain)], 13, Ui.TEXT_DIM))
+	else:
+		box.add_child(Ui.label("%s POINTS  •  %s  •  SAISON TERMINÉE" % [Ui.compact(points), status], 13, Ui.TEXT_DIM))
+	# Paliers envoyés par /state (source serveur) ; la config embarquée reste
+	# le repli hors-ligne.
+	var tiers: Array = season.get("tiers", [])
+	if tiers.is_empty():
+		tiers = _season_config(str(season.get("seasonId", ""))).get("tiers", [])
 	var free_claimed: Array = season.get("freeClaimed", [])
-	for i in config.get("tiers", []).size():
-		var tier: Dictionary = config.get("tiers", [])[i]
-		var reward: Dictionary = tier.get("freeReward", {})
-		var button := Ui.button("PALIER %s  •  +%s SPINS" % [Ui.compact(int(tier.get("points", 0))), Ui.compact(int(reward.get("spins", 0)))], Ui.GOLD, true)
-		button.disabled = _busy or points < int(tier.get("points", 0)) or free_claimed.has(i)
-		button.pressed.connect(_claim_season.bind(str(season.get("seasonId", "")), i, false))
-		box.add_child(button)
+	var paid_claimed: Array = season.get("paidClaimed", [])
+	var season_id := str(season.get("seasonId", ""))
+	for i in tiers.size():
+		if typeof(tiers[i]) != TYPE_DICTIONARY:
+			continue
+		var tier: Dictionary = tiers[i]
+		var tier_points := int(tier.get("points", 0))
+		var reached := points >= tier_points
+		var free_reward: Dictionary = tier.get("freeReward", {})
+		var free_btn := Ui.button("PALIER %s  •  +%s SPINS" % [Ui.compact(tier_points), Ui.compact(int(free_reward.get("spins", 0)))], Ui.GOLD, true)
+		free_btn.disabled = _busy or not reached or free_claimed.has(i)
+		free_btn.pressed.connect(_claim_season.bind(season_id, i, false))
+		box.add_child(free_btn)
+		var premium_reward: Variant = tier.get("premiumReward")
+		if typeof(premium_reward) == TYPE_DICTIONARY:
+			var premium_text := "PREMIUM %s  •  +%s SPINS" % [Ui.compact(tier_points), Ui.compact(int(premium_reward.get("spins", 0)))]
+			if not premium:
+				premium_text = "PREMIUM VERROUILLÉ  •  +%s SPINS" % Ui.compact(int(premium_reward.get("spins", 0)))
+			var premium_btn := Ui.button(premium_text, Ui.NEON_MAGENTA, true)
+			premium_btn.disabled = _busy or not premium or not reached or paid_claimed.has(i)
+			premium_btn.pressed.connect(_claim_season.bind(season_id, i, true))
+			box.add_child(premium_btn)
 	panel.add_child(box)
 	return panel
 
@@ -338,7 +388,7 @@ func _mutate(path: String, body: Dictionary, event_name: String) -> void:
 		var props := body.duplicate()
 		props.erase("requestId")
 		if typeof(response.data) == TYPE_DICTIONARY:
-			for key in ["rank", "cohortId", "milestoneIndex", "points", "teamId", "teamPoints", "contributionPoints", "achievementId", "progress", "target", "day", "streak", "entitlementBonusSpins", "missionId", "seasonId", "tier", "premium"]:
+			for key in ["rank", "cohortId", "milestoneIndex", "points", "teamId", "teamPoints", "contributionPoints", "achievementId", "progress", "target", "day", "streak", "entitlementBonusSpins", "missionId", "seasonId", "tier", "premium", "eventKey"]:
 				if response.data.has(key):
 					props[key] = response.data[key]
 		Events.track(event_name, props)

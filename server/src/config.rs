@@ -257,11 +257,16 @@ pub struct DailyEntry {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct DailyConfig {
     pub cycle: Vec<DailyEntry>,
     pub bonus: DailyBonusConfig,
     #[serde(default)]
     pub missions: Vec<MissionConfig>,
+    /// Taille du tirage quotidien dans le pool `missions`. Absent = tout le
+    /// pool est actif (comportement historique).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub missions_per_day: Option<u32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -480,6 +485,18 @@ pub struct EventPointSource {
     pub points: u64,
 }
 
+/// Actions de progression reconnues (missions, achievements, sources de
+/// points d'événement et de saison). `credits_earned` reçoit le MONTANT de
+/// crédits gagnés comme quantité (spin, attaque, cashout de raid).
+pub const PROGRESS_ACTIONS: &[&str] = &[
+    "spin",
+    "upgrade",
+    "chest_open",
+    "attack",
+    "raid",
+    "credits_earned",
+];
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct EventRewardTier {
@@ -519,6 +536,29 @@ pub struct EventLeaderboardConfig {
     pub display_limit: u32,
 }
 
+/// Récurrence d'un événement : occurrences de durée fixe (presets 4h-48h),
+/// cadencées depuis `startsAtMs` jusqu'à `endsAtMs`. Aucune intervention
+/// manuelle entre deux occurrences.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EventSchedule {
+    pub cadence_hours: u32,
+    pub duration_hours: u32,
+}
+
+/// Occurrence concrète d'un événement. `key` préfixe toutes les lignes SQL de
+/// l'occurrence ; un événement à dates fixes garde `event_id` nu, donc les
+/// données existantes restent valides.
+#[derive(Debug, Clone, PartialEq)]
+pub struct EventWindow {
+    pub key: String,
+    pub occurrence: u64,
+    pub starts_at_ms: i64,
+    pub ends_at_ms: i64,
+}
+
+pub const MS_PER_HOUR: i64 = 3_600_000;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct EventConfig {
@@ -526,6 +566,12 @@ pub struct EventConfig {
     pub name: String,
     pub starts_at_ms: i64,
     pub ends_at_ms: i64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub schedule: Option<EventSchedule>,
+    /// Heures pendant lesquelles une récompense de rang reste réclamable
+    /// après la fin d'une occurrence (72 h sans valeur).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub claim_window_hours: Option<u32>,
     pub point_sources: Vec<EventPointSource>,
     #[serde(default)]
     pub milestones: Vec<EventMilestone>,
@@ -533,6 +579,110 @@ pub struct EventConfig {
     pub team: Option<TeamEventConfig>,
     pub leaderboard: EventLeaderboardConfig,
     pub reward_tiers: Vec<EventRewardTier>,
+}
+
+impl EventConfig {
+    pub fn claim_window_ms(&self) -> i64 {
+        i64::from(self.claim_window_hours.unwrap_or(72)) * MS_PER_HOUR
+    }
+
+    fn window_for_occurrence(&self, occurrence: u64) -> Option<EventWindow> {
+        let Some(schedule) = &self.schedule else {
+            if occurrence != 0 {
+                return None;
+            }
+            return Some(EventWindow {
+                key: self.event_id.clone(),
+                occurrence: 0,
+                starts_at_ms: self.starts_at_ms,
+                ends_at_ms: self.ends_at_ms,
+            });
+        };
+        let cadence = i64::from(schedule.cadence_hours) * MS_PER_HOUR;
+        let duration = i64::from(schedule.duration_hours) * MS_PER_HOUR;
+        let offset = i64::try_from(occurrence).ok()?.checked_mul(cadence)?;
+        let starts_at_ms = self.starts_at_ms.checked_add(offset)?;
+        if starts_at_ms >= self.ends_at_ms {
+            return None;
+        }
+        Some(EventWindow {
+            key: format!("{}#{occurrence}", self.event_id),
+            occurrence,
+            starts_at_ms,
+            ends_at_ms: starts_at_ms.checked_add(duration)?.min(self.ends_at_ms),
+        })
+    }
+
+    fn occurrence_index_at(&self, now_ms: i64) -> Option<u64> {
+        if now_ms < self.starts_at_ms {
+            return None;
+        }
+        match &self.schedule {
+            None => Some(0),
+            Some(schedule) => {
+                let cadence = i64::from(schedule.cadence_hours) * MS_PER_HOUR;
+                u64::try_from((now_ms - self.starts_at_ms) / cadence).ok()
+            }
+        }
+    }
+
+    /// Occurrence en cours à `now_ms`, s'il y en a une.
+    pub fn active_window(&self, now_ms: i64) -> Option<EventWindow> {
+        let window = self.window_for_occurrence(self.occurrence_index_at(now_ms)?)?;
+        (window.starts_at_ms <= now_ms && now_ms < window.ends_at_ms).then_some(window)
+    }
+
+    /// Occurrences terminées, la plus récente d'abord (distribution des rangs).
+    pub fn ended_windows(&self, now_ms: i64, max: usize) -> Vec<EventWindow> {
+        let mut result = Vec::new();
+        let Some(latest) = self.occurrence_index_at(now_ms) else {
+            return result;
+        };
+        let mut occurrence = latest;
+        loop {
+            if let Some(window) = self.window_for_occurrence(occurrence) {
+                if window.ends_at_ms <= now_ms {
+                    result.push(window);
+                    if result.len() >= max {
+                        break;
+                    }
+                }
+            }
+            if occurrence == 0 {
+                break;
+            }
+            occurrence -= 1;
+        }
+        result
+    }
+
+    /// Fenêtre montrée au joueur : active, sinon dernière terminée encore
+    /// réclamable, sinon la prochaine à venir.
+    pub fn display_window(&self, now_ms: i64) -> Option<EventWindow> {
+        if let Some(active) = self.active_window(now_ms) {
+            return Some(active);
+        }
+        if let Some(ended) = self.ended_windows(now_ms, 1).into_iter().next() {
+            if now_ms < ended.ends_at_ms.saturating_add(self.claim_window_ms()) {
+                return Some(ended);
+            }
+        }
+        let next = match self.occurrence_index_at(now_ms) {
+            None => 0,
+            Some(index) => index.checked_add(1)?,
+        };
+        self.window_for_occurrence(next)
+            .filter(|window| window.starts_at_ms > now_ms)
+    }
+
+    /// Clés des occurrences dont la fenêtre de claim est encore ouverte.
+    pub fn claimable_keys(&self, now_ms: i64) -> Vec<String> {
+        self.ended_windows(now_ms, 4)
+            .into_iter()
+            .filter(|window| now_ms < window.ends_at_ms.saturating_add(self.claim_window_ms()))
+            .map(|window| window.key)
+            .collect()
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -594,6 +744,10 @@ pub struct SeasonConfig {
     pub name: String,
     pub starts_at_ms: i64,
     pub ends_at_ms: i64,
+    /// Sources de points PROPRES à la saison : la progression saisonnière ne
+    /// dépend plus d'un événement actif (autonomie live-ops).
+    #[serde(default)]
+    pub point_sources: Vec<EventPointSource>,
     pub tiers: Vec<SeasonTier>,
 }
 
@@ -665,13 +819,40 @@ pub struct RemoteConfig {
 }
 
 impl RemoteConfig {
-    /// Identifiants des événements en cours à `now_ms`.
+    /// Identifiants des événements dont une occurrence est en cours à `now_ms`.
     pub fn active_event_ids(&self, now_ms: i64) -> Vec<&str> {
         self.events
             .iter()
-            .filter(|event| event.starts_at_ms <= now_ms && now_ms < event.ends_at_ms)
+            .filter(|event| event.active_window(now_ms).is_some())
             .map(|event| event.event_id.as_str())
             .collect()
+    }
+
+    /// Tirage quotidien déterministe : mêmes missions pour toutes les
+    /// instances (hash date + missionId), aucune horloge de boot impliquée.
+    pub fn daily_missions_for(&self, day: chrono::NaiveDate) -> Vec<&MissionConfig> {
+        let pool = &self.daily.missions;
+        let per_day = self
+            .daily
+            .missions_per_day
+            .map(|count| count as usize)
+            .unwrap_or(pool.len());
+        if per_day >= pool.len() {
+            return pool.iter().collect();
+        }
+        let mut keyed: Vec<(Vec<u8>, &MissionConfig)> = pool
+            .iter()
+            .map(|mission| {
+                let mut hasher = Sha256::new();
+                hasher.update(day.to_string().as_bytes());
+                hasher.update(b"|");
+                hasher.update(mission.mission_id.as_bytes());
+                (hasher.finalize().to_vec(), mission)
+            })
+            .collect();
+        keyed.sort_by(|left, right| left.0.cmp(&right.0));
+        keyed.truncate(per_day);
+        keyed.into_iter().map(|(_, mission)| mission).collect()
     }
 
     /// Table de base d'un coffre : le registre s'il est référencé, sinon la
@@ -1112,12 +1293,7 @@ impl RemoteConfig {
                 || achievement.name.len() > 64
                 || achievement.description.trim().is_empty()
                 || achievement.description.len() > 160
-                || achievement.action.trim().is_empty()
-                || achievement.action.len() > 48
-                || !achievement
-                    .action
-                    .chars()
-                    .all(|character| character.is_ascii_lowercase() || character == '_')
+                || !PROGRESS_ACTIONS.contains(&achievement.action.as_str())
                 || achievement.target == 0
                 || achievement.target > i64::MAX as u64
                 || achievement
@@ -1193,9 +1369,26 @@ impl RemoteConfig {
             }
         }
         let mut mission_ids = BTreeSet::new();
+        let missions_per_day = self
+            .daily
+            .missions_per_day
+            .unwrap_or(self.daily.missions.len() as u32);
+        if missions_per_day == 0 || missions_per_day as usize > self.daily.missions.len() {
+            problems.push(format!(
+                "daily.missionsPerDay hors du pool : {} pour {} missions",
+                missions_per_day,
+                self.daily.missions.len()
+            ));
+        }
         for m in &self.daily.missions {
             if m.target == 0 || !mission_ids.insert(&m.mission_id) {
                 problems.push(format!("mission invalide ou en double : {}", m.mission_id));
+            }
+            if !PROGRESS_ACTIONS.contains(&m.action.as_str()) {
+                problems.push(format!(
+                    "mission {} : action inconnue {}",
+                    m.mission_id, m.action
+                ));
             }
             if m.target > i64::MAX as u64 || !reward_fits_storage(&m.reward) {
                 problems.push(format!(
@@ -1670,12 +1863,58 @@ impl RemoteConfig {
             if event.starts_at_ms >= event.ends_at_ms {
                 problems.push(format!("event {} : fenêtre invalide", event.event_id));
             }
+            if event.event_id.contains('#') {
+                problems.push(format!(
+                    "event {} : '#' est réservé aux clés d'occurrence",
+                    event.event_id
+                ));
+            }
+            if let Some(schedule) = &event.schedule {
+                if !(4..=48).contains(&schedule.duration_hours) {
+                    problems.push(format!(
+                        "event {} : durée {}h hors presets 4h-48h",
+                        event.event_id, schedule.duration_hours
+                    ));
+                }
+                if schedule.cadence_hours < schedule.duration_hours
+                    || schedule.cadence_hours > 24 * 14
+                {
+                    problems.push(format!(
+                        "event {} : cadence {}h invalide (>= durée, <= 2 semaines)",
+                        event.event_id, schedule.cadence_hours
+                    ));
+                }
+                let duration_ms = i64::from(schedule.duration_hours) * MS_PER_HOUR;
+                if event.ends_at_ms.saturating_sub(event.starts_at_ms) < duration_ms {
+                    problems.push(format!(
+                        "event {} : période plus courte qu'une occurrence",
+                        event.event_id
+                    ));
+                }
+            }
+            if event
+                .claim_window_hours
+                .is_some_and(|hours| hours == 0 || hours > 720)
+            {
+                problems.push(format!(
+                    "event {} : fenêtre de claim hors bornes 1h-720h",
+                    event.event_id
+                ));
+            }
             if event
                 .point_sources
                 .iter()
                 .any(|source| source.points > i64::MAX as u64)
             {
                 problems.push(format!("event {} : points hors BIGINT", event.event_id));
+            }
+            for source in &event.point_sources {
+                if !PROGRESS_ACTIONS.contains(&source.action.as_str()) {
+                    problems.push(format!(
+                        "event {} : action inconnue {}",
+                        event.event_id, source.action
+                    ));
+                }
             }
             if event.leaderboard.cohort_size == 0
                 || event.leaderboard.cohort_size > 500
@@ -1757,6 +1996,23 @@ impl RemoteConfig {
                     season.season_id
                 ));
             }
+            if season.point_sources.is_empty() {
+                problems.push(format!(
+                    "season {} : aucune source de points autonome",
+                    season.season_id
+                ));
+            }
+            for source in &season.point_sources {
+                if !PROGRESS_ACTIONS.contains(&source.action.as_str())
+                    || source.points == 0
+                    || source.points > i64::MAX as u64
+                {
+                    problems.push(format!(
+                        "season {} : source de points invalide ({})",
+                        season.season_id, source.action
+                    ));
+                }
+            }
             if season.tiers.iter().any(|tier| {
                 tier.points > i64::MAX as u64
                     || !reward_fits_storage(&tier.free_reward)
@@ -1768,6 +2024,28 @@ impl RemoteConfig {
                 problems.push(format!(
                     "season {} : palier hors stockage",
                     season.season_id
+                ));
+            }
+        }
+        // La rotation saisonnière est séquentielle : deux saisons qui se
+        // chevauchent créditeraient les mêmes actions deux fois.
+        let mut season_windows: Vec<(i64, i64, &str)> = self
+            .seasons
+            .iter()
+            .map(|season| {
+                (
+                    season.starts_at_ms,
+                    season.ends_at_ms,
+                    season.season_id.as_str(),
+                )
+            })
+            .collect();
+        season_windows.sort();
+        for pair in season_windows.windows(2) {
+            if pair[1].0 < pair[0].1 {
+                problems.push(format!(
+                    "seasons {} et {} se chevauchent : rotation séquentielle exigée",
+                    pair[0].2, pair[1].2
                 ));
             }
         }
@@ -1927,6 +2205,116 @@ mod tests {
         assert!(!cfg.districts.is_empty());
         assert_eq!(cfg.economy.spin_multipliers.first(), Some(&1));
         assert_eq!(cfg.economy.spin_multipliers.last(), Some(&100_000));
+    }
+
+    /// Les occurrences récurrentes sont pur calcul sur (ancre, cadence,
+    /// durée) : mêmes fenêtres sur toutes les instances, clés stables pour les
+    /// lignes SQL, et un événement à dates fixes garde sa clé nue historique.
+    #[test]
+    fn recurring_event_windows_are_deterministic_and_bounded() {
+        let cfg = bundled();
+        let event = cfg
+            .events
+            .iter()
+            .find(|event| {
+                event
+                    .schedule
+                    .as_ref()
+                    .is_some_and(|s| s.cadence_hours == 24 && s.duration_hours == 4)
+            })
+            .expect("la config livrée doit contenir un événement quotidien 4h");
+        let anchor = event.starts_at_ms;
+        let hour = MS_PER_HOUR;
+
+        let active = event.active_window(anchor + 2 * hour).unwrap();
+        assert_eq!(active.key, format!("{}#0", event.event_id));
+        assert_eq!(
+            (active.starts_at_ms, active.ends_at_ms),
+            (anchor, anchor + 4 * hour)
+        );
+        // Hors durée : plus rien d'actif jusqu'à l'occurrence suivante.
+        assert!(event.active_window(anchor + 5 * hour).is_none());
+        assert!(event.active_window(anchor - 1).is_none());
+        // J+3 : troisième occurrence, clé distincte.
+        let later = event.active_window(anchor + 3 * 24 * hour + hour).unwrap();
+        assert_eq!(later.occurrence, 3);
+        assert_eq!(later.key, format!("{}#3", event.event_id));
+
+        // Occurrences terminées : la plus récente d'abord (ordre du worker).
+        let ended = event.ended_windows(anchor + 29 * hour, 4);
+        let keys: Vec<&str> = ended.iter().map(|w| w.key.as_str()).collect();
+        assert_eq!(
+            keys,
+            vec![
+                format!("{}#1", event.event_id).as_str(),
+                format!("{}#0", event.event_id).as_str()
+            ]
+        );
+
+        // Fenêtre de claim 24h : à J+3 seule l'occurrence 2 (finie il y a
+        // 20h) reste réclamable ; 0 et 1 sont expirées.
+        assert_eq!(event.claim_window_ms(), 24 * hour);
+        assert_eq!(
+            event.claimable_keys(anchor + 72 * hour),
+            vec![format!("{}#2", event.event_id)]
+        );
+
+        // Avant l'ancre, la vitrine montre la première occurrence à venir.
+        let upcoming = event.display_window(anchor - 1).unwrap();
+        assert_eq!(upcoming.key, format!("{}#0", event.event_id));
+
+        // Dates fixes : clé nue = données historiques intactes.
+        let fixed = cfg
+            .events
+            .iter()
+            .find(|event| event.schedule.is_none())
+            .expect("la config livrée doit garder un événement à dates fixes");
+        let window = fixed.active_window(fixed.starts_at_ms).unwrap();
+        assert_eq!(window.key, fixed.event_id);
+        assert_eq!(window.occurrence, 0);
+        assert_eq!(
+            fixed.claimable_keys(fixed.ends_at_ms + 1),
+            vec![fixed.event_id.clone()]
+        );
+    }
+
+    /// Le tirage quotidien doit être identique sur toutes les instances (pas
+    /// d'horloge de boot, pas de RNG) et faire tourner tout le pool sur la
+    /// durée — sinon une partie du contenu payé n'est jamais montrée.
+    #[test]
+    fn daily_mission_draw_is_deterministic_and_rotates_the_pool() {
+        let cfg = bundled();
+        let per_day = cfg.daily.missions_per_day.expect("tirage configuré") as usize;
+        assert!(per_day < cfg.daily.missions.len());
+
+        let day = chrono::NaiveDate::from_ymd_opt(2026, 8, 25).unwrap();
+        let first: Vec<&str> = cfg
+            .daily_missions_for(day)
+            .iter()
+            .map(|m| m.mission_id.as_str())
+            .collect();
+        let second: Vec<&str> = cfg
+            .daily_missions_for(day)
+            .iter()
+            .map(|m| m.mission_id.as_str())
+            .collect();
+        assert_eq!(first, second);
+        assert_eq!(first.len(), per_day);
+
+        let mut seen = BTreeSet::new();
+        for offset in 0..60 {
+            let day = day + chrono::Days::new(offset);
+            let draw = cfg.daily_missions_for(day);
+            assert_eq!(draw.len(), per_day, "tirage du jour {day}");
+            for mission in draw {
+                seen.insert(mission.mission_id.as_str());
+            }
+        }
+        assert_eq!(
+            seen.len(),
+            cfg.daily.missions.len(),
+            "sur 60 jours, tout le pool de missions doit apparaître"
+        );
     }
 
     /// L'enveloppe doit rejeter un district ajouté par config qui dérive de la

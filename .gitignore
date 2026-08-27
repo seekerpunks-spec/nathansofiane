@@ -25,3 +25,14 @@ art/local_ai/previous_runtime/
 
 # Sauvegardes automatiques Blender
 *.blend1
+
+# Scratch / fichiers de debug locaux
+list.txt
+cargocheck.txt
+diffstat.txt
+docs_list.txt
+fulldiff.txt
+gate_r26.txt
+gate_r26b.txt
+gitlog.txt
+_gh_out*.txt

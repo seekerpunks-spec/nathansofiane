@@ -17,10 +17,23 @@ pub struct ProgressResult {
     pub achievements: Vec<AchievementProgressResult>,
 }
 
+impl ProgressResult {
+    /// Fusionne la progression d'une seconde action déclenchée dans la même
+    /// transaction (ex. `spin` puis `credits_earned`).
+    pub fn merge(&mut self, other: ProgressResult) {
+        self.events.extend(other.events);
+        self.team_events.extend(other.team_events);
+        self.achievements.extend(other.achievements);
+    }
+}
+
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct EventProgressResult {
     pub event_id: String,
+    /// Clé de l'occurrence créditée (identique à `event_id` pour un
+    /// événement à dates fixes).
+    pub event_key: String,
     pub points_added: i64,
     pub points: i64,
     pub cohort_id: i32,
@@ -170,7 +183,11 @@ pub async fn progress_action_tx(
             })
             .collect();
     }
-    for mission in config.daily.missions.iter().filter(|m| m.action == action) {
+    for mission in config
+        .daily_missions_for(today)
+        .into_iter()
+        .filter(|m| m.action == action)
+    {
         sqlx::query(
             "INSERT INTO mission_progress(address,mission_id,mission_day,progress) VALUES($1,$2,$3,LEAST($4,$5)) \
              ON CONFLICT(address,mission_id,mission_day) DO UPDATE SET progress = \
@@ -186,17 +203,17 @@ pub async fn progress_action_tx(
     }
 
     let now_ms = now.timestamp_millis();
-    let mut season_points = 0i64;
     let current_team: Option<String> =
         sqlx::query_scalar("SELECT team_id FROM team_members WHERE address=$1")
             .bind(address)
             .fetch_optional(&mut **tx)
             .await?;
-    for event in config
-        .events
-        .iter()
-        .filter(|e| e.starts_at_ms <= now_ms && now_ms < e.ends_at_ms)
-    {
+    for event in &config.events {
+        // Les points s'accumulent sur la CLÉ d'occurrence : chaque passage
+        // d'un événement récurrent repart d'un classement vierge.
+        let Some(window) = event.active_window(now_ms) else {
+            continue;
+        };
         let mut points = 0i64;
         for source in event.point_sources.iter().filter(|s| s.action == action) {
             let source_points = checked_u64_to_i64(source.points, "event.points")?;
@@ -208,18 +225,15 @@ pub async fn progress_action_tx(
                 .ok_or_else(|| ApiError::Internal(anyhow!("overflow économique: event.total")))?;
         }
         if points > 0 {
-            season_points = season_points
-                .checked_add(points)
-                .ok_or_else(|| ApiError::Internal(anyhow!("overflow économique: season.points")))?;
-            // Sérialise uniquement l'affectation de cohorte de cet événement.
+            // Sérialise uniquement l'affectation de cohorte de cette occurrence.
             sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))")
-                .bind(&event.event_id)
+                .bind(&window.key)
                 .execute(&mut **tx)
                 .await?;
             let existing_cohort: Option<i32> = sqlx::query_scalar(
                 "SELECT cohort_id FROM event_scores WHERE event_id=$1 AND address=$2",
             )
-            .bind(&event.event_id)
+            .bind(&window.key)
             .bind(address)
             .fetch_optional(&mut **tx)
             .await?;
@@ -229,13 +243,13 @@ pub async fn progress_action_tx(
                 let last_cohort: i32 = sqlx::query_scalar(
                     "SELECT COALESCE(MAX(cohort_id),1) FROM event_scores WHERE event_id=$1",
                 )
-                .bind(&event.event_id)
+                .bind(&window.key)
                 .fetch_one(&mut **tx)
                 .await?;
                 let members: i64 = sqlx::query_scalar(
                     "SELECT COUNT(*) FROM event_scores WHERE event_id=$1 AND cohort_id=$2",
                 )
-                .bind(&event.event_id)
+                .bind(&window.key)
                 .bind(last_cohort)
                 .fetch_one(&mut **tx)
                 .await?;
@@ -252,7 +266,7 @@ pub async fn progress_action_tx(
                  ON CONFLICT(event_id,address) DO UPDATE SET points = LEAST(9223372036854775807::numeric, event_scores.points::numeric + EXCLUDED.points::numeric)::bigint \
                  RETURNING points",
             )
-            .bind(&event.event_id)
+            .bind(&window.key)
             .bind(address)
             .bind(points)
             .bind(cohort_id)
@@ -270,7 +284,7 @@ pub async fn progress_action_tx(
                     "INSERT INTO event_milestone_claims(event_id,address,milestone_index,auto_claimed) \
                      VALUES($1,$2,$3,true) ON CONFLICT DO NOTHING",
                 )
-                .bind(&event.event_id)
+                .bind(&window.key)
                 .bind(address)
                 .bind(index as i32)
                 .execute(&mut **tx)
@@ -283,6 +297,7 @@ pub async fn progress_action_tx(
             }
             result.events.push(EventProgressResult {
                 event_id: event.event_id.clone(),
+                event_key: window.key.clone(),
                 points_added: points,
                 points: total_points,
                 cohort_id,
@@ -295,7 +310,7 @@ pub async fn progress_action_tx(
                          ON CONFLICT(event_id,team_id) DO UPDATE SET points = LEAST(9223372036854775807::numeric, team_event_scores.points::numeric + EXCLUDED.points::numeric)::bigint \
                          RETURNING points",
                     )
-                    .bind(&event.event_id)
+                    .bind(&window.key)
                     .bind(team_id)
                     .bind(points)
                     .fetch_one(&mut **tx)
@@ -305,7 +320,7 @@ pub async fn progress_action_tx(
                          ON CONFLICT(event_id,team_id,address) DO UPDATE SET points = LEAST(9223372036854775807::numeric, team_event_contributions.points::numeric + EXCLUDED.points::numeric)::bigint \
                          RETURNING points",
                     )
-                    .bind(&event.event_id)
+                    .bind(&window.key)
                     .bind(team_id)
                     .bind(address)
                     .bind(points)
@@ -322,11 +337,23 @@ pub async fn progress_action_tx(
             }
         }
     }
+    // Les saisons progressent depuis leurs PROPRES sources : la boucle de
+    // rétention saisonnière ne dépend plus d'un événement actif.
     for season in config
         .seasons
         .iter()
         .filter(|s| s.starts_at_ms <= now_ms && now_ms < s.ends_at_ms)
     {
+        let mut season_points = 0i64;
+        for source in season.point_sources.iter().filter(|s| s.action == action) {
+            let source_points = checked_u64_to_i64(source.points, "season.points")?;
+            let delta = source_points
+                .checked_mul(amount.max(0))
+                .ok_or_else(|| ApiError::Internal(anyhow!("overflow économique: season.points")))?;
+            season_points = season_points
+                .checked_add(delta)
+                .ok_or_else(|| ApiError::Internal(anyhow!("overflow économique: season.total")))?;
+        }
         if season_points > 0 {
             sqlx::query(
                 "INSERT INTO season_progress(address,season_id,points) VALUES($1,$2,$3) \

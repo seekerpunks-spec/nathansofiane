@@ -1,15 +1,24 @@
 {
-  "note": "Saison data-driven. Les dates se modifient par remote config.",
+  "note": "Saison data-driven. 'pointSources' = progression AUTONOME (indépendante des événements) ; les dates se modifient par remote config.",
   "items": [
     {
       "seasonId": "neon_genesis",
       "name": "Neon Genesis",
       "startsAtMs": 1787328000000,
       "endsAtMs": 1790812800000,
+      "pointSources": [
+        { "action": "spin", "points": 1 },
+        { "action": "upgrade", "points": 20 },
+        { "action": "chest_open", "points": 30 },
+        { "action": "attack", "points": 25 },
+        { "action": "raid", "points": 40 }
+      ],
       "tiers": [
-        { "points": 100, "freeReward": { "spins": 25, "credits": 100000 }, "premiumReward": { "spins": 75, "credits": 300000 } },
-        { "points": 500, "freeReward": { "spins": 75, "credits": 500000, "chest": "basic" }, "premiumReward": { "spins": 200, "credits": 1000000, "chest": "neon" } },
-        { "points": 1500, "freeReward": { "spins": 200, "credits": 1500000, "chest": "neon" }, "premiumReward": { "spins": 500, "credits": 4000000, "chest": "elite" } }
+        { "points": 200, "freeReward": { "spins": 25, "credits": 100000 }, "premiumReward": { "spins": 75, "credits": 300000 } },
+        { "points": 1000, "freeReward": { "spins": 75, "credits": 500000, "chest": "basic" }, "premiumReward": { "spins": 200, "credits": 1000000, "chest": "neon" } },
+        { "points": 3000, "freeReward": { "spins": 150, "credits": 1000000 }, "premiumReward": { "spins": 350, "credits": 2500000, "chest": "quantum" } },
+        { "points": 8000, "freeReward": { "spins": 200, "credits": 1500000, "chest": "neon" }, "premiumReward": { "spins": 500, "credits": 4000000, "chest": "elite" } },
+        { "points": 20000, "freeReward": { "spins": 300, "credits": 2500000, "chest": "quantum" }, "premiumReward": { "spins": 800, "credits": 6000000, "chest": "elite" } }
       ]
     }
   ]

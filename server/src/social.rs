@@ -513,7 +513,7 @@ pub async fn resolve_attack(
         .bind(&addr.0)
         .execute(&mut *tx)
         .await?;
-    let progress = game::progress_action_tx(
+    let mut progress = game::progress_action_tx(
         &mut tx,
         &addr.0,
         "attack",
@@ -521,6 +521,18 @@ pub async fn resolve_attack(
         &state.config,
     )
     .await?;
+    if reward > 0 {
+        progress.merge(
+            game::progress_action_tx(
+                &mut tx,
+                &addr.0,
+                "credits_earned",
+                game::checked_u64_to_i64(reward, "attack.creditsEarned")?,
+                &state.config,
+            )
+            .await?,
+        );
+    }
     let credits: i64 = sqlx::query_scalar("SELECT credits FROM player_state WHERE address=$1")
         .bind(&addr.0)
         .fetch_one(&mut *tx)
@@ -598,8 +610,20 @@ async fn cashout_locked(
         .bind(address)
         .execute(&mut **tx)
         .await?;
-    let progress =
+    let mut progress =
         game::progress_action_tx(tx, address, "raid", row.multiplier as i64, config).await?;
+    if reward > 0 {
+        progress.merge(
+            game::progress_action_tx(
+                tx,
+                address,
+                "credits_earned",
+                game::checked_u64_to_i64(reward, "raid.creditsEarned")?,
+                config,
+            )
+            .await?,
+        );
+    }
     let credits: i64 = sqlx::query_scalar("SELECT credits FROM player_state WHERE address=$1")
         .bind(address)
         .fetch_one(&mut **tx)

@@ -178,6 +178,34 @@ async fn main() -> anyhow::Result<()> {
         }
     });
 
+    // Worker live-ops : matérialise les récompenses de rang des occurrences
+    // terminées puis archive celles dont la fenêtre de claim est close.
+    // Idempotent multi-instance (verrous advisory + lignes de distribution).
+    let liveops_state = Arc::clone(&state);
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(Duration::from_secs(60));
+        loop {
+            interval.tick().await;
+            let now_ms = Utc::now().timestamp_millis();
+            match engagement::distribute_rank_rewards(
+                &liveops_state.db,
+                &liveops_state.config,
+                now_ms,
+            )
+            .await
+            {
+                Ok(0) => {}
+                Ok(count) => tracing::info!(count, "occurrences distribuées"),
+                Err(error) => tracing::warn!(?error, "distribution des rangs échouée"),
+            }
+            match engagement::archive_expired_events(&liveops_state.db).await {
+                Ok(0) => {}
+                Ok(count) => tracing::info!(count, "occurrences archivées"),
+                Err(error) => tracing::warn!(?error, "archivage événements échoué"),
+            }
+        }
+    });
+
     let cors = if dev_auth {
         CorsLayer::permissive()
     } else if let Ok(origin) = std::env::var("CORS_ORIGIN") {
@@ -419,7 +447,9 @@ async fn get_state(
     let mission_rows: Vec<(String, i64, bool)> = sqlx::query_as(
         "SELECT mission_id,progress,claimed FROM mission_progress WHERE address=$1 AND mission_day=$2",
     ).bind(&address).bind(today).fetch_all(state.db.pool()).await?;
-    let missions: Vec<Value> = state.config.daily.missions.iter().map(|m| {
+    // Seules les missions TIRÉES aujourd'hui sont exposées : même tirage
+    // déterministe que l'accrual et le claim côté serveur.
+    let missions: Vec<Value> = state.config.daily_missions_for(today).into_iter().map(|m| {
         let row = mission_rows.iter().find(|(id,_,_)| id == &m.mission_id);
         json!({"missionId":m.mission_id,"name":m.name,"action":m.action,"target":m.target,
             "progress":row.map(|r| r.1).unwrap_or(0),"claimed":row.map(|r|r.2).unwrap_or(false),"reward":m.reward})
@@ -435,20 +465,64 @@ async fn get_state(
     .bind(&address)
     .fetch_all(state.db.pool())
     .await?;
-    let events: Vec<Value> = state.config.events.iter().map(|e| {
-        let score = event_scores.iter().find(|(id,_,_)| id == &e.event_id);
-        let milestones: Vec<Value> = e.milestones.iter().enumerate().map(|(index,milestone)| {
-            let claim = milestone_claims.iter().find(|(event_id,milestone_index,_)| {
-                event_id == &e.event_id && *milestone_index == index as i32
-            });
-            json!({"index":index,"points":milestone.points,"reward":milestone.reward,
+    let rank_rewards: Vec<(String, i64, Value, chrono::DateTime<Utc>, Option<chrono::DateTime<Utc>>)> =
+        sqlx::query_as(
+            "SELECT event_key,rank,reward,claim_until,claimed_at FROM event_rank_rewards WHERE address=$1",
+        )
+        .bind(&address)
+        .fetch_all(state.db.pool())
+        .await?;
+    let now_ms = now.timestamp_millis();
+    let events: Vec<Value> = state
+        .config
+        .events
+        .iter()
+        .filter_map(|e| {
+            // Fenêtre affichée : occurrence active, sinon terminée encore
+            // réclamable, sinon la prochaine. Rien = événement clos pour de bon.
+            let window = e.display_window(now_ms)?;
+            let score = event_scores.iter().find(|(id, _, _)| id == &window.key);
+            let milestones: Vec<Value> = e
+                .milestones
+                .iter()
+                .enumerate()
+                .map(|(index, milestone)| {
+                    let claim = milestone_claims
+                        .iter()
+                        .find(|(event_key, milestone_index, _)| {
+                            event_key == &window.key && *milestone_index == index as i32
+                        });
+                    json!({"index":index,"points":milestone.points,"reward":milestone.reward,
                 "autoClaim":milestone.auto_claim,"claimed":claim.is_some(),
                 "autoClaimed":claim.map(|row|row.2).unwrap_or(false)})
-        }).collect();
-        json!({"eventId":e.event_id,"name":e.name,"startsAtMs":e.starts_at_ms,"endsAtMs":e.ends_at_ms,
-            "points":score.map(|s|s.1).unwrap_or(0),"rewardClaimed":score.map(|s|s.2).unwrap_or(false),
-            "milestones":milestones})
-    }).collect();
+                })
+                .collect();
+            let rank_reward = rank_rewards
+                .iter()
+                .find(|(key, _, _, _, _)| key == &window.key)
+                .map(|(_, rank, reward, claim_until, claimed_at)| {
+                    json!({
+                        "rank": rank,
+                        "reward": reward,
+                        "claimUntilMs": claim_until.timestamp_millis(),
+                        "claimed": claimed_at.is_some(),
+                    })
+                });
+            let reward_claimed = rank_reward
+                .as_ref()
+                .and_then(|reward| reward.get("claimed"))
+                .and_then(Value::as_bool)
+                .unwrap_or_else(|| score.map(|s| s.2).unwrap_or(false));
+            Some(
+                json!({"eventId":e.event_id,"eventKey":window.key,"occurrence":window.occurrence,
+            "name":e.name,"startsAtMs":window.starts_at_ms,"endsAtMs":window.ends_at_ms,
+            "recurring":e.schedule.is_some(),
+            "points":score.map(|s|s.1).unwrap_or(0),"rewardClaimed":reward_claimed,
+            "rankReward":rank_reward,
+            "milestones":milestones}),
+            )
+        })
+        .collect();
     let team_events = engagement::team_events_for_state(&state, &address).await?;
     let season_rows: Vec<(String, i64, bool, Value, Value)> = sqlx::query_as(
         "SELECT season_id,points,premium,free_claimed,paid_claimed FROM season_progress WHERE address=$1",
@@ -456,7 +530,9 @@ async fn get_state(
     let seasons: Vec<Value> = state.config.seasons.iter().map(|s| {
         let row = season_rows.iter().find(|(id,_,_,_,_)| id == &s.season_id);
         json!({"seasonId":s.season_id,"name":s.name,"startsAtMs":s.starts_at_ms,"endsAtMs":s.ends_at_ms,
+            "active":s.starts_at_ms <= now_ms && now_ms < s.ends_at_ms,
             "points":row.map(|r|r.1).unwrap_or(0),"premium":row.map(|r|r.2).unwrap_or(false),
+            "tiers":s.tiers,
             "freeClaimed":row.map(|r|r.3.clone()).unwrap_or_else(||json!([])),"paidClaimed":row.map(|r|r.4.clone()).unwrap_or_else(||json!([]))})
     }).collect();
     let pending_encounter = social::pending_for(&state.db, &address).await?;

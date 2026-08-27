@@ -232,8 +232,20 @@ async fn perform_spin(
         OutcomeType::Credits | OutcomeType::None => {}
     }
 
-    let progress =
+    let mut progress =
         game::progress_action_tx(&mut tx, address, "spin", multiplier as i64, config).await?;
+    if credits_gained > 0 {
+        progress.merge(
+            game::progress_action_tx(
+                &mut tx,
+                address,
+                "credits_earned",
+                game::checked_u64_to_i64(credits_gained, "spin.creditsEarned")?,
+                config,
+            )
+            .await?,
+        );
+    }
     let global_progression = if outcome.outcome_type == OutcomeType::Card {
         progression::refresh_score_tx(&mut tx, address, config).await?
     } else {

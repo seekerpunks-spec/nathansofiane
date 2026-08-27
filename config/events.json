@@ -1,8 +1,10 @@
 {
+  "note": "PROVISIONAL — événements live-ops. 'schedule' = occurrences récurrentes (durée 4h-48h, cadence >= durée) SANS intervention manuelle : rangs distribués et occurrences archivées par le worker serveur. Sans 'schedule' : dates fixes classiques.",
   "items": [
     {
       "eventId": "neon_rush_r17", "name": "Neon Rush",
       "startsAtMs": 1787328000000, "endsAtMs": 1790812800000,
+      "claimWindowHours": 96,
       "pointSources": [
         { "action": "spin", "points": 10 }, { "action": "upgrade", "points": 50 },
         { "action": "chest_open", "points": 100 }, { "action": "attack", "points": 150 },
@@ -29,6 +31,58 @@
         { "minRank": 2, "maxRank": 3, "reward": { "spins": 500, "credits": 2500000, "chest": "neon" } },
         { "minRank": 4, "maxRank": 10, "reward": { "spins": 250, "credits": 1000000, "chest": "basic" } },
         { "minRank": 11, "maxRank": 50, "reward": { "spins": 50, "credits": 250000 } }
+      ]
+    },
+    {
+      "eventId": "overclock_surge", "name": "Overclock Surge",
+      "startsAtMs": 1787594400000, "endsAtMs": 1819130400000,
+      "schedule": { "cadenceHours": 24, "durationHours": 4 },
+      "claimWindowHours": 24,
+      "pointSources": [
+        { "action": "spin", "points": 5 },
+        { "action": "upgrade", "points": 25 },
+        { "action": "chest_open", "points": 40 }
+      ],
+      "milestones": [
+        { "points": 100, "autoClaim": true, "reward": { "spins": 10, "credits": 50000 } },
+        { "points": 400, "autoClaim": false, "reward": { "spins": 30, "credits": 200000 } },
+        { "points": 1200, "autoClaim": false, "reward": { "spins": 80, "credits": 600000, "chest": "basic" } }
+      ],
+      "leaderboard": { "cohortSize": 25, "displayLimit": 25 },
+      "rewardTiers": [
+        { "minRank": 1, "maxRank": 1, "reward": { "spins": 150, "credits": 1000000, "chest": "neon" } },
+        { "minRank": 2, "maxRank": 5, "reward": { "spins": 75, "credits": 400000, "chest": "basic" } },
+        { "minRank": 6, "maxRank": 25, "reward": { "spins": 25, "credits": 150000 } }
+      ]
+    },
+    {
+      "eventId": "blackout_weekend", "name": "Blackout Weekend",
+      "startsAtMs": 1787335200000, "endsAtMs": 1818871200000,
+      "schedule": { "cadenceHours": 168, "durationHours": 48 },
+      "claimWindowHours": 72,
+      "pointSources": [
+        { "action": "spin", "points": 15 },
+        { "action": "attack", "points": 250 },
+        { "action": "raid", "points": 350 }
+      ],
+      "milestones": [
+        { "points": 500, "autoClaim": true, "reward": { "spins": 25, "credits": 150000 } },
+        { "points": 2500, "autoClaim": false, "reward": { "spins": 100, "credits": 750000, "chest": "basic" } },
+        { "points": 10000, "autoClaim": false, "reward": { "spins": 300, "credits": 2000000, "chest": "quantum" } }
+      ],
+      "team": {
+        "name": "Crew Blackout",
+        "minContributionPoints": 200,
+        "milestones": [
+          { "points": 3000, "reward": { "spins": 75, "credits": 400000 } },
+          { "points": 12000, "reward": { "spins": 250, "credits": 1500000, "chest": "neon" } }
+        ]
+      },
+      "leaderboard": { "cohortSize": 25, "displayLimit": 25 },
+      "rewardTiers": [
+        { "minRank": 1, "maxRank": 1, "reward": { "spins": 400, "credits": 2500000, "chest": "quantum" } },
+        { "minRank": 2, "maxRank": 5, "reward": { "spins": 200, "credits": 1200000, "chest": "neon" } },
+        { "minRank": 6, "maxRank": 25, "reward": { "spins": 75, "credits": 400000 } }
       ]
     }
   ]
