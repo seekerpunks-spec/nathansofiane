@@ -195,7 +195,7 @@ impl DistrictCurveConfig {
     /// résultat différent au bord de la tolérance en flottant.
     pub fn cost_deviation(&self, id: u32, total_credits: u128) -> f64 {
         let expected = self.expected_district_cost(id);
-        if !(expected > 0.0) || !expected.is_finite() {
+        if !expected.is_finite() || expected <= 0.0 {
             return f64::INFINITY;
         }
         (total_credits as f64 - expected).abs() / expected
@@ -656,6 +656,26 @@ impl EventConfig {
         result
     }
 
+    /// Toutes les occurrences terminées dont la fenêtre de claim est encore
+    /// ouverte. La profondeur est dérivée de la config : une cadence courte et
+    /// une longue fenêtre de claim ne doivent jamais être tronquées par une
+    /// constante arbitraire dans le worker live-ops.
+    pub fn claimable_windows(&self, now_ms: i64) -> Vec<EventWindow> {
+        let limit = match &self.schedule {
+            None => 1,
+            Some(schedule) => {
+                let claim_hours = u64::from(self.claim_window_hours.unwrap_or(72));
+                let cadence_hours = u64::from(schedule.cadence_hours.max(1));
+                let intervals = claim_hours.div_ceil(cadence_hours).saturating_add(2);
+                usize::try_from(intervals).unwrap_or(usize::MAX)
+            }
+        };
+        self.ended_windows(now_ms, limit)
+            .into_iter()
+            .filter(|window| now_ms < window.ends_at_ms.saturating_add(self.claim_window_ms()))
+            .collect()
+    }
+
     /// Fenêtre montrée au joueur : active, sinon dernière terminée encore
     /// réclamable, sinon la prochaine à venir.
     pub fn display_window(&self, now_ms: i64) -> Option<EventWindow> {
@@ -677,9 +697,8 @@ impl EventConfig {
 
     /// Clés des occurrences dont la fenêtre de claim est encore ouverte.
     pub fn claimable_keys(&self, now_ms: i64) -> Vec<String> {
-        self.ended_windows(now_ms, 4)
+        self.claimable_windows(now_ms)
             .into_iter()
-            .filter(|window| now_ms < window.ends_at_ms.saturating_add(self.claim_window_ms()))
             .map(|window| window.key)
             .collect()
     }
@@ -2258,6 +2277,20 @@ mod tests {
             event.claimable_keys(anchor + 72 * hour),
             vec![format!("{}#2", event.event_id)]
         );
+
+        // La profondeur de rattrapage suit la config, pas une constante. Avec
+        // 720 h de claim et une cadence 4 h, 180 occurrences restent ouvertes.
+        let mut stress = event.clone();
+        stress.schedule = Some(EventSchedule {
+            cadence_hours: 4,
+            duration_hours: 4,
+        });
+        stress.claim_window_hours = Some(720);
+        stress.ends_at_ms = anchor + 400 * 4 * hour;
+        let claimable = stress.claimable_windows(anchor + 201 * 4 * hour);
+        assert_eq!(claimable.len(), 180);
+        assert_eq!(claimable.first().map(|w| w.occurrence), Some(200));
+        assert_eq!(claimable.last().map(|w| w.occurrence), Some(21));
 
         // Avant l'ancre, la vitrine montre la première occurrence à venir.
         let upcoming = event.display_window(anchor - 1).unwrap();

@@ -6,6 +6,7 @@ $main = Get-Content -LiteralPath (Join-Path $client "scenes\Main.gd") -Raw
 $ui = Get-Content -LiteralPath (Join-Path $client "scripts\core\Ui.gd") -Raw
 $onboarding = Get-Content -LiteralPath (Join-Path $client "scenes\screens\OnboardingScreen.gd") -Raw
 $events = Get-Content -LiteralPath (Join-Path $client "scripts\core\Events.gd") -Raw
+$missions = Get-Content -LiteralPath (Join-Path $client "scenes\screens\MissionsScreen.gd") -Raw
 $spinPath = Join-Path $client "scenes\screens\SpinScreen.gd"
 $spinLines = (Get-Content -LiteralPath $spinPath).Count
 $smoke = Get-Content -LiteralPath (Join-Path $client "tests\SmokeScenes.gd") -Raw
@@ -18,12 +19,15 @@ if ($main -notmatch 'NOTIFICATION_WM_GO_BACK_REQUEST') { throw "Bouton Retour An
 if ($main -notmatch 'dismiss_on_back') { throw "Fermeture des modales au Retour absente" }
 if ($ui -notmatch 'get_display_safe_area') { throw "Safe areas système non prises en compte" }
 if ($ui -notmatch 'custom_minimum_size\s*=\s*Vector2\(0, 64\)') { throw "Cible tactile standard 64 absente" }
-if ($spinLines -gt 1100) { throw "SpinScreen redevient monolithique: $spinLines lignes" }
+if ($ui -notmatch 'static func reward_text' -or $missions -match 'reward\.get\("spins"') {
+    throw "Récompenses live-ops encore supposées spins-only"
+}
+if ($spinLines -gt 1000) { throw "SpinScreen redevient monolithique: $spinLines lignes" }
 if ($onboarding -match 'apply_state\(\{\s*"spins"' -or $events -notmatch 'func reset_session' -or
     $events -notmatch '_session_generation') {
     throw "Session mobile: état fabriqué ou isolation analytics absente"
 }
-foreach ($component in @("SpinVisuals.gd", "SpinNetworkView.gd", "SpinNetworkActions.gd", "SpinEncounterView.gd")) {
+foreach ($component in @("SpinVisuals.gd", "SpinNetworkView.gd", "SpinNetworkActions.gd", "SpinEncounterView.gd", "SpinTelemetry.gd")) {
     if (-not (Test-Path -LiteralPath (Join-Path $client "scripts\components\$component"))) {
         throw "Composant Spin absent: $component"
     }

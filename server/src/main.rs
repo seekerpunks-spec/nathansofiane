@@ -44,7 +44,7 @@ use axum::response::Response;
 use axum::routing::{get, post};
 use axum::Json;
 use axum::Router;
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use serde::Deserialize;
 use serde_json::{json, Value};
 use std::net::SocketAddr;
@@ -52,6 +52,8 @@ use std::sync::Arc;
 use std::time::Duration;
 use tower_http::cors::CorsLayer;
 use tower_http::trace::TraceLayer;
+
+type RankRewardRow = (String, i64, Value, DateTime<Utc>, Option<DateTime<Utc>>);
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -465,7 +467,7 @@ async fn get_state(
     .bind(&address)
     .fetch_all(state.db.pool())
     .await?;
-    let rank_rewards: Vec<(String, i64, Value, chrono::DateTime<Utc>, Option<chrono::DateTime<Utc>>)> =
+    let rank_rewards: Vec<RankRewardRow> =
         sqlx::query_as(
             "SELECT event_key,rank,reward,claim_until,claimed_at FROM event_rank_rewards WHERE address=$1",
         )

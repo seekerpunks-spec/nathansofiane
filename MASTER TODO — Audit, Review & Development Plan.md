@@ -1247,11 +1247,12 @@ L'expérience doit pouvoir être comprise avec très peu de texte.
 
 # PHASE 20 — CODE QUALITY
 
-Statut R24 : le monolithe `SpinScreen.gd` a été ramené de 1 798 à 1 067 lignes.
-Le rendu du cabinet/reels/particules, la composition Seeker Network, ses actions
-asynchrones et les overlays Attack/Raid vivent maintenant dans quatre composants
-sans logique économique cliente. Le smoke ouvre réellement Network, Attack,
-Raid et le résultat social afin de tester plus que la simple instanciation.
+Statut R27 : le monolithe `SpinScreen.gd` a été ramené de 1 798 à 989 lignes.
+Le rendu du cabinet/reels/particules et le mapping des symboles, la composition
+Seeker Network, ses actions asynchrones, les overlays Attack/Raid et la
+télémétrie vivent maintenant dans cinq composants sans logique économique
+cliente. Le smoke ouvre réellement Network, Attack, Raid et le résultat social,
+et vérifie aussi les récompenses spins/crédits/coffres et les symboles du slot.
 L'inventaire `tools/workspace_inventory.ps1` confirme aussi que les quatre
 dossiers racine aux noms anormaux ne contiennent aucun fichier ; `server/target`
 est le seul volume majeur et reste ignoré, sans nettoyage nécessaire au runtime.

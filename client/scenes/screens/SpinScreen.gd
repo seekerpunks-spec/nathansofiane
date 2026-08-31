@@ -15,6 +15,7 @@ const SpinVisuals := preload("res://scripts/components/SpinVisuals.gd")
 const SpinNetworkView := preload("res://scripts/components/SpinNetworkView.gd")
 const SpinEncounterView := preload("res://scripts/components/SpinEncounterView.gd")
 const SpinNetworkActions := preload("res://scripts/components/SpinNetworkActions.gd")
+const SpinTelemetry := preload("res://scripts/components/SpinTelemetry.gd")
 const SYMBOLS := ["credits", "shield", "hack", "vault", "energy", "glitch"]
 
 var _spins_value: Label
@@ -518,7 +519,7 @@ func _do_spin() -> void:
 		_pending_base_credits = int(data.get("baseCreditsGained", _pending_credits))
 		_pending_multiplier = int(data.get("multiplier", 1))
 		_pending_progress = data.get("progress", {}) if typeof(data.get("progress", {})) == TYPE_DICTIONARY else {}
-		_final_symbols = _symbols_for_result(_pending_outcome)
+		_final_symbols = SpinVisuals.symbols_for_result(_pending_outcome)
 		_animate_slots(_final_symbols)
 	elif response.code == 403:
 		var details := _parse_spin_error_details(response.data)
@@ -542,41 +543,6 @@ func _do_spin() -> void:
 		_result_banner.text = "ERREUR RÉSEAU · RÉESSAIE"
 		_result_banner.add_theme_color_override("font_color", Ui.NEON_MAGENTA)
 		_reset_idle_state(false)
-
-
-func _symbols_for_result(outcome: Dictionary) -> Array[String]:
-	var result: Array[String] = []
-	var result_type := str(outcome.get("type", "credits")).to_lower()
-	var tier := str(outcome.get("tier", "common")).to_lower()
-	if result_type in ["none", "glitch"]:
-		result.assign(["glitch", "credits", "energy"])
-		return result
-	var symbol := "credits"
-	match result_type:
-		"attack":
-			symbol = "hack"
-		"raid":
-			symbol = "vault"
-		"shield":
-			symbol = "shield"
-		"chest":
-			symbol = "energy"
-		"card":
-			symbol = "hack"
-	if result_type != "credits":
-		result.assign([symbol, symbol, symbol])
-		return result
-	match tier:
-		"uncommon":
-			symbol = "energy"
-		"rare":
-			symbol = "shield"
-		"epic":
-			symbol = "hack"
-		"legendary":
-			symbol = "vault"
-	result.assign([symbol, symbol, symbol])
-	return result
 
 
 func _animate_slots(finals: Array[String]) -> void:
@@ -711,58 +677,14 @@ func _on_landed() -> void:
 	if tier == "legendary":
 		Sfx.jackpot()
 	Haptics.win(tier)
-	Events.track("spin_completed", {
-		"tier": tier,
-		"type": result_type,
-		"multiplier": _pending_multiplier,
-		"spinsSpent": _pending_multiplier,
-		"baseCredits": _pending_base_credits,
-		"credits": _pending_credits,
-	})
-	if _pending_credits > 0:
-		Events.track("currency_earned", {
-			"currency": "credits",
-			"amount": _pending_credits,
-			"source": "spin",
-			"multiplier": _pending_multiplier,
-		})
-	for event_progress in _pending_progress.get("events", []):
-		if typeof(event_progress) != TYPE_DICTIONARY:
-			continue
-		var event_id := str(event_progress.get("eventId", ""))
-		Events.track("event_progress", {
-			"eventId": event_id,
-			"pointsAdded": int(event_progress.get("pointsAdded", 0)),
-			"points": int(event_progress.get("points", 0)),
-			"cohortId": int(event_progress.get("cohortId", 1)),
-			"source": "spin",
-		})
-		for milestone_index in event_progress.get("autoMilestonesClaimed", []):
-			Events.track("milestone_claim", {
-				"eventId": event_id,
-				"milestoneIndex": int(milestone_index),
-				"claimMode": "auto",
-			})
-	for team_progress in _pending_progress.get("teamEvents", []):
-		if typeof(team_progress) != TYPE_DICTIONARY:
-			continue
-		Events.track("team_event_progress", {
-			"eventId": str(team_progress.get("eventId", "")),
-			"teamId": str(team_progress.get("teamId", "")),
-			"pointsAdded": int(team_progress.get("pointsAdded", 0)),
-			"teamPoints": int(team_progress.get("teamPoints", 0)),
-			"contributionPoints": int(team_progress.get("contributionPoints", 0)),
-			"source": "spin",
-		})
-	for achievement_progress in _pending_progress.get("achievements", []):
-		if typeof(achievement_progress) != TYPE_DICTIONARY:
-			continue
-		Events.track("achievement_progress", {
-			"achievementId": str(achievement_progress.get("achievementId", "")),
-			"action": str(achievement_progress.get("action", "spin")),
-			"progress": int(achievement_progress.get("progress", 0)),
-			"target": int(achievement_progress.get("target", 0)),
-		})
+	SpinTelemetry.track_result(
+		tier,
+		result_type,
+		_pending_multiplier,
+		_pending_base_credits,
+		_pending_credits,
+		_pending_progress,
+	)
 	_refresh_hud()
 	_reset_idle_state(false)
 	var pending: Variant = Store.state.get("pendingEncounter", null)

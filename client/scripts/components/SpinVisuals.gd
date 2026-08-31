@@ -2,6 +2,40 @@ extends RefCounted
 ## Composants de rendu procédural du slot. Ils ne connaissent ni le réseau ni
 ## l'économie : SpinScreen leur transmet uniquement un état visuel.
 
+static func symbols_for_result(outcome: Dictionary) -> Array[String]:
+	var result: Array[String] = []
+	var result_type := str(outcome.get("type", "credits")).to_lower()
+	var tier := str(outcome.get("tier", "common")).to_lower()
+	if result_type in ["none", "glitch"]:
+		result.assign(["glitch", "credits", "energy"])
+		return result
+	var symbol := "credits"
+	match result_type:
+		"attack":
+			symbol = "hack"
+		"raid":
+			symbol = "vault"
+		"shield":
+			symbol = "shield"
+		"chest":
+			symbol = "energy"
+		"card":
+			symbol = "hack"
+	if result_type != "credits":
+		result.assign([symbol, symbol, symbol])
+		return result
+	match tier:
+		"uncommon":
+			symbol = "energy"
+		"rare":
+			symbol = "shield"
+		"epic":
+			symbol = "hack"
+		"legendary":
+			symbol = "vault"
+	result.assign([symbol, symbol, symbol])
+	return result
+
 class SlotCabinet extends Control:
 	var accent := Ui.NEON_CYAN
 	var win_mode := false

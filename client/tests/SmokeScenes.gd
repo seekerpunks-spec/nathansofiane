@@ -15,6 +15,7 @@ const SCENES := [
 	"res://scenes/screens/MissionsScreen.tscn",
 	"res://scenes/screens/StoreScreen.tscn",
 ]
+const SpinVisuals := preload("res://scripts/components/SpinVisuals.gd")
 
 var _failures: int = 0
 
@@ -71,6 +72,26 @@ func _run() -> void:
 		"seasons": _json("seasons.json").get("items", []),
 	}
 	Config._index_outcomes()
+	var credits_only := Ui.reward_text({"credits": 300000})
+	_check(credits_only == "+300K CR", "récompense crédits-only mal formatée: " + credits_only)
+	_check(not credits_only.contains("SPINS"), "récompense crédits-only invente des spins")
+	_check(Ui.reward_text({"chest": "basic"}) == "+1 BASIC CACHE", "coffre-only mal formaté")
+	var mixed_reward := Ui.reward_text({"spins": 25, "credits": 100000, "chest": "neon"})
+	_check(mixed_reward.contains("+25 SPINS"), "spins absents de la récompense mixte")
+	_check(mixed_reward.contains("+100K CR"), "crédits absents de la récompense mixte")
+	_check(mixed_reward.contains("+1 NEON CACHE"), "coffre absent de la récompense mixte")
+	_check(
+		SpinVisuals.symbols_for_result({"type": "attack", "tier": "rare"}) == ["hack", "hack", "hack"],
+		"mapping visuel Attack invalide"
+	)
+	_check(
+		SpinVisuals.symbols_for_result({"type": "credits", "tier": "legendary"}) == ["vault", "vault", "vault"],
+		"mapping visuel jackpot invalide"
+	)
+	_check(
+		SpinVisuals.symbols_for_result({"type": "none"}) == ["glitch", "credits", "energy"],
+		"mapping visuel spin vide invalide"
+	)
 	Store.apply_state({
 		"spins": 12, "credits": 8500000, "serverTimeMs": int(Time.get_unix_time_from_system() * 1000),
 		"nextSpinAtMs": int(Time.get_unix_time_from_system() * 1000) + 180000,

@@ -1,6 +1,6 @@
-# MÉMOIRE — TODO / PROCHAINES TÂCHES R26
+# MÉMOIRE — TODO / PROCHAINES TÂCHES R27
 
-> MAJ 25/08/2026. Roadmap détaillée : `docs/ROADMAP.md`. Checklist de
+> MAJ 31/08/2026. Roadmap détaillée : `docs/ROADMAP.md`. Checklist de
 > publication : `docs/RELEASE_CHECKLIST.md`. Spec produit : `MASTER TODO`.
 
 ## Fait (cumul)
@@ -25,15 +25,21 @@
       Core) ajoutés par config uniquement, économie vérifiée par `economy_check`
       (coûts cumulés 64,8 M → 1,38 Md). Reste éventuel : catégories de coffres
       Basic→Elite (§12).
-- [ ] **Live-ops automatisée R26 — commit du WIP vert** : migration 0020
-      (distributions idempotentes, récompenses de rang figées avec fenêtre de
-      claim, 5 tables d'archives), `distribute_rank_rewards` /
+- [x] **Live-ops automatisée R26 — WIP vert commité** (commit `da142f8`,
+      22 commits avant R27 ; migration 0020 vérifiée dans le commit, hash blob
+      `15a8fc2d`) : distributions idempotentes, récompenses de rang figées avec
+      fenêtre de claim, 5 tables d'archives, `distribute_rank_rewards` /
       `archive_expired_events`, `EventSchedule`/`EventWindow`, rotation des
-      missions par jour, configs daily/events/seasons, MissionsScreen. Gate
-      `validate_all.ps1` verte sur le WIP ; revuer le diff puis committer.
-- [ ] **Gate `api_contract_check.ps1`** : jamais rejouée dans cette session,
-      elle exige une instance locale `DEV_AUTH` dédiée. À lancer via
-      `validate_all.ps1 -ApiBaseUrl ... -ApiDevAddress ...`.
+      missions par jour, configs daily/events/seasons, MissionsScreen. Revue de
+      diff GO, `validate_all.ps1` vert.
+- [x] **Gate `api_contract_check.ps1` R27** : rejouée sur une instance `DEV_AUTH`
+      dédiée ; concurrence ×4, rejeu, soldes, achat, pub et logout tous verts.
+- [x] **Diagnostic Git** : `git fsck --full` passe, avec un seul commit dangling
+      et aucune corruption active ; aucun nettoyage destructif lancé.
+- [x] **R27 robustesse** : rattrapage live-ops data-driven (test 180 fenêtres),
+      Clippy strict vert, libellés de récompense génériques et SpinScreen à
+      989 lignes avec composant de télémétrie séparé.
+- [x] **Finaliser R27** : revue du diff et lot atomique validé pour versionnage.
 
 ## Décisions produit encore ouvertes (ne pas inventer)
 

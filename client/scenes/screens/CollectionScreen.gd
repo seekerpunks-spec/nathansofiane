@@ -132,21 +132,7 @@ func _set_reward(set_data: Dictionary) -> Dictionary:
 	return {"spins": int(set_data.get("completionSpins", 0)), "credits": 0, "chest": ""}
 
 func _reward_label(reward: Dictionary) -> String:
-	var parts: Array[String] = []
-	if int(reward.get("spins", 0)) > 0:
-		parts.append("+%s SPINS" % Ui.compact(int(reward.get("spins", 0))))
-	if int(reward.get("credits", 0)) > 0:
-		parts.append("+%s CR" % Ui.compact(int(reward.get("credits", 0))))
-	var chest_id := str(reward.get("chest", ""))
-	if chest_id != "":
-		parts.append("+1 " + _chest_name(chest_id).to_upper())
-	return "RÉCLAMER  " + " ".join(parts) if not parts.is_empty() else "RÉCLAMER"
-
-func _chest_name(chest_id: String) -> String:
-	for chest in Config.chests():
-		if typeof(chest) == TYPE_DICTIONARY and str(chest.get("chestId", "")) == chest_id:
-			return str(chest.get("name", chest_id))
-	return chest_id
+	return "RÉCLAMER  " + Ui.reward_text(reward)
 
 func _set_card(set_data: Dictionary) -> PanelContainer:
 	var accent := _theme_color(str(set_data.get("visualTheme", "")))

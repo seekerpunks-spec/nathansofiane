@@ -14,7 +14,7 @@ Tu es l'agent de build continu de **CyberSeeker** : jeu de spin cyberpunk (type 
 1. `memory/README.md` — comment fonctionnent les fichiers mémoire
 2. `memory/CURRENT_STATE.md` — où on en est, ce qui est vérifié / pas vérifié
 3. `memory/TODO.md` — prochaines tâches par milestone
-4. `memory/DECISIONS.md` — décisions verrouillées (D1–D10 utilisateur, T1–T15 techniques) — **ne pas rouvrir sans demande explicite**
+4. `memory/DECISIONS.md` — décisions verrouillées (D1–D11 utilisateur, T1–T35 techniques) — **ne pas rouvrir sans demande explicite**
 5. `memory/GDD.md` + `memory/ARCHITECTURE.md` — règles du jeu + contrat API
 
 Hiérarchie de vérité : `server/src/*.rs` = contrat API définitif > `docs/` (source complète) > `memory/` (condensé, à maintenir à chaque changement significatif, ~60 lignes max/fichier). Ne JAMAIS stocker de secrets dans `memory/`. `DEV_AUTH=true` est du dev — JAMAIS en prod.
@@ -33,23 +33,28 @@ Hiérarchie de vérité : `server/src/*.rs` = contrat API définitif > `docs/` (
 6. **GDScript 4** : pas de méthode nommée `get()` (collision `Object.get`, warning = erreur) ; une `const` doit être une expression constante (pas d'appel de fonction) ; pas de variable et fonction au même nom.
 7. **Mémorisation (T14)** : tout changement significatif → mise à jour du/des `memory/*.md` dans la même session, condensé.
 
-## État actuel (R25 — 25/08/2026)
-- Tout le MASTER TODO gameplay est livré (spin ×1→×100K, 2 districts, collection,
-  rétention, liveops, social Signal Jam/Ghost Vault, crews, trading, achievements,
-  entitlements NFT et reward pool SKR fail-closed). 21 modules Rust, 19 migrations.
-- R25 a réparé la gate sécurité laissée rouge : `$auth.Split("#[cfg(test)]")`
-  résolvait la surcharge PowerShell `char[]` et tronquait le runtime analysé à
-  6 caractères, rendant deux checks négatifs vacuous. `validate_all.ps1` est vert
-  (28 tests Rust, 53 événements analytics, smoke 6 scènes × 3 ratios).
+## État actuel (R27 — 31/08/2026)
+- Tout le MASTER TODO gameplay est livré (spin ×1→×100K, 5 districts de lancement,
+  collection, rétention, liveops, social Signal Jam/Ghost Vault, crews, trading,
+  achievements, entitlements NFT et reward pool SKR fail-closed). 21 modules Rust,
+  20 migrations.
+- R26 livré et commité (HEAD `da142f8`, 22 commits au total avant R27) : 5 districts
+  data-driven + live-ops automatisée (migration 0020, distributions idempotentes,
+  rang figé avec fenêtre de claim, 5 tables d'archives). `validate_all.ps1` vert
+  sur l'arbre commité.
+- R27 validé : rattrapage live-ops dérivé de la config (180 fenêtres
+  testées), Clippy strict vert, récompenses UI génériques et SpinScreen ramené à
+  989 lignes. `CYBERSEEKER_VALIDATION_OK` + `API_CONTRACT_CHECK_OK`.
 - Quirks machine : le shell Cursor exige `required_permissions: ["all"]` (aucun
-  backend sandbox Windows). Git 2.55 installé, `.git` réapproprié depuis le
-  compte sandbox Codex, `core.autocrlf=false` local, 15 commits, arbre propre.
-- Prochain lot : monter le volume de contenu par config (2 districts / 8 cartes /
-  2 sets / 3 coffres aujourd'hui), rejouer `api_contract_check` sur une instance
-  DEV_AUTH locale.
+  backend sandbox Windows). Git 2.55 installé, `.git` réapproprié depuis le compte
+  sandbox Codex, `core.autocrlf=false` local. `git fsck --full` passe ; un seul
+  commit dangling, aucune corruption active.
 
 ## Roadmap (condensé)
-M1 spin+auth (**GREEN** R16) → **M2 districts/upgrades (prochain)** → M3 coffres/cartes/collections → M4 rétention (dailies, leaderboards, events) → M5 monétisation SKR (packs, paiements SPL vérifiés on-chain) → M6/M7 polish + build Android + dApp Store. Détails : `memory/TODO.md` + `memory/GDD.md`.
+Core gameplay et live-ops locaux **GREEN** → dépendances
+externes (providers, HTTPS, appareil Seeker, conformité, keystore) → design/wallet
+uniquement quand leur lot est rouvert → APK/AAB après gate shippable. Détails :
+`memory/TODO.md` + `memory/GDD.md`.
 
 ## Contrat API M1 (vérifié client↔serveur)
 `POST /spin {requestId,multiplier}` → `{outcome,multiplier,spinsSpent,baseCreditsGained,creditsGained,spins,credits,nextSpinAtMs,serverTimeMs}` ; 403 `INSUFFICIENT_SPINS` expose required/available/next. Contrats complets : `docs/API_R17.md`.

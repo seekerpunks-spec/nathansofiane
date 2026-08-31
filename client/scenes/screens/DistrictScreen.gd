@@ -318,7 +318,7 @@ func _show_complete(reward: Dictionary, district_id: int, next_district_id: int,
 	box.custom_minimum_size.x = 0
 	box.add_theme_constant_override("separation", 18)
 	box.add_child(Ui.label("DISTRICT COMPLETE", 34, Ui.GOLD))
-	box.add_child(Ui.label("+%s CR   +%s SPINS" % [Ui.compact(int(reward.get("credits", 0))), Ui.compact(int(reward.get("spins", 0)))], 20, Ui.TEXT))
+	box.add_child(Ui.label(Ui.reward_text(reward), 20, Ui.TEXT))
 	var close := Ui.button("CITY SECURED" if all_complete else "NEXT DISTRICT", Ui.GOLD)
 	close.pressed.connect(func() -> void:
 		overlay.queue_free()

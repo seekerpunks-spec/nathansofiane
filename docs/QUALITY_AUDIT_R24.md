@@ -53,6 +53,7 @@ montant d'achat incorrect, le crédit/replay exact de l'offre starter DEV, le
 crédit/replay d'une pub, son cooldown, puis la révocation de session.
 `validate_all.ps1 -ApiBaseUrl ... -ApiDevAddress ...` l'intègre à la gate quand
 une instance locale `DEV_AUTH` dédiée est disponible.
+La gate a été rejouée après R27 le 31/08/2026 : `API_CONTRACT_CHECK_OK`.
 
 Playthrough social HTTP à deux identités/instances validé : cible financée et
 upgradée, Firewall 3→2 sur Signal Jam bloqué sans dégât, plateau Ghost Vault non
@@ -73,6 +74,21 @@ et cartes vérifiés. Le test PostgreSQL rejette aussi l'auto-ciblage et deux ow
   smoke ouvre aussi les overlays Network, Attack, Raid et résultat social.
 
 Gate : `tools/mobile_ux_check.ps1` puis `tools/validate_all.ps1`.
+
+## Durcissement R27
+
+- La distribution live-ops parcourt toutes les occurrences encore claimables
+  au lieu d'une constante de quatre. Un test couvre 180 fenêtres simultanément
+  ouvertes pour la borne config 720 h / cadence 4 h.
+- Les claims reconnaissent un événement fixe ou ses clés `eventId#n` sans
+  wildcard SQL.
+- `Ui.reward_text` rend les récompenses spins, crédits et coffres sans inventer
+  `+0 SPINS`; le smoke couvre les formes credits-only, chest-only et mixte.
+- `SpinScreen.gd` compte 989 lignes ; mapping visuel et télémétrie sont extraits,
+  et `mobile_ux_check.ps1` bloque toute régression au-dessus de 1 000 lignes.
+- Rust 1.97.1 : formatage et Clippy strict `--all-targets -D warnings` verts.
+- Gate complète : 39 tests Rust, 12 tests PostgreSQL prouvés, 53 analytics et
+  six scènes sur trois ratios portrait, sans APK/AAB.
 
 ## Pets
 

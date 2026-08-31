@@ -115,3 +115,18 @@
       garde-fou de longueur ; `validate_all.ps1` repasse vert.
 - [ ] Autres systèmes restants du MASTER TODO.
 - [ ] Design et Wallet Adapter différés explicitement pour ce lot.
+
+## P9 — Robustesse post-audit R27
+
+- [x] Rattrapage de toutes les occurrences live-ops encore claimables, profondeur
+      dérivée de la cadence et de la fenêtre de claim (180 fenêtres testées).
+- [x] Suppression du fallback `LIKE` fragile pour reconnaître les occurrences
+      d'un même événement.
+- [x] `cargo fmt --check` et Clippy strict `-D warnings` verts.
+- [x] Résumé de récompense partagé spins/crédits/coffres sur Missions, Events,
+      Crew, Season, Collection et complétion de district.
+- [x] Extraction du mapping de symboles et de la télémétrie Spin ; contrôleur
+      ramené à 989 lignes, gate anti-régression fixée à 1 000.
+- [x] Gate complète et contrat HTTP rejoués sans APK/AAB.
+- [ ] Transfert libre de ressources, chat et donations restent fermés par
+      décision anti-abus/modération ; design et wallet restent hors lot.

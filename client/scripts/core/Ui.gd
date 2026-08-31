@@ -72,6 +72,28 @@ static func compact(n: int) -> String:
 			break
 	return sign + _trim(value) + suffix
 
+## Résumé uniforme d'une récompense data-driven. Aucun écran ne doit supposer
+## qu'un palier contient forcément des spins : crédits et coffres sont des
+## récompenses autonomes valides.
+static func reward_text(reward: Dictionary, separator: String = "  •  ") -> String:
+	var parts: Array[String] = []
+	var spins := int(reward.get("spins", 0))
+	var credits := int(reward.get("credits", 0))
+	var chest_id := str(reward.get("chest", ""))
+	if spins > 0:
+		parts.append("+%s SPINS" % compact(spins))
+	if credits > 0:
+		parts.append("+%s CR" % compact(credits))
+	if chest_id != "":
+		parts.append("+1 " + _chest_name(chest_id).to_upper())
+	return separator.join(parts) if not parts.is_empty() else "RÉCOMPENSE"
+
+static func _chest_name(chest_id: String) -> String:
+	for chest in Config.chests():
+		if typeof(chest) == TYPE_DICTIONARY and str(chest.get("chestId", "")) == chest_id:
+			return str(chest.get("name", chest_id))
+	return chest_id
+
 static func _trim(v: float) -> String:
 	var s: String
 	if v < 10.0:

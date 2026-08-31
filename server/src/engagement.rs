@@ -863,10 +863,11 @@ pub async fn claim_event(
         }
         let already: bool = sqlx::query_scalar(
             "SELECT EXISTS(SELECT 1 FROM event_rank_rewards \
-             WHERE address=$1 AND event_key LIKE $2 AND claimed_at IS NOT NULL)",
+             WHERE address=$1 AND (event_key=$2 OR left(event_key,char_length($2)+1)=$2 || '#') \
+             AND claimed_at IS NOT NULL)",
         )
         .bind(&addr.0)
-        .bind(format!("{}%", event.event_id))
+        .bind(&event.event_id)
         .fetch_one(state.db.pool())
         .await?;
         if already {
@@ -944,11 +945,8 @@ pub async fn distribute_rank_rewards(
 ) -> anyhow::Result<u64> {
     let mut distributed = 0u64;
     for event in &config.events {
-        for window in event.ended_windows(now_ms, 4) {
+        for window in event.claimable_windows(now_ms) {
             let claim_until_ms = window.ends_at_ms.saturating_add(event.claim_window_ms());
-            if claim_until_ms <= now_ms {
-                continue;
-            }
             let already: bool = sqlx::query_scalar(
                 "SELECT EXISTS(SELECT 1 FROM event_reward_distributions WHERE event_key=$1)",
             )

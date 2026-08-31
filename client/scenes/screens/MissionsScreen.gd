@@ -130,7 +130,7 @@ func _mission_card(mission: Dictionary) -> PanelContainer:
 	bar.value = clampf(float(progress) / float(maxi(1, target)) * 100.0, 0.0, 100.0)
 	box.add_child(bar)
 	var reward: Dictionary = mission.get("reward", {})
-	var claim := Ui.button("RÉCLAMER  +%s SPINS" % Ui.compact(int(reward.get("spins", 0))), Ui.NEON_CYAN, progress < target)
+	var claim := Ui.button("RÉCLAMER  " + Ui.reward_text(reward), Ui.NEON_CYAN, progress < target)
 	claim.disabled = _busy or progress < target or bool(mission.get("claimed", false))
 	claim.pressed.connect(_claim_mission.bind(str(mission.get("missionId", ""))))
 	box.add_child(claim)
@@ -154,9 +154,7 @@ func _achievement_card(achievement: Dictionary) -> PanelContainer:
 	bar.value = clampf(float(progress) / float(maxi(1, target)) * 100.0, 0.0, 100.0)
 	box.add_child(bar)
 	var reward: Dictionary = achievement.get("reward", {})
-	var reward_text := "+%s SPINS" % Ui.compact(int(reward.get("spins", 0)))
-	if int(reward.get("credits", 0)) > 0:
-		reward_text += "  +%s CR" % Ui.compact(int(reward.get("credits", 0)))
+	var reward_text := Ui.reward_text(reward)
 	var claimed := bool(achievement.get("claimed", false))
 	var claim := Ui.button("RÉCUPÉRÉ" if claimed else "RÉCLAMER  " + reward_text, Ui.GOLD, true)
 	claim.disabled = _busy or claimed or progress < target
@@ -194,9 +192,7 @@ func _event_card(event: Dictionary) -> PanelContainer:
 		var progress := Ui.progress_bar(Ui.GOLD, 8)
 		progress.value = clampf(float(points) / float(maxi(1, target)) * 100.0, 0.0, 100.0)
 		box.add_child(progress)
-		var reward_text := "+%s SPINS" % Ui.compact(int(reward.get("spins", 0)))
-		if int(reward.get("credits", 0)) > 0:
-			reward_text += "  +%s CR" % Ui.compact(int(reward.get("credits", 0)))
+		var reward_text := Ui.reward_text(reward)
 		var claim_text := "PALIER %s  •  %s" % [Ui.compact(target), reward_text]
 		if claimed:
 			claim_text = "RÉCUPÉRÉ  •  " + reward_text
@@ -219,9 +215,9 @@ func _event_card(event: Dictionary) -> PanelContainer:
 		var claim_remain := int(rank_reward.get("claimUntilMs", 0)) - now
 		if claim_remain > 0:
 			var rank_prize: Dictionary = rank_reward.get("reward", {})
-			var finish := Ui.button("RANG #%d  •  +%s SPINS  •  EXPIRE %s" % [
+			var finish := Ui.button("RANG #%d  •  %s  •  EXPIRE %s" % [
 				int(rank_reward.get("rank", 0)),
-				Ui.compact(int(rank_prize.get("spins", 0))),
+				Ui.reward_text(rank_prize),
 				Ui.mmss_long(claim_remain),
 			], Ui.GOLD)
 			finish.disabled = _busy
@@ -256,9 +252,7 @@ func _team_event_card(event: Dictionary) -> PanelContainer:
 		var progress := Ui.progress_bar(Ui.NEON_CYAN, 8)
 		progress.value = clampf(float(team_points) / float(maxi(1, target)) * 100.0, 0.0, 100.0)
 		box.add_child(progress)
-		var reward_text := "+%s SPINS" % Ui.compact(int(reward.get("spins", 0)))
-		if int(reward.get("credits", 0)) > 0:
-			reward_text += "  +%s CR" % Ui.compact(int(reward.get("credits", 0)))
+		var reward_text := Ui.reward_text(reward)
 		var claim_text := "ÉQUIPE %s  •  %s" % [Ui.compact(target), reward_text]
 		if contribution < minimum:
 			claim_text = "CONTRIBUE %s  •  %s" % [Ui.compact(minimum), reward_text]
@@ -301,15 +295,15 @@ func _season_card(season: Dictionary) -> PanelContainer:
 		var tier_points := int(tier.get("points", 0))
 		var reached := points >= tier_points
 		var free_reward: Dictionary = tier.get("freeReward", {})
-		var free_btn := Ui.button("PALIER %s  •  +%s SPINS" % [Ui.compact(tier_points), Ui.compact(int(free_reward.get("spins", 0)))], Ui.GOLD, true)
+		var free_btn := Ui.button("PALIER %s  •  %s" % [Ui.compact(tier_points), Ui.reward_text(free_reward)], Ui.GOLD, true)
 		free_btn.disabled = _busy or not reached or free_claimed.has(i)
 		free_btn.pressed.connect(_claim_season.bind(season_id, i, false))
 		box.add_child(free_btn)
 		var premium_reward: Variant = tier.get("premiumReward")
 		if typeof(premium_reward) == TYPE_DICTIONARY:
-			var premium_text := "PREMIUM %s  •  +%s SPINS" % [Ui.compact(tier_points), Ui.compact(int(premium_reward.get("spins", 0)))]
+			var premium_text := "PREMIUM %s  •  %s" % [Ui.compact(tier_points), Ui.reward_text(premium_reward)]
 			if not premium:
-				premium_text = "PREMIUM VERROUILLÉ  •  +%s SPINS" % Ui.compact(int(premium_reward.get("spins", 0)))
+				premium_text = "PREMIUM VERROUILLÉ  •  " + Ui.reward_text(premium_reward)
 			var premium_btn := Ui.button(premium_text, Ui.NEON_MAGENTA, true)
 			premium_btn.disabled = _busy or not premium or not reached or paid_claimed.has(i)
 			premium_btn.pressed.connect(_claim_season.bind(season_id, i, true))
