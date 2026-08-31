@@ -52,7 +52,7 @@ memory/                      contexte condensé de reprise
 - `Config.gd` : remote config typée avec dernier cache valide.
 - `Store.gd` : cache d'affichage, mutations et horloge compensée serveur.
 - `Sfx.gd`, `Haptics.gd`, `Events.gd` : feedbacks et analytics batchés.
-- `Ui.gd` : design system cyberpunk partagé.
+- `Ui.gd` : design system arcade + Nunito MSDF, StyleBoxFlat AA.
 
 Les tokens restent en mémoire. Une persistance sécurisée ne sera activée qu'avec
 le coffre-fort natif du bridge wallet. Le refresh est single-flight : les
@@ -66,7 +66,7 @@ requêtes 401 concurrentes réutilisent une rotation déjà terminée.
 - `SpinNetworkView.gd`, `SpinNetworkActions.gd` : composition et mutations du
   Seeker Network isolées de la boucle de spin.
 - `SpinEncounterView.gd` : overlays Attack/Raid sans calcul économique client.
-- `DistrictScreen` : cinq éléments, six niveaux visuels chacun et upgrade.
+- `DistrictScreen` : diorama village (cinq pads 2.5D, glyphes si art absent).
 - `CollectionScreen` : coffres, cartes, doublons, progression et claims de sets.
 - `MissionsScreen` : daily, missions, événement, classement et saison.
 - `StoreScreen` : offres, pub optionnelle et achats derrière adaptateurs.

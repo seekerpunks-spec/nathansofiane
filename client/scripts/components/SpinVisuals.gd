@@ -68,6 +68,9 @@ class SlotCabinet extends Control:
 		draw_style_box(_box(Color("#050712"), Color("#35446E"), 26, 2), Rect2(24, 96, size.x - 48, 342))
 		draw_rect(Rect2(30, 265, size.x - 60, 3), Color(accent, 0.92))
 		draw_line(Vector2(30, 266), Vector2(size.x - 30, 266), Color(accent, 0.9), 3.0)
+		if win_mode:
+			var scan := fmod(_time * 220.0, size.x - 88.0)
+			draw_rect(Rect2(30 + scan, 258, 42, 16), Color(accent, 0.28 + breathe * 0.22))
 		for i in 7:
 			var energy := 0.16 + 0.10 * sin(_time * 3.0 + i)
 			draw_rect(Rect2(18 + i * 72, 92, 34, 3), Color(accent, energy))
@@ -206,6 +209,8 @@ class AnimatedBackdrop extends Control:
 class ParticleBurst extends Control:
 	var _particles: Array = []
 
+	var _rings: Array = []
+
 	func emit_burst(origin: Vector2, color: Color, count: int) -> void:
 		_particles.clear()
 		for i in count:
@@ -223,6 +228,11 @@ class ParticleBurst extends Control:
 		set_process(true)
 		queue_redraw()
 
+	func emit_ring(origin: Vector2, color: Color) -> void:
+		_rings.append({"origin": origin, "color": color, "age": 0.0, "life": 0.55})
+		set_process(true)
+		queue_redraw()
+
 	func _process(delta: float) -> void:
 		for particle in _particles:
 			particle.position += particle.velocity * delta
@@ -230,11 +240,21 @@ class ParticleBurst extends Control:
 			particle.velocity *= 0.985
 			particle.life -= delta
 		_particles = _particles.filter(func(particle: Dictionary) -> bool: return particle.life > 0.0)
-		if _particles.is_empty():
+		for ring in _rings:
+			ring.age += delta
+		_rings = _rings.filter(func(ring: Dictionary) -> bool: return ring.age < ring.life)
+		if _particles.is_empty() and _rings.is_empty():
 			set_process(false)
 		queue_redraw()
 
 	func _draw() -> void:
+		for ring in _rings:
+			var t := clampf(ring.age / ring.life, 0.0, 1.0)
+			var radius := 18.0 + t * 140.0
+			var color: Color = ring.color
+			color.a = 0.55 * (1.0 - t)
+			draw_arc(ring.origin, radius, 0.0, TAU, 48, color, 3.0)
+			draw_arc(ring.origin, radius * 0.72, 0.0, TAU, 36, Color(Ui.GOLD, color.a * 0.7), 2.0)
 		for particle in _particles:
 			var alpha := clampf(particle.life / particle.max_life, 0.0, 1.0)
 			var color: Color = particle.color

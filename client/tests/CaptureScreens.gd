@@ -63,8 +63,9 @@ func _capture_all() -> void:
 	for key in SCREENS:
 		var screen: Control = load(SCREENS[key]).instantiate()
 		stage.add_child(screen)
-		await get_tree().create_timer(0.6).timeout
-		await RenderingServer.frame_post_draw
+		for frame in 10:
+			await get_tree().process_frame
+		RenderingServer.force_draw()
 		var output := ProjectSettings.globalize_path("res://../captures/" + key + "_runtime.png")
 		DirAccess.make_dir_recursive_absolute(output.get_base_dir())
 		var error := get_viewport().get_texture().get_image().save_png(output)

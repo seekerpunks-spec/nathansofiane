@@ -12,6 +12,7 @@ const SLOT_FRAME := preload("res://assets/generated/api_gpt/slot_machine.webp")
 const BYTE_MASCOT := preload("res://assets/generated/api_gpt/byte.webp")
 const SPIN_BUTTON_ART := preload("res://assets/generated/api_gpt/spin_button.webp")
 const SpinVisuals := preload("res://scripts/components/SpinVisuals.gd")
+const SpinJuice := preload("res://scripts/components/SpinJuice.gd")
 const SpinNetworkView := preload("res://scripts/components/SpinNetworkView.gd")
 const SpinEncounterView := preload("res://scripts/components/SpinEncounterView.gd")
 const SpinNetworkActions := preload("res://scripts/components/SpinNetworkActions.gd")
@@ -38,7 +39,9 @@ var _cabinet: Control
 var _particles: Control
 var _reels: Array = []
 var _reel_tweens: Array = []
-var _idle_tween: Tween
+var _hud_spins := -1
+var _hud_credits := -1
+var _mascot: Control
 
 var _busy := false
 var _revealed := false
@@ -95,6 +98,7 @@ func _build() -> void:
 	bg.texture = SPIN_BG
 	bg.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	bg.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	Ui.soften_tex(bg)
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
 	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(bg)
@@ -181,7 +185,8 @@ func _promo_button(text: String, accent: Color) -> Button:
 	button.add_theme_font_size_override("font_size", 14)
 	button.add_theme_color_override("font_color", Color.WHITE)
 	button.add_theme_color_override("font_outline_color", Color("#121A4A"))
-	button.add_theme_constant_override("outline_size", 4)
+	button.add_theme_font_override("font", Ui.FACE)
+	button.add_theme_constant_override("outline_size", 2)
 	button.add_theme_stylebox_override("normal", _game_box(accent, Color.WHITE, 18, 3, 7))
 	button.add_theme_stylebox_override("hover", _game_box(accent.lightened(0.08), Color.WHITE, 18, 4, 9))
 	button.add_theme_stylebox_override("pressed", _game_box(accent.darkened(0.16), Ui.GOLD, 18, 4, 4))
@@ -239,6 +244,7 @@ func _build_cabinet() -> void:
 	cabinet_art.set_position(Vector2.ZERO)
 	cabinet_art.set_size(Vector2(520, 540))
 	cabinet_art.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	Ui.soften_tex(cabinet_art)
 	_cabinet_root.add_child(cabinet_art)
 
 	_status_label = Ui.label("NEON RUSH", 22, Ui.NEON_MAGENTA)
@@ -278,20 +284,22 @@ func _build_cabinet() -> void:
 
 
 func _build_lower_controls() -> void:
-	var mascot := TextureRect.new()
-	mascot.texture = BYTE_MASCOT
-	mascot.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	mascot.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	mascot.position = Vector2(4, 714)
-	mascot.size = Vector2(168, 198)
-	mascot.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(mascot)
+	_mascot = TextureRect.new()
+	_mascot.texture = BYTE_MASCOT
+	_mascot.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_mascot.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	_mascot.position = Vector2(4, 714)
+	_mascot.size = Vector2(168, 198)
+	_mascot.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	Ui.soften_tex(_mascot)
+	add_child(_mascot)
 
 	_spin_btn = _big_button("SPIN")
 	_spin_btn.position = Vector2(148, 732)
 	_spin_btn.size = Vector2(246, 106)
 	_spin_btn.pivot_offset = _spin_btn.size / 2.0
 	_spin_btn.pressed.connect(_on_spin_pressed)
+	Juice.arm(_spin_btn, true)
 	var spin_art := TextureRect.new()
 	spin_art.texture = SPIN_BUTTON_ART
 	spin_art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
@@ -300,6 +308,7 @@ func _build_lower_controls() -> void:
 	spin_art.size = Vector2(286, 201)
 	spin_art.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	spin_art.show_behind_parent = true
+	Ui.soften_tex(spin_art)
 	_spin_btn.add_child(spin_art)
 	add_child(_spin_btn)
 
@@ -308,6 +317,7 @@ func _build_lower_controls() -> void:
 	_multiplier_btn.size = Vector2(174, 58)
 	_multiplier_btn.add_theme_font_size_override("font_size", 17)
 	_multiplier_btn.pressed.connect(_cycle_multiplier)
+	Juice.arm(_multiplier_btn, true)
 	add_child(_multiplier_btn)
 
 	var district_btn := _promo_button("CITY", Color("#1867C9"))
@@ -315,6 +325,7 @@ func _build_lower_controls() -> void:
 	district_btn.size = Vector2(84, 68)
 	district_btn.add_theme_font_size_override("font_size", 15)
 	district_btn.pressed.connect(func() -> void: navigate_requested.emit("district"))
+	Juice.arm(district_btn, true)
 	add_child(district_btn)
 
 
@@ -322,6 +333,7 @@ func _big_button(text: String) -> Button:
 	var button := Button.new()
 	button.text = text
 	button.focus_mode = Control.FOCUS_NONE
+	button.add_theme_font_override("font", Ui.FACE)
 	button.add_theme_font_size_override("font_size", 36)
 	button.add_theme_stylebox_override("normal", StyleBoxEmpty.new())
 	button.add_theme_stylebox_override("hover", StyleBoxEmpty.new())
@@ -329,7 +341,7 @@ func _big_button(text: String) -> Button:
 	button.add_theme_stylebox_override("disabled", StyleBoxEmpty.new())
 	button.add_theme_color_override("font_color", Color.WHITE)
 	button.add_theme_color_override("font_outline_color", Color("#342047"))
-	button.add_theme_constant_override("outline_size", 7)
+	button.add_theme_constant_override("outline_size", 3)
 	button.add_theme_color_override("font_disabled_color", Color.WHITE)
 	return button
 
@@ -420,8 +432,20 @@ func _update_event() -> void:
 
 
 func _refresh_hud() -> void:
-	_spins_value.text = "⚡ " + str(Store.spins())
-	_credits_value.text = Ui.compact(Store.credits())
+	var spins := Store.spins()
+	var credits := Store.credits()
+	if _hud_spins < 0:
+		_spins_value.text = "⚡ " + str(spins)
+		_credits_value.text = Ui.compact(credits)
+	else:
+		if spins != _hud_spins:
+			Juice.count(_spins_value, _hud_spins, spins, 0.28, func(n: int) -> String: return "⚡ " + str(n))
+		if credits != _hud_credits:
+			Juice.count(_credits_value, _hud_credits, credits, 0.42, func(n: int) -> String: return Ui.compact(n))
+			if credits > _hud_credits and not Juice.reduced():
+				Sfx.coin()
+	_hud_spins = spins
+	_hud_credits = credits
 	_normalize_multiplier()
 	var districts := Config.districts()
 	var active_district: Dictionary = {}
@@ -546,7 +570,8 @@ func _do_spin() -> void:
 
 
 func _animate_slots(finals: Array[String]) -> void:
-	_reel_tweens.clear()
+	if finals.is_empty():
+		return
 	_landed_count = 0
 	var tier := str(_pending_outcome.get("tier", "common")).to_lower()
 	_anticipation = tier in ["rare", "epic", "legendary"]
@@ -555,39 +580,16 @@ func _animate_slots(finals: Array[String]) -> void:
 	_spin_btn.text = "STOP NOW"
 	_status_label.text = "GOOD LUCK!"
 	_tick_timer.start()
-
-	for i in 3:
-		var reel: Control = _reels[i]
-		reel.start_spin()
-		var duration := 0.24 + i * 0.08 if Preferences.reduced_motion else 0.92 + i * 0.30
-		if i == 2 and _anticipation and not Preferences.reduced_motion:
-			duration += 0.34
-		var travel := SpinVisuals.SlotReel.CELL_HEIGHT * float(12 + i * 4)
-		var tween := create_tween()
-		if Preferences.reduced_motion:
-			tween.tween_property(reel, "roll_offset", travel, duration) \
-				.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
-		else:
-			tween.tween_property(reel, "roll_offset", SpinVisuals.SlotReel.CELL_HEIGHT * 2.0, 0.14) \
-				.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-			tween.tween_property(reel, "roll_offset", travel - SpinVisuals.SlotReel.CELL_HEIGHT * 3.0, duration - 0.44) \
-				.set_trans(Tween.TRANS_LINEAR).set_ease(Tween.EASE_IN_OUT)
-			tween.tween_property(reel, "roll_offset", travel, 0.30) \
-				.set_trans(Tween.TRANS_QUINT).set_ease(Tween.EASE_OUT)
-		tween.tween_callback(_land_reel.bind(i, finals[i]))
-		_reel_tweens.append(tween)
+	_reel_tweens = SpinJuice.spin_reels(self, _reels, _anticipation, _land_reel)
 
 
-func _land_reel(index: int, symbol: String) -> void:
+func _land_reel(index: int) -> void:
 	if _revealed:
 		return
+	var symbol: String = _final_symbols[index]
 	var reel: Control = _reels[index]
 	reel.land(symbol)
-	reel.pivot_offset = reel.size / 2.0
-	reel.scale = Vector2(1.07, 0.94)
-	var bounce := create_tween()
-	bounce.tween_property(reel, "scale", Vector2.ONE, 0.20) \
-		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	SpinJuice.land_bounce(reel)
 	Sfx.reel_stop(index)
 	Haptics.vibrate(0.25 + index * 0.16, 20 + index * 8)
 	_landed_count += 1
@@ -597,7 +599,7 @@ func _land_reel(index: int, symbol: String) -> void:
 		_status_label.add_theme_color_override("font_color", Ui.NEON_MAGENTA)
 		_cabinet.set_mode(Ui.NEON_MAGENTA, false)
 		Sfx.anticipation()
-		_anticipation_pulse()
+		SpinJuice.anticipation_pulse(_cabinet_root)
 	if _landed_count >= 3:
 		_on_landed()
 
@@ -607,8 +609,8 @@ func _skip_slots() -> void:
 		return
 	_skip_enabled = false
 	for tween in _reel_tweens:
-		if tween != null and tween.is_running():
-			tween.kill()
+		if tween != null and tween is Tween and (tween as Tween).is_valid():
+			(tween as Tween).kill()
 	for i in 3:
 		var reel: Control = _reels[i]
 		if reel.spinning:
@@ -672,7 +674,7 @@ func _on_landed() -> void:
 	_status_label.add_theme_color_override("font_color", accent)
 	_cabinet.set_mode(accent, tier in ["epic", "legendary"])
 
-	_impact_result(tier, accent)
+	SpinJuice.impact(_result_banner, _cabinet_root, _flash, _particles, tier, accent)
 	Sfx.result(tier if result_type != "none" else "glitch")
 	if tier == "legendary":
 		Sfx.jackpot()
@@ -690,51 +692,6 @@ func _on_landed() -> void:
 	var pending: Variant = Store.state.get("pendingEncounter", null)
 	if typeof(pending) == TYPE_DICTIONARY:
 		_show_social_encounter(pending)
-
-
-func _impact_result(tier: String, accent: Color) -> void:
-	_result_banner.pivot_offset = _result_banner.size / 2.0
-	_result_banner.scale = Vector2(1.38, 1.38)
-	var pop := create_tween()
-	pop.tween_property(_result_banner, "scale", Vector2.ONE, 0.30) \
-		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-
-	var count := 18
-	var flash_alpha := 0.12
-	match tier:
-		"rare":
-			count = 34
-			flash_alpha = 0.20
-		"epic":
-			count = 58
-			flash_alpha = 0.32
-		"legendary":
-			count = 90
-			flash_alpha = 0.52
-	_particles.emit_burst(Vector2(270, 500), accent, count)
-
-	_flash.color = Color(accent, flash_alpha)
-	var flash_tween := create_tween()
-	flash_tween.tween_property(_flash, "color", Color(accent, 0), 0.46)
-
-	if not Preferences.reduced_motion:
-		var shake := create_tween()
-		shake.tween_property(_cabinet_root, "position", Vector2(3, 145), 0.035)
-		shake.tween_property(_cabinet_root, "position", Vector2(17, 139), 0.035)
-		shake.tween_property(_cabinet_root, "position", Vector2(6, 144), 0.035)
-		shake.tween_property(_cabinet_root, "position", Vector2(13, 141), 0.035)
-		shake.tween_property(_cabinet_root, "position", Vector2(10, 142), 0.06) \
-			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-
-
-func _anticipation_pulse() -> void:
-	if Preferences.reduced_motion:
-		return
-	_cabinet_root.pivot_offset = _cabinet_root.size / 2.0
-	var pulse := create_tween()
-	pulse.tween_property(_cabinet_root, "scale", Vector2(1.025, 1.025), 0.18)
-	pulse.tween_property(_cabinet_root, "scale", Vector2.ONE, 0.24) \
-		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 
 func _on_tick() -> void:
@@ -761,21 +718,16 @@ func _reset_idle_state(reset_message: bool = true) -> void:
 
 
 func _start_idle_animation() -> void:
-	if Preferences.reduced_motion or _spin_btn == null:
+	if _spin_btn == null:
 		return
-	_stop_idle_animation()
-	_idle_tween = create_tween().set_loops()
-	_idle_tween.tween_property(_spin_btn, "scale", Vector2(1.025, 1.025), 0.85) \
-		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	_idle_tween.tween_property(_spin_btn, "scale", Vector2.ONE, 0.85) \
-		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	Juice.breathe(_spin_btn, 0.028, 0.85)
+	if _mascot != null:
+		Juice.breathe(_mascot, 0.018, 1.15)
 
 
 func _stop_idle_animation() -> void:
-	if _idle_tween != null and _idle_tween.is_running():
-		_idle_tween.kill()
 	if _spin_btn != null:
-		_spin_btn.scale = Vector2.ONE
+		Juice.stop(_spin_btn)
 
 
 func _parse_spin_error_details(data: Variant) -> Dictionary:

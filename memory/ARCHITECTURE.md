@@ -5,7 +5,8 @@
 
 ## Stack et règle d'or
 
-- Client : Godot 4.7.2, GDScript, portrait 540×1170, rendu Compatibility.
+- Client : Godot 4.7.2, GDScript, portrait 540×1170, rendu Compatibility,
+  Nunito ExtraBold MSDF, textures Linear+mipmaps.
 - Serveur : Rust, Axum 0.7, SQLx 0.8 et PostgreSQL.
 - Config : JSON validé au boot et distribué avec version + SHA-256.
 - Le client envoie des intentions et anime la réponse. RNG, soldes, coûts,
@@ -17,7 +18,7 @@
   `Haptics`, `Events`.
 - `Net` lit `CYBERSEEKER_API_URL`, sérialise les requêtes, rafraîchit le JWT et
   retente une fois les GET/mutations idempotentes.
-- Navigation : Spin, District, Cards, Missions et Store.
+- Navigation : Spin, District (diorama pads 2.5D), Cards, Missions et Store.
 - Les six scènes représentatives sont fumées par `client/tests/SmokeScenes.gd`.
 - Les tokens ne sont pas persistés avant raccordement d'un coffre-fort mobile.
 

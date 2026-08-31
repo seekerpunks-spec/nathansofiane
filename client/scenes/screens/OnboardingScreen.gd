@@ -21,6 +21,7 @@ func _build() -> void:
 	art.set_anchors_preset(Control.PRESET_FULL_RECT)
 	art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	Ui.soften_tex(art)
 	art.modulate = Color.WHITE
 	art.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(art)
@@ -33,7 +34,7 @@ func _build() -> void:
 	signal_label.position = Vector2(90, 38)
 	signal_label.size = Vector2(360, 32)
 	signal_label.add_theme_color_override("font_outline_color", Color.WHITE)
-	signal_label.add_theme_constant_override("outline_size", 5)
+	signal_label.add_theme_constant_override("outline_size", 2)
 	add_child(signal_label)
 
 	var mascot := Ui.HeroArt.new()
@@ -43,6 +44,7 @@ func _build() -> void:
 	mascot.position = Vector2(56, 72)
 	mascot.size = Vector2(428, 550)
 	mascot.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	Ui.soften_tex(mascot)
 	add_child(mascot)
 
 	var panel := Ui.panel(Color("#102B68", 0.98), Ui.GOLD)
@@ -83,30 +85,14 @@ func _big_button(text: String, accent: Color) -> Button:
 	b.text = text
 	b.custom_minimum_size = Vector2(0, 72)
 	b.focus_mode = Control.FOCUS_NONE
+	b.add_theme_font_override("font", Ui.FACE)
 	b.add_theme_font_size_override("font_size", 22)
 	b.pressed.connect(_connect)
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = accent
-	sb.border_color = Color("#FFF1A6")
-	sb.set_border_width_all(3)
-	sb.set_corner_radius_all(24)
-	sb.set_content_margin_all(12)
-	b.add_theme_stylebox_override("normal", sb)
-	var sb_hi := StyleBoxFlat.new()
-	sb_hi.bg_color = accent.lightened(0.15)
-	sb_hi.border_color = Color.WHITE
-	sb_hi.set_border_width_all(3)
-	sb_hi.set_corner_radius_all(24)
-	sb_hi.set_content_margin_all(12)
-	b.add_theme_stylebox_override("hover", sb_hi)
-	var sb_p := StyleBoxFlat.new()
-	sb_p.bg_color = accent.darkened(0.2)
-	sb_p.border_color = Ui.NEON_MAGENTA
-	sb_p.set_border_width_all(3)
-	sb_p.set_corner_radius_all(24)
-	sb_p.set_content_margin_all(12)
-	b.add_theme_stylebox_override("pressed", sb_p)
+	b.add_theme_stylebox_override("normal", Ui.style_box(accent, Color("#FFF1A6"), 24, 3))
+	b.add_theme_stylebox_override("hover", Ui.style_box(accent.lightened(0.15), Color.WHITE, 24, 3))
+	b.add_theme_stylebox_override("pressed", Ui.style_box(accent.darkened(0.2), Ui.NEON_MAGENTA, 24, 3))
 	b.add_theme_color_override("font_color", Ui.BG)
+	Juice.arm(b, true)
 	return b
 
 func _set_status(text: String, color: Color = Ui.NEON_CYAN) -> void:

@@ -113,42 +113,38 @@ func _open_tab(tab: String) -> void:
 		entrance.tween_property(inst, "position", Vector2.ZERO, 0.28)
 	for key in _nav_buttons:
 		var btn: Button = _nav_buttons[key]
-		btn.add_theme_color_override("font_color", Color.WHITE if key == tab else Color("#B9C7F2"))
+		btn.add_theme_color_override("font_color", Color.WHITE if key == tab or key == "spin" else Color("#B9C7F2"))
 		btn.button_pressed = key == tab
 
 
 func _nav_box(bg: Color, border: Color = Color.TRANSPARENT, width: int = 0) -> StyleBoxFlat:
-	var box := StyleBoxFlat.new()
-	box.bg_color = bg
-	box.border_color = border
-	box.set_border_width_all(width)
-	box.set_corner_radius_all(18)
+	var box := Ui.style_box(bg, border, 18, width, bg.a > 0.04)
 	box.set_content_margin_all(6)
 	return box
 
 func _build_nav() -> void:
-	_nav = Ui.panel(Color("#15183C", 0.98), Color("#5DE9FF"))
+	_nav = Ui.panel(Color("#15183C", 0.98), Color("#FFF0C0"))
 	_nav.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
 	var safe := Ui.safe_insets()
-	_nav.offset_left = 10 + safe.x
-	_nav.offset_right = -(10 + safe.z)
+	_nav.offset_left = 8 + safe.x
+	_nav.offset_right = -(8 + safe.z)
 	_nav.offset_top = -Ui.NAV_HEIGHT
-	_nav.offset_bottom = -(8 + safe.w)
+	_nav.offset_bottom = -(6 + safe.w)
 	var stack := VBoxContainer.new()
 	stack.add_theme_constant_override("separation", 2)
 	var active_rail := ColorRect.new()
 	active_rail.color = Color(Ui.GOLD, 0.94)
-	active_rail.custom_minimum_size.y = 2
+	active_rail.custom_minimum_size.y = 3
 	active_rail.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	stack.add_child(active_rail)
 	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 2)
+	row.add_theme_constant_override("separation", 4)
 	var labels := {
-		"spin":"◎\nSPIN",
-		"district":"▦\nBASE",
-		"collection":"✦\nCARDS",
-		"missions":"✓\nQUESTS",
-		"store":"◆\nSHOP",
+		"district": "BASE",
+		"collection": "CARDS",
+		"spin": "SPIN",
+		"missions": "QUESTS",
+		"store": "SHOP",
 	}
 	for key in labels:
 		var button := Button.new()
@@ -156,14 +152,21 @@ func _build_nav() -> void:
 		button.toggle_mode = true
 		button.focus_mode = Control.FOCUS_NONE
 		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		button.custom_minimum_size.y = 70
-		button.add_theme_font_size_override("font_size", 13)
+		button.custom_minimum_size.y = 84 if key == "spin" else 64
+		button.add_theme_font_override("font", Ui.FACE)
+		button.add_theme_font_size_override("font_size", 16 if key == "spin" else 12)
 		button.add_theme_color_override("font_hover_color", Color.WHITE)
 		button.add_theme_color_override("font_pressed_color", Color.WHITE)
-		button.add_theme_stylebox_override("normal", _nav_box(Color.TRANSPARENT))
-		button.add_theme_stylebox_override("hover", _nav_box(Color("#31529A", 0.72)))
-		button.add_theme_stylebox_override("pressed", _nav_box(Color("#334D9A"), Ui.GOLD, 3))
+		if key == "spin":
+			button.add_theme_stylebox_override("normal", _nav_box(Color("#FF4F46"), Color.WHITE, 3))
+			button.add_theme_stylebox_override("hover", _nav_box(Color("#FF6A5C"), Color.WHITE, 3))
+			button.add_theme_stylebox_override("pressed", _nav_box(Color("#FF4F46"), Ui.GOLD, 4))
+		else:
+			button.add_theme_stylebox_override("normal", _nav_box(Color.TRANSPARENT))
+			button.add_theme_stylebox_override("hover", _nav_box(Color("#31529A", 0.72)))
+			button.add_theme_stylebox_override("pressed", _nav_box(Color("#334D9A"), Ui.GOLD, 3))
 		button.pressed.connect(_on_nav_pressed.bind(key))
+		Juice.arm(button, true)
 		row.add_child(button)
 		_nav_buttons[key] = button
 	stack.add_child(row)

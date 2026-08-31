@@ -43,10 +43,29 @@ window/handheld/orientation=1
 
 [gui]
 
+common/snap_controls_to_pixels=false
+theme/default_font_hinting=0
+theme/default_font_multichannel_signed_distance_field=true
+theme/default_font_generate_mipmaps=true
+theme/custom_font="res://assets/fonts/Nunito-ExtraBold.ttf"
 common/drop_mouse_on_gui_input_disabled=true
+
+[importer_defaults]
+
+texture={
+"mipmaps/generate": true
+}
+font_data_dynamic={
+"generate_mipmaps": true,
+"hinting": 0,
+"msdf_pixel_range": 16,
+"msdf_size": 48,
+"multichannel_signed_distance_field": true
+}
 
 [rendering]
 
+textures/canvas_textures/default_texture_filter=2
 renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.mobile="gl_compatibility"
 textures/vram_compression/import_etc2_astc=true

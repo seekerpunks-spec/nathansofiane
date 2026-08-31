@@ -8,11 +8,19 @@ var _credits: Label
 var _busy := false
 
 func _ready() -> void:
+	add_child(Ui.illustrated_stage("res://assets/generated/api_gpt/heroes/collection_hero.webp"))
 	var body := Ui.screen_body()
-	body.add_child(Ui.hero_card("res://assets/generated/api_gpt/heroes/collection_hero.webp", "OPEN  •  REVEAL  •  COLLECT", "Collections", "Open caches and complete your sets.", Ui.NEON_MAGENTA))
-	_credits = Ui.label("", 18, Ui.GOLD)
-	_credits.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-	body.add_child(_credits)
+	var head := HBoxContainer.new()
+	var title := Ui.kicker_block("OPEN  •  REVEAL  •  COLLECT", "Cards", Ui.NEON_MAGENTA)
+	head.add_child(title)
+	var spacer := Control.new()
+	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	head.add_child(spacer)
+	var credits_chip := Ui.hud_chip(Ui.GOLD)
+	_credits = Ui.label("0 CR", 18, Color("#11225A"))
+	credits_chip.add_child(_credits)
+	head.add_child(credits_chip)
+	body.add_child(head)
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -29,7 +37,7 @@ func _ready() -> void:
 func _refresh() -> void:
 	if _content == null:
 		return
-	_credits.text = "SOLDE  " + Ui.compact(Store.credits()) + " CR"
+	_credits.text = Ui.compact(Store.credits()) + " CR"
 	for child in _content.get_children():
 		child.queue_free()
 	_content.add_child(Ui.section_title("AVAILABLE CACHES", Ui.NEON_MAGENTA))
@@ -57,9 +65,10 @@ func _chest_card(chest: Dictionary) -> PanelContainer:
 	if art_path != "" and ResourceLoader.exists(art_path):
 		var art := TextureRect.new()
 		art.texture = load(art_path)
-		art.custom_minimum_size = Vector2(86, 86)
+		art.custom_minimum_size = Vector2(110, 110)
 		art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		Ui.soften_tex(art)
 		row.add_child(art)
 	var text := VBoxContainer.new()
 	text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -73,7 +82,7 @@ func _chest_card(chest: Dictionary) -> PanelContainer:
 	text.add_child(info)
 	row.add_child(text)
 	var actions := VBoxContainer.new()
-	var open := Ui.button("OPEN", Ui.NEON_CYAN, true)
+	var open := Ui.button("OPEN", Color("#FF4F46"))
 	open.disabled = _busy or qty < 1
 	open.pressed.connect(_open_chest.bind(id))
 	actions.add_child(open)
@@ -277,6 +286,12 @@ func _show_drops(cards: Array) -> void:
 	center.add_child(box)
 	overlay.add_child(center)
 	add_child(overlay)
+	Juice.modal(box)
+	var delay := 0.06
+	for child in box.get_children():
+		if child is Label and child != box.get_child(0):
+			Ui.reveal(child, delay)
+			delay += 0.05
 	Sfx.result("rare")
 
 class CardGlyph extends Control:

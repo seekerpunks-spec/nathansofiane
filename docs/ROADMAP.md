@@ -212,3 +212,48 @@
 - [x] Gate `mobile_ux_check.ps1` étendue : splash configuré, fichier splash
       présent, 3 icônes câblées et présentes, description sans accents ;
       test négatif vérifié (icône manquante → gate rouge).
+
+## P16 — Juice design/anim R34 (T38)
+
+- [x] `Juice.gd` : animations UI via `offset_transform_*` Godot 4.7
+      (squash, pop, shake, pulse, modal, count-up), `reduced_motion` fail-safe,
+      armé sur `Ui.button` / nav / SPIN. Héros et scanline backdrop migrés.
+- [x] `SpinJuice.gd` : accélération, croisière, overshoot, stagger ~320 ms,
+      anticipation rare+, impact/shake. SpinScreen 989→935 lignes.
+- [x] Payline scan + burst/anneau legendary, HUD ticker crédits/spins,
+      respiration BYTE, SFX `coin`/`upgrade`.
+- [x] Modales collection/district + pop carte d'upgrade.
+- [x] Smoke : `offset_transform_enabled`, pop no-op en reduced_motion.
+      Gate mobile : Juice.gd + SpinJuice.gd requis.
+
+## P17 — DA graphique district R35 (T39)
+
+- [x] Quinze silhouettes 2.5D jouet pour Neon Slums (5 bâtiments × 3 paliers),
+      converties WebP 384 px, câblées dans `district_01.json` (lv 0–1 / 2–3 /
+      4–5 → t0 / t1 / t2). Identité originale, pas un calque Coin Master.
+- [x] `DistrictScreen` : diorama village (pads positionnés, HUD ivoire, fond
+      lisible, voile 0.12). Overflow >5 en grille pour le smoke.
+- [x] Glyphes procéduraux conservés pour D2–D5 et assets absents.
+- [x] Gate : 15 WebP, zéro orphelin, tripwire anti-voile, smoke art D1.
+
+## P18 — Villages 5 districts R36 + tap R37 (T40)
+
+- [x] Cinq stages portrait + HUD overlay type spin, voile retiré.
+- [x] 55 bâtiments 2.5D (D1 trois paliers, D2–D5 ruine/landmark).
+- [x] T40 : D6 = 0 € outils, pas un cap Mo. Arts 1024 px (~12,4 Mo).
+      District = tap sur le bâtiment + bulle de coût (plus de bandeau).
+      Gate : hygiène WebP/orphelins, plafond santé 2048 Mo / 8192 Ko.
+
+## P19 — DA casual Coin Master R38 (feel, D8)
+
+- [x] Village : croix 2+1+2, marteau rond, 5 etoiles, 2 taps (cout puis
+      build), barre de build en haut, BUILD BAY (shop).
+- [x] Nav : SPIN coral au centre, BASE/CARDS/QUESTS/SHOP autour.
+- [x] Cards/Quests/Shop : fond illustre + HUD overlay, plus de hero 172 px.
+
+## P20 — Netteté runtime R39
+
+- [x] Alpha feather + WebP lossless bâtiments, stages natifs, chrome 8×.
+- [x] Nunito ExtraBold MSDF, mipmaps, snap pixels off, StyleBoxFlat AA.
+- [x] Pas de FXAA/MSAA 2D (non supportés en Compatibility 4.7).
+

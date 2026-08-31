@@ -33,18 +33,14 @@ Hiérarchie de vérité : `server/src/*.rs` = contrat API définitif > `docs/` (
 6. **GDScript 4** : pas de méthode nommée `get()` (collision `Object.get`, warning = erreur) ; une `const` doit être une expression constante (pas d'appel de fonction) ; pas de variable et fonction au même nom.
 7. **Mémorisation (T14)** : tout changement significatif → mise à jour du/des `memory/*.md` dans la même session, condensé.
 
-## État actuel (R33 — 31/08/2026)
+## État actuel (R39 — 01/09/2026)
 - Tout le MASTER TODO gameplay est livré (spin ×1→×100K, 5 districts de lancement,
  collection, rétention, liveops, social Signal Jam/Ghost Vault, crews, trading,
  achievements, entitlements NFT et reward pool SKR fail-closed). 21 modules Rust,
  20 migrations. Historique R26→R30 : voir `memory/CURRENT_STATE.md`.
-- R31 validé : budget d'assets mobile. `client/assets` 47,65 → 3,65 Mo (18
- textures WebP calibrées, coffres 1024→256 px, ~25 Mo d'assets morts supprimés
- dont le staging `local_ai/` qui partait dans l'APK). Pipelines ComfyUI/Blender
- en staging sous `art/`, promotions du manifest avec conversion WebP intégrée.
- `mobile_ux_check.ps1` applique le budget (5 Mo total, 1 024 Ko/fichier, zéro
- orphelin/PNG/staging, tests négatifs vérifiés). Champ `image` mort retiré des
- cartes. `run_local_full_gate.ps1` exit 0 : `LOCAL_FULL_GATE_OK`, 39/39 Rust,
+- R31 validé : hygiène d'assets (orphelins/PNG/staging hors client). Le
+ plafond 5 Mo R31 est **obsolète** (T40).
+- `run_local_full_gate.ps1` (R31) : `LOCAL_FULL_GATE_OK`, 39/39 Rust,
  12/12 PostgreSQL, contrats API et social verts.
 - R32 validé (D12) : **UI joueur 100 % anglaise** — 103 remplacements dans les
  `.gd` client + configs joueur (achievements, label GLITCH), smoke sur `CLAIM`,
@@ -56,6 +52,14 @@ Hiérarchie de vérité : `server/src/*.rs` = contrat API définitif > `docs/` (
  `tools/android_icons/build_icons.py`) et câblées dans le preset (safe zone
  adaptive respectée), `export/*` hors pck, description projet EN, version
  0.3.0-r33. Gate mobile : splash/icônes/description vérifiés, test négatif OK.
+- R34 validé (T38) : juice UI Godot 4.7 via `offset_transform_*` (`Juice.gd`),
+ rythme slot dans `SpinJuice.gd` (stagger/overshoot/anticipation, SpinScreen
+ 935 l.), HUD ticker, squash boutons, modales, `reduced_motion`. Serveur
+ souverain. Smoke + gate mobile étendus (Juice.gd / SpinJuice.gd).
+- R35 validé (T39) : écran District en **diorama village** (5 pads 2.5D).
+- R36–R39 : villages 5 districts, tap/marteau Coin Master (feel, D8),
+ T40 = 0 € outils pas cap APK. R39 = netteté (MSDF, mipmaps, alpha lissé).
+ Identité originale.
 - Quirks machine : le shell Cursor exige `required_permissions: ["all"]` (aucun
  backend sandbox Windows). Hôte réel = **Windows PowerShell 5.1, pas de pwsh** :
  les .ps1 accentués DOIVENT garder leur BOM UTF-8, les gates leur

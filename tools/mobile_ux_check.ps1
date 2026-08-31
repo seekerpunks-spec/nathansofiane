@@ -23,11 +23,14 @@ if ($ui -notmatch 'static func reward_text' -or $missions -match 'reward\.get\("
     throw "Récompenses live-ops encore supposées spins-only"
 }
 if ($spinLines -gt 1000) { throw "SpinScreen redevient monolithique: $spinLines lignes" }
+$juice = Get-Content -Encoding UTF8 -LiteralPath (Join-Path $client "scripts\core\Juice.gd") -Raw
+if ($juice -notmatch 'offset_transform_enabled') { throw "Juice.gd n'utilise pas offset_transform Godot 4.7" }
+if ($juice -notmatch 'reduced_motion') { throw "Juice.gd n'honore pas reduced_motion" }
 if ($onboarding -match 'apply_state\(\{\s*"spins"' -or $events -notmatch 'func reset_session' -or
     $events -notmatch '_session_generation') {
     throw "Session mobile: état fabriqué ou isolation analytics absente"
 }
-foreach ($component in @("SpinVisuals.gd", "SpinNetworkView.gd", "SpinNetworkActions.gd", "SpinEncounterView.gd", "SpinTelemetry.gd")) {
+foreach ($component in @("SpinVisuals.gd", "SpinJuice.gd", "SpinNetworkView.gd", "SpinNetworkActions.gd", "SpinEncounterView.gd", "SpinTelemetry.gd")) {
     if (-not (Test-Path -LiteralPath (Join-Path $client "scripts\components\$component"))) {
         throw "Composant Spin absent: $component"
     }
@@ -53,12 +56,12 @@ if ($petHits) { throw "Système Pets détecté dans le runtime" }
 
 # --- Budget d'assets mobile (R31) ---
 # La derive de poids ne se voit qu'au build Android : la gate la rend visible
-# a chaque validation. Chiffres de reference apres conversion WebP : 3,64 Mo
-# au total, plus gros fichier 913 Ko (atlas du slot, sans perte).
+# Qualite graphique prioritaire : D6 = 0 euro (outils), PAS un plafond Mo.
+# User 31/08 : "si le jeu fait 2 Go on s'en fout". Hygiene WebP/orphelins conservee.
 $assetsRoot = Join-Path $client "assets"
 $generatedRoot = Join-Path $assetsRoot "generated"
-$assetBudgetTotalMB = 5.0
-$assetBudgetFileKB = 1024
+$assetBudgetTotalMB = 2048.0
+$assetBudgetFileKB = 8192
 
 if (Test-Path -LiteralPath (Join-Path $generatedRoot "local_ai")) {
     throw "Staging local_ai present dans client/assets : il vit sous art/local_ai/staging"
@@ -100,6 +103,33 @@ foreach ($texture in $textures) {
 }
 if ($orphans) {
     throw "Assets orphelins (aucune reference code/config): $($orphans -join ', ')"
+}
+
+# Diorama : stages portrait + batiments 2.5D (R36, poids releve).
+$buildingDir = Join-Path $generatedRoot "districts\buildings"
+$stageDir = Join-Path $generatedRoot "districts\stages"
+$buildingCount = 0
+$stageCount = 0
+if (Test-Path -LiteralPath $buildingDir) {
+    $buildingCount = @(Get-ChildItem -LiteralPath $buildingDir -Filter "*.webp").Count
+}
+if (Test-Path -LiteralPath $stageDir) {
+    $stageCount = @(Get-ChildItem -LiteralPath $stageDir -Filter "*.webp").Count
+}
+if ($buildingCount -lt 50) {
+    throw "Art diorama incomplet: $buildingCount/50+ WebP batiments"
+}
+if ($stageCount -lt 5) {
+    throw "Stages district incomplets: $stageCount/5"
+}
+if ($joined -notmatch '_layout_pads') {
+    throw "DistrictScreen n'est plus un diorama village"
+}
+if ($joined -notmatch '_open_build_bay') {
+    throw "Village: BUILD BAY (shop marteau) absent"
+}
+if ($joined -match 'modulate = Color\(0\.38, 0\.42, 0\.58') {
+    throw "Fond district encore etouffe (voile/modulate R17)"
 }
 
 # Un .import sans source est un residu de suppression : Godot le regenere de
@@ -167,6 +197,34 @@ foreach ($iconKey in @("main_192x192", "adaptive_foreground_432x432", "adaptive_
     }
 }
 if ($preset -notmatch 'exclude_filter="[^"]*export/\*') { throw "Preset Android: export/* doit rester hors du pck" }
+
+# --- Netteté R39 ---
+if ($project -notmatch 'theme/custom_font="res://assets/fonts/Nunito-ExtraBold\.ttf"') {
+    throw "Police Nunito ExtraBold absente du theme"
+}
+if ($project -notmatch 'default_font_multichannel_signed_distance_field=true') {
+    throw "MSDF defaut police desactive"
+}
+if ($project -notmatch 'textures/canvas_textures/default_texture_filter=2') {
+    throw "Filtre canvas Linear+mipmaps absent"
+}
+if ($project -notmatch 'common/snap_controls_to_pixels=false') {
+    throw "snap_controls_to_pixels encore pixel-art"
+}
+if ($joined -notmatch 'assets/generated/ui/star\.webp') { throw "Chrome star.webp non reference" }
+if ($joined -notmatch 'assets/generated/ui/hammer\.webp') { throw "Chrome hammer.webp non reference" }
+if ($ui -notmatch 'anti_aliasing = true') { throw "StyleBoxFlat AA absent" }
+$mipOff = Get-ChildItem -LiteralPath $generatedRoot -Recurse -Filter "*.import" |
+    Where-Object { (Get-Content -Encoding UTF8 -LiteralPath $_.FullName -Raw) -match 'mipmaps/generate=false' }
+if ($mipOff) {
+    throw "Textures sans mipmaps: $(($mipOff | ForEach-Object Name) -join ', ')"
+}
+if (-not (Test-Path -LiteralPath (Join-Path $client "assets\fonts\Nunito-ExtraBold.ttf"))) {
+    throw "Nunito-ExtraBold.ttf manquant"
+}
+if (-not (Test-Path -LiteralPath (Join-Path $client "assets\fonts\OFL.txt"))) {
+    throw "Licence OFL Nunito manquante"
+}
 
 [pscustomobject]@{
     TouchInputs = $touchInputs

@@ -88,6 +88,23 @@ func _run() -> void:
 		SpinVisuals.symbols_for_result({"type": "credits", "tier": "legendary"}) == ["vault", "vault", "vault"],
 		"mapping visuel jackpot invalide"
 	)
+	var juice_btn := Ui.button("SPIN", Ui.NEON_CYAN)
+	_check(juice_btn.offset_transform_enabled, "Juice.arm n'active pas offset_transform_enabled")
+	_check(juice_btn.offset_transform_pivot_ratio == Vector2(0.5, 0.5), "pivot juice hors centre")
+	juice_btn.free()
+	_check(ResourceLoader.exists("res://assets/generated/ui/star.webp"), "chrome star absent")
+	_check(ResourceLoader.exists("res://assets/generated/ui/hammer.webp"), "chrome hammer absent")
+	_check(ResourceLoader.exists("res://assets/generated/ui/wrench.webp"), "chrome wrench absent")
+	_check(ResourceLoader.exists("res://assets/fonts/Nunito-ExtraBold.ttf"), "police Nunito absente")
+	var polish_box := Ui.style_box()
+	_check(polish_box.anti_aliasing, "StyleBoxFlat anti_aliasing off")
+	_check(polish_box.corner_detail >= 10, "coins StyleBox trop anguleux")
+	var probe := Control.new()
+	Preferences.reduced_motion = true
+	Juice.pop(probe, 1.2, 0.2)
+	_check(probe.offset_transform_scale == Vector2.ONE, "reduced_motion doit ignorer le pop")
+	probe.free()
+	Preferences.reduced_motion = false
 	_check(
 		SpinVisuals.symbols_for_result({"type": "none"}) == ["glitch", "credits", "energy"],
 		"mapping visuel spin vide invalide"
@@ -200,7 +217,7 @@ func _check_district_screen(instance: Node) -> void:
 			"Fond de district introuvable: " + background
 		)
 
-	# Changer de district doit changer le décor ET la carte héros.
+	# Changer de district doit changer le décor ET le bandeau nom.
 	var last: Dictionary = districts[districts.size() - 1]
 	var expected: Texture2D = instance._asset_texture(str(last.get("background", "")))
 	instance._district = last
@@ -208,7 +225,26 @@ func _check_district_screen(instance: Node) -> void:
 	instance._rebuild_hero()
 	await get_tree().process_frame
 	_check(instance._background.texture == expected, "Le décor ne suit pas le district actif")
-	_check(instance._hero_holder.get_child_count() == 1, "Carte héros non reconstruite")
+	_check(instance._hero_holder.get_child_count() == 1, "Bandeau village non reconstruit")
+	_check(instance.has_method("_open_build_bay"), "BUILD BAY absent")
+
+	# Tout asset déclaré (les 5 districts) doit réellement charger.
+	for district in districts:
+		if typeof(district) != TYPE_DICTIONARY:
+			continue
+		for element in district.get("elements", []):
+			if typeof(element) != TYPE_DICTIONARY:
+				continue
+			for level in element.get("levels", []):
+				if typeof(level) != TYPE_DICTIONARY:
+					continue
+				var asset := str(level.get("asset", ""))
+				if asset.is_empty():
+					continue
+				_check(
+					instance._asset_texture(asset) != null,
+					"Art de structure introuvable: " + asset
+				)
 
 	# Les silhouettes procédurales doivent couvrir n'importe quel identifiant
 	# d'élément, pas seulement les cinq premiers. On passe par le rendu réel

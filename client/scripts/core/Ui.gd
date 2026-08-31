@@ -20,9 +20,10 @@ const GREY := Color("#90A5D4")
 const TEXT := Color("#FFF8E8")
 const TEXT_DIM := Color("#B6C7EB")
 const DANGER := Color("#FF526E")
-const NAV_HEIGHT := 104
+const NAV_HEIGHT := 118
 const SAFE_MARGIN := 20
 const HERO_HEIGHT := 172
+const FACE := preload("res://assets/fonts/Nunito-ExtraBold.ttf")
 
 static func safe_insets() -> Vector4:
 	var window_size := Vector2(DisplayServer.window_get_size())
@@ -117,18 +118,74 @@ static func mmss_long(ms: int) -> String:
 	var minutes := (seconds % 3600) / 60
 	return "%dd %02dh %02dm" % [days, hours, minutes] if days > 0 else "%02dh %02dm" % [hours, minutes]
 
-## Panel avec bordure néon + fond.
-static func style_box(bg: Color = PANEL, border: Color = BORDER, radius: int = 18, width: int = 2) -> StyleBoxFlat:
+## Panel avec bordure néon + fond. AA + corner_detail doc 4.7 StyleBoxFlat.
+static func style_box(bg: Color = PANEL, border: Color = BORDER, radius: int = 18, width: int = 2, shadow: bool = true) -> StyleBoxFlat:
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = bg
 	sb.border_color = border
 	sb.set_border_width_all(width)
 	sb.set_corner_radius_all(radius)
+	sb.corner_detail = 12
+	sb.anti_aliasing = true
+	sb.anti_aliasing_size = 1.0
 	sb.set_content_margin_all(15)
-	sb.shadow_color = Color("#020929", 0.58)
-	sb.shadow_size = 9
-	sb.shadow_offset = Vector2(0, 6)
+	if shadow:
+		sb.shadow_color = Color("#020929", 0.58)
+		sb.shadow_size = 9
+		sb.shadow_offset = Vector2(0, 6)
 	return sb
+
+static func soften_tex(node: CanvasItem) -> void:
+	node.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+
+## Fond illustré plein écran + voile léger, HUD par-dessus (pas un dashboard).
+static func illustrated_stage(path: String) -> Control:
+	var root := Control.new()
+	root.set_anchors_preset(Control.PRESET_FULL_RECT)
+	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var sky := ColorRect.new()
+	sky.color = BG
+	sky.set_anchors_preset(Control.PRESET_FULL_RECT)
+	sky.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(sky)
+	if path != "" and ResourceLoader.exists(path):
+		var art := TextureRect.new()
+		art.texture = load(path)
+		art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+		art.set_anchors_preset(Control.PRESET_FULL_RECT)
+		art.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		soften_tex(art)
+		root.add_child(art)
+	var veil := ColorRect.new()
+	veil.color = Color(0.03, 0.05, 0.14, 0.32)
+	veil.set_anchors_preset(Control.PRESET_FULL_RECT)
+	veil.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(veil)
+	return root
+
+
+static func kicker_block(kicker: String, title: String, accent: Color = NEON_CYAN) -> VBoxContainer:
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 0)
+	var k := label(kicker.to_upper(), 11, accent)
+	k.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	box.add_child(k)
+	var t := label(title, 28, TEXT)
+	t.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	box.add_child(t)
+	return box
+
+
+static func hud_chip(accent: Color) -> PanelContainer:
+	var chip := PanelContainer.new()
+	var box := style_box(Color("#FFF0C0"), Color(accent, 0.98), 22, 4)
+	box.set_content_margin_all(8)
+	box.shadow_color = Color("#182356", 0.48)
+	box.shadow_size = 7
+	box.shadow_offset = Vector2(0, 5)
+	chip.add_theme_stylebox_override("panel", box)
+	return chip
 
 static func panel(bg: Color = PANEL, border: Color = BORDER) -> PanelContainer:
 	var p := PanelContainer.new()
@@ -140,10 +197,15 @@ static func label(text: String, size: int, color: Color = TEXT) -> Label:
 	var l := Label.new()
 	l.text = text
 	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	l.add_theme_font_override("font", FACE)
 	l.add_theme_font_size_override("font_size", size)
 	l.add_theme_color_override("font_color", color)
-	l.add_theme_color_override("font_outline_color", Color("#03102E", 0.94))
-	l.add_theme_constant_override("outline_size", 4)
+	l.add_theme_color_override("font_outline_color", Color("#03102E", 0.72))
+	l.add_theme_constant_override("outline_size", 2)
+	l.add_theme_color_override("font_shadow_color", Color("#03102E", 0.42))
+	l.add_theme_constant_override("shadow_offset_x", 0)
+	l.add_theme_constant_override("shadow_offset_y", 1)
+	l.add_theme_constant_override("shadow_outline_size", 2)
 	return l
 
 static func button(text: String, accent: Color = NEON_CYAN, secondary: bool = false) -> Button:
@@ -151,15 +213,17 @@ static func button(text: String, accent: Color = NEON_CYAN, secondary: bool = fa
 	b.text = text
 	b.custom_minimum_size = Vector2(0, 64)
 	b.focus_mode = Control.FOCUS_NONE
+	b.add_theme_font_override("font", FACE)
 	b.add_theme_font_size_override("font_size", 18)
 	var base := PANEL_HI if secondary else accent
 	var font := TEXT if secondary else BG
-	b.add_theme_stylebox_override("normal", style_box(base, Color(accent, 0.92), 20, 3))
-	b.add_theme_stylebox_override("hover", style_box(base.lightened(0.09), accent, 20, 3))
-	b.add_theme_stylebox_override("pressed", style_box(base.darkened(0.16), Color.WHITE, 20, 3))
-	b.add_theme_stylebox_override("disabled", style_box(Color(PANEL_HI, 0.55), BORDER, 20, 1))
+	b.add_theme_stylebox_override("normal", style_box(base, Color(accent, 0.92), 24, 3))
+	b.add_theme_stylebox_override("hover", style_box(base.lightened(0.09), accent, 24, 3))
+	b.add_theme_stylebox_override("pressed", style_box(base.darkened(0.16), Color.WHITE, 24, 3))
+	b.add_theme_stylebox_override("disabled", style_box(Color(PANEL_HI, 0.55), BORDER, 24, 1))
 	b.add_theme_color_override("font_color", font)
 	b.add_theme_color_override("font_disabled_color", TEXT_DIM)
+	Juice.arm(b, true)
 	return b
 
 static func page_title(kicker: String, title: String, subtitle: String = "") -> VBoxContainer:
@@ -193,6 +257,7 @@ static func hero_card(image_path: String, kicker: String, title: String, subtitl
 	art.texture = load(image_path)
 	art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	soften_tex(art)
 	art.set_anchors_preset(Control.PRESET_FULL_RECT)
 	art.anchor_left = 0.35
 	art.offset_left = -18
@@ -279,6 +344,8 @@ static func _scroll_box(color: Color) -> StyleBoxFlat:
 	var box := StyleBoxFlat.new()
 	box.bg_color = color
 	box.set_corner_radius_all(4)
+	box.corner_detail = 8
+	box.anti_aliasing = true
 	return box
 
 static func screen_body() -> VBoxContainer:
@@ -319,17 +386,12 @@ class SignalBackdrop extends Control:
 			queue_redraw()
 
 	func _draw() -> void:
-		var drift := sin(phase * 0.32) * 24.0
-		for x in range(-160, int(size.x) + 240, 92):
-			draw_line(Vector2(x + drift, 0), Vector2(x - 210 + drift, size.y), Color(accent, 0.055), 2.0)
-		for y in range(80, int(size.y), 150):
-			draw_line(Vector2(0, y), Vector2(size.x, y), Color(NEON_BLUE, 0.045), 1.0)
-		var core := Vector2(size.x * 0.82 + sin(phase * 0.42) * 12.0, size.y * 0.24)
-		for ring in range(5, 0, -1):
-			draw_circle(core, 42.0 + ring * 34.0, Color(accent, 0.012 + ring * 0.006))
-		var hot := Vector2(size.x * 0.10, size.y * 0.72 + cos(phase * 0.36) * 18.0)
+		var core := Vector2(size.x * 0.78 + sin(phase * 0.28) * 10.0, size.y * 0.20)
 		for ring in range(4, 0, -1):
-			draw_circle(hot, 36.0 + ring * 30.0, Color(NEON_MAGENTA, 0.012 + ring * 0.006))
+			draw_circle(core, 70.0 + ring * 52.0, Color(accent, 0.008 + ring * 0.004))
+		var hot := Vector2(size.x * 0.14, size.y * 0.74 + cos(phase * 0.24) * 12.0)
+		for ring in range(3, 0, -1):
+			draw_circle(hot, 48.0 + ring * 40.0, Color(NEON_MAGENTA, 0.007 + ring * 0.004))
 
 ## Animation intrinsèque du rendu de héros. Elle respecte le réglage de
 ## réduction des mouvements et ne modifie jamais le layout des conteneurs.
@@ -338,17 +400,18 @@ class HeroArt extends TextureRect:
 
 	func _ready() -> void:
 		mouse_filter = Control.MOUSE_FILTER_IGNORE
+		offset_transform_enabled = true
+		offset_transform_pivot_ratio = Vector2(0.5, 0.5)
 		modulate = Color(1, 1, 1, 0)
 		var intro := create_tween().set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 		intro.tween_property(self, "modulate", Color.WHITE, 0.45)
 
 	func _process(delta: float) -> void:
-		pivot_offset = size * 0.5
-		if Preferences.get("reduced_motion"):
-			rotation = 0.0
-			scale = Vector2.ONE
+		if Preferences.reduced_motion:
+			offset_transform_rotation = 0.0
+			offset_transform_scale = Vector2.ONE
 			return
 		phase += delta
-		rotation = sin(phase * 0.85) * 0.006
+		offset_transform_rotation = sin(phase * 0.85) * 0.006
 		var breathe := 1.0 + sin(phase * 1.15) * 0.008
-		scale = Vector2(breathe, breathe)
+		offset_transform_scale = Vector2(breathe, breathe)

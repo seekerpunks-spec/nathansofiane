@@ -1,4 +1,4 @@
-# MÉMOIRE — TODO / PROCHAINES TÂCHES R33
+# MÉMOIRE — TODO / PROCHAINES TÂCHES R35
 
 > MAJ 31/08/2026. Roadmap détaillée : `docs/ROADMAP.md`. Checklist de
 > publication : `docs/RELEASE_CHECKLIST.md`. Spec produit : `MASTER TODO`.
@@ -62,6 +62,19 @@
       preset (main 192 + adaptive fg/bg 432, safe zone respectée),
       description projet en anglais, version 0.3.0-r33, gate mobile étendue
       avec test négatif.
+- [x] **R34 juice design/anim** : `Juice.gd` (offset_transform 4.7),
+      `SpinJuice.gd` (stagger/overshoot/anticipation), HUD ticker, squash
+      boutons, modales collection/district, reduced_motion, SpinScreen 935 l.
+- [x] **R35 DA graphique district** : diorama village (plus de liste), 15
+      silhouettes 2.5D Neon Slums (3 paliers), HUD ivoire, voile levé,
+      glyphes D2–D5, budget WebP tenu.
+
+- [x] **R36 DA village 5 districts** : HUD overlay, 5 stages, 55 bâtiments.
+- [x] **R38 DA Coin Master (feel)** : marteau rond + 2 taps + étoiles +
+      barre de build en haut + BUILD BAY. Nav SPIN central coral.
+      Cards/Quests/Shop en overlay illustré, plus de hero dashboard.
+- [x] **R39 netteté** : alpha lissé, mipmaps, Nunito MSDF, chrome supersamplé.
+      Viewport 540 conservé (T2). Pas de FXAA Compatibility.
 
 ## Décisions produit encore ouvertes (ne pas inventer)
 
