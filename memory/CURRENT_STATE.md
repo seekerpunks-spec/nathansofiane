@@ -1,8 +1,20 @@
-# MÉMOIRE — ÉTAT ACTUEL R27
+# MÉMOIRE — ÉTAT ACTUEL R28
 
 > MAJ 31/08/2026. R26 = « volume de contenu + live-ops automatisée » —
 > intégralement commitée dans `da142f8` (22 commits au total avant R27). R27
 > ferme les dettes post-audit sans design final, wallet natif ni build Android.
+> R28 rend le playthrough social HTTP reproductible et fail-closed.
+
+## Lot R28 (validé)
+
+- `tools/social_contract_check.ps1` orchestre deux joueurs authentifiés par deux
+  instances DEV partageant PostgreSQL/JWT, sans injection SQL.
+- Couverture : amitié/ciblage, Firewall 0→3, trois Attack bloquées puis un dégât,
+  revanche, réparation, Raid conservatif et Trade 1-pour-1 atomique ; retries
+  byte-identiques sur les mutations critiques.
+- `validate_all.ps1` exige la seconde instance lorsqu'une gate HTTP est demandée.
+- Gate complète verte : 39/39 Rust, 12/12 PostgreSQL, 53 analytics, 18 smokes,
+  `API_CONTRACT_CHECK_OK`, `SOCIAL_CONTRACT_CHECK_OK`, validation finale verte.
 
 ## Lot R27 (validé)
 

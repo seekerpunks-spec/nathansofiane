@@ -130,3 +130,14 @@
 - [x] Gate complète et contrat HTTP rejoués sans APK/AAB.
 - [ ] Transfert libre de ressources, chat et donations restent fermés par
       décision anti-abus/modération ; design et wallet restent hors lot.
+
+## P10 — Contrat social HTTP R28
+
+- [x] Gate reproductible à deux joueurs et deux instances DEV, sans injection
+      SQL ni contournement de l'autorité serveur.
+- [x] Amitié bilatérale, ciblage ami/revanche, Firewall ×3, Attack bloquée et
+      dommageable, réparation, Raid conservatif et trading de doublons prouvés.
+- [x] Rejeux byte-identiques pour les mutations sociales critiques.
+- [x] `validate_all.ps1` fail-closed quand une gate HTTP est demandée sans la
+      seconde instance d'authentification.
+- [x] Gate R28 complète verte sans APK/AAB.

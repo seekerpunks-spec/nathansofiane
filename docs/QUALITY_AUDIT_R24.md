@@ -55,10 +55,20 @@ crédit/replay d'une pub, son cooldown, puis la révocation de session.
 une instance locale `DEV_AUTH` dédiée est disponible.
 La gate a été rejouée après R27 le 31/08/2026 : `API_CONTRACT_CHECK_OK`.
 
-Playthrough social HTTP à deux identités/instances validé : cible financée et
-upgradée, Firewall 3→2 sur Signal Jam bloqué sans dégât, plateau Ghost Vault non
-exposé, cashout débité exactement à la cible, puis gains ×4 de Firewall, coffres
-et cartes vérifiés. Le test PostgreSQL rejette aussi l'auto-ciblage et deux owners.
+Gate sociale R28 reproductible : `tools/social_contract_check.ps1` crée deux
+joueurs par deux instances DEV partageant PostgreSQL et `JWT_SECRET`, mais liées
+à deux `DEV_ADDRESS` distinctes. Elle valide amitié/ciblage, Firewall 0→3, trois
+Signal Jam bloqués, un dégât réel, revanche, réparation, Ghost Vault sans fuite
+du plateau avec transfert conservatif et échange atomique de doublons. Les
+rejeux Attack, Raid et Trade doivent être byte-identiques. Le test PostgreSQL
+rejette aussi l'auto-ciblage et deux owners.
+
+`validate_all.ps1 -ApiBaseUrl ... -ApiSecondaryAuthBaseUrl ...
+-ApiDevAddress ... -ApiSecondaryDevAddress ...` enchaîne désormais les contrats
+généraux et sociaux et échoue si la seconde instance manque. Les deux processus
+de gate utilisent un quota local élevé ; cette configuration reste interdite en
+production. Validation R28 : `API_CONTRACT_CHECK_OK`,
+`SOCIAL_CONTRACT_CHECK_OK`, puis `CYBERSEEKER_VALIDATION_OK`.
 
 ## UX mobile locale
 

@@ -207,7 +207,9 @@ Seeker relèvent de la publication externe ; voir `RELEASE_CHECKLIST.md`.
 ## 10. Validation
 
 `tools/validate_all.ps1` enchaîne audit économique, format/test Rust, import
-Godot et smoke des scènes. Les routes R17 ont aussi été exercées sur un serveur
-local avec vérification de l'idempotence. Le binaire serveur release et l'APK
-sont construits séparément afin que leur production échoue explicitement si la
-configuration est impropre.
+Godot et smoke des scènes. Avec `-ApiBaseUrl` et
+`-ApiSecondaryAuthBaseUrl`, il exerce aussi les contrats généraux puis un
+playthrough social complet à deux joueurs sur deux instances DEV partageant la
+base et le secret JWT. Ce mode HTTP est fail-closed si la seconde instance
+manque. Le binaire serveur release et l'APK sont construits séparément afin que
+leur production échoue explicitement si la configuration est impropre.

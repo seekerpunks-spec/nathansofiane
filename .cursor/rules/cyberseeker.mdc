@@ -33,7 +33,7 @@ Hiérarchie de vérité : `server/src/*.rs` = contrat API définitif > `docs/` (
 6. **GDScript 4** : pas de méthode nommée `get()` (collision `Object.get`, warning = erreur) ; une `const` doit être une expression constante (pas d'appel de fonction) ; pas de variable et fonction au même nom.
 7. **Mémorisation (T14)** : tout changement significatif → mise à jour du/des `memory/*.md` dans la même session, condensé.
 
-## État actuel (R27 — 31/08/2026)
+## État actuel (R28 — 31/08/2026)
 - Tout le MASTER TODO gameplay est livré (spin ×1→×100K, 5 districts de lancement,
   collection, rétention, liveops, social Signal Jam/Ghost Vault, crews, trading,
   achievements, entitlements NFT et reward pool SKR fail-closed). 21 modules Rust,
@@ -45,6 +45,10 @@ Hiérarchie de vérité : `server/src/*.rs` = contrat API définitif > `docs/` (
 - R27 validé : rattrapage live-ops dérivé de la config (180 fenêtres
   testées), Clippy strict vert, récompenses UI génériques et SpinScreen ramené à
   989 lignes. `CYBERSEEKER_VALIDATION_OK` + `API_CONTRACT_CHECK_OK`.
+- R28 validé : `social_contract_check.ps1` automatise le playthrough à deux
+  joueurs/instances (amis, Firewall, Attack, revanche, réparation, Raid et
+  Trade), et la gate HTTP échoue désormais sans seconde instance. Validation
+  complète verte avec `SOCIAL_CONTRACT_CHECK_OK`, sans APK/AAB.
 - Quirks machine : le shell Cursor exige `required_permissions: ["all"]` (aucun
   backend sandbox Windows). Git 2.55 installé, `.git` réapproprié depuis le compte
   sandbox Codex, `core.autocrlf=false` local. `git fsck --full` passe ; un seul

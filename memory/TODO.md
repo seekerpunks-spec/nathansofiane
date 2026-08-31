@@ -1,4 +1,4 @@
-# MÉMOIRE — TODO / PROCHAINES TÂCHES R27
+# MÉMOIRE — TODO / PROCHAINES TÂCHES R28
 
 > MAJ 31/08/2026. Roadmap détaillée : `docs/ROADMAP.md`. Checklist de
 > publication : `docs/RELEASE_CHECKLIST.md`. Spec produit : `MASTER TODO`.
@@ -40,6 +40,9 @@
       Clippy strict vert, libellés de récompense génériques et SpinScreen à
       989 lignes avec composant de télémétrie séparé.
 - [x] **Finaliser R27** : revue du diff et lot atomique validé pour versionnage.
+- [x] **R28 contrat social HTTP** : deux joueurs/deux instances, Attack,
+      Firewall, revanche, réparation, Raid conservatif et Trade atomique ; gate
+      complète fail-closed et verte sans APK/AAB.
 
 ## Décisions produit encore ouvertes (ne pas inventer)
 

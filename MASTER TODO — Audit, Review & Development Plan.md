@@ -1211,9 +1211,14 @@ Le test HTTP confirme logout `200/true`, replay `200/false`, puis refresh `401`.
 La passe overflow relit désormais le solde serveur après claim de set, borne la
 régénération même au-delà de `i32` intervalles et protège streak, niveau et
 progression de mission avant les additions PostgreSQL.
-Le playthrough HTTP à deux joueurs valide Firewall bloquant, Attack sans dégât,
-Raid sans fuite de plateau et débit exact, ainsi que les gains ×4 Shield/Chest/Card.
-Les invariants DB refusent auto-ciblage, statuts incohérents et double owner.
+R28 automatise le playthrough HTTP à deux joueurs dans
+`tools/social_contract_check.ps1` : amitié et ciblage, Firewall 0→3, trois Attack
+bloquées puis un dégât, revanche, réparation, Raid sans fuite du plateau avec
+débit/crédit conservatif, et échange atomique de deux doublons distincts. Les
+rejeux des mutations critiques doivent être byte-identiques. La gate complète
+exige deux instances DEV partageant PostgreSQL/JWT mais chacune liée à sa propre
+`DEV_ADDRESS`. Les invariants DB refusent aussi auto-ciblage, statuts incohérents
+et double owner.
 
 Ne pas over-engineer.
 

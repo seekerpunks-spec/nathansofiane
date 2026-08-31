@@ -1,7 +1,9 @@
 param(
     [string]$GodotPath = "",
     [string]$ApiBaseUrl = "",
+    [string]$ApiSecondaryAuthBaseUrl = "",
     [string]$ApiDevAddress = "dev-player-0001",
+    [string]$ApiSecondaryDevAddress = "dev-player-0002",
     [string]$TestDatabaseUrl = "postgres://postgres:postgres@localhost:5432/cyberseeker_test",
     [switch]$BuildAndroid
 )
@@ -73,6 +75,13 @@ if ($ApiBaseUrl) {
     & (Join-Path $PSScriptRoot "api_contract_check.ps1") `
         -BaseUrl $ApiBaseUrl -DevAddress $ApiDevAddress
     if ($LASTEXITCODE -ne 0) { throw "Contrats API échoués" }
+    if (-not $ApiSecondaryAuthBaseUrl) {
+        throw "Gate HTTP incomplète : passer -ApiSecondaryAuthBaseUrl avec une seconde instance DEV_AUTH partageant DB/JWT"
+    }
+    & (Join-Path $PSScriptRoot "social_contract_check.ps1") `
+        -BaseUrl $ApiBaseUrl -SecondaryAuthBaseUrl $ApiSecondaryAuthBaseUrl `
+        -AlphaAddress $ApiDevAddress -BetaAddress $ApiSecondaryDevAddress
+    if ($LASTEXITCODE -ne 0) { throw "Contrats sociaux API échoués" }
 }
 
 if ($BuildAndroid) {
