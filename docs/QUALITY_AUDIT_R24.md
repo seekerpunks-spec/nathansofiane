@@ -70,6 +70,13 @@ de gate utilisent un quota local élevé ; cette configuration reste interdite e
 production. Validation R28 : `API_CONTRACT_CHECK_OK`,
 `SOCIAL_CONTRACT_CHECK_OK`, puis `CYBERSEEKER_VALIDATION_OK`.
 
+Orchestration R29 : `tools/run_local_full_gate.ps1` rend cette passe
+mono-commande. Il refuse les ports occupés, construit le serveur debug, génère
+deux identités et un secret local, attend les deux `/ready`, lance toutes les
+gates puis arrête ses deux PID dans un `finally`. Exécution de validation :
+`LOCAL_FULL_GATE_OK`, puis contrôle externe `SERVER_PROCESSES=0` et
+`GATE_LOGS=0`. Aucun APK/AAB construit.
+
 ## UX mobile locale
 
 - Portrait, stretch `canvas_items/expand` et safe insets système.

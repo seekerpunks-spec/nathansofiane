@@ -1220,6 +1220,13 @@ exige deux instances DEV partageant PostgreSQL/JWT mais chacune liée à sa prop
 `DEV_ADDRESS`. Les invariants DB refusent aussi auto-ciblage, statuts incohérents
 et double owner.
 
+R29 supprime toute orchestration manuelle : `tools/run_local_full_gate.ps1`
+construit le serveur debug, vérifie que ses deux ports sont libres, démarre les
+deux instances cachées avec identités/secrets éphémères, attend leur readiness,
+enchaîne toute la gate R28 et arrête exactement les PID créés dans un `finally`.
+Le chemin succès est vérifié sans processus ni journal temporaire résiduel. Ce
+script ne demande et ne produit jamais d'APK/AAB.
+
 Ne pas over-engineer.
 
 Sécuriser surtout ce qui peut créer ou détruire de la valeur de jeu.

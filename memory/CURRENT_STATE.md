@@ -1,9 +1,19 @@
-# MÉMOIRE — ÉTAT ACTUEL R28
+# MÉMOIRE — ÉTAT ACTUEL R29
 
 > MAJ 31/08/2026. R26 = « volume de contenu + live-ops automatisée » —
 > intégralement commitée dans `da142f8` (22 commits au total avant R27). R27
 > ferme les dettes post-audit sans design final, wallet natif ni build Android.
 > R28 rend le playthrough social HTTP reproductible et fail-closed.
+
+## Lot R29 (validé)
+
+- `tools/run_local_full_gate.ps1` rend la validation locale mono-commande : build
+  serveur debug, deux instances/identités DEV éphémères, readiness, gate R28,
+  arrêt garanti et restauration des variables.
+- Ports occupés refusés ; logs temporaires supprimés sur succès et conservés sur
+  échec. Test réel terminé par `LOCAL_FULL_GATE_OK`.
+- Après sortie : zéro processus `cyberseeker-server`, zéro log de gate résiduel,
+  aucun APK/AAB produit.
 
 ## Lot R28 (validé)
 

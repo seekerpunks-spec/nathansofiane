@@ -141,3 +141,12 @@
 - [x] `validate_all.ps1` fail-closed quand une gate HTTP est demandée sans la
       seconde instance d'authentification.
 - [x] Gate R28 complète verte sans APK/AAB.
+
+## P11 — Orchestration mono-commande R29
+
+- [x] Build automatique du serveur debug avec target Cargo configurable.
+- [x] Refus des ports occupés, deux identités DEV et secret JWT éphémères.
+- [x] Démarrage caché, readiness bornée et diagnostics conservés en cas d'échec.
+- [x] Arrêt garanti des seuls PID créés et restauration de l'environnement.
+- [x] Gate complète verte jusqu'à `LOCAL_FULL_GATE_OK`, sans processus/log
+      résiduel et sans build Android.

@@ -102,8 +102,14 @@ smoke test, un design system et des assets cyberpunk originaux. Voir
 Validation complète locale :
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File tools\validate_all.ps1
+powershell -ExecutionPolicy Bypass -File tools\run_local_full_gate.ps1
 ```
+
+Cette commande exige PostgreSQL local, construit uniquement le serveur debug,
+lance deux instances `DEV_AUTH` cachées avec identités éphémères, exécute les
+gates statiques/Rust/Godot/API/sociales, puis arrête les deux processus. Elle ne
+construit aucun APK/AAB. `tools\validate_all.ps1` reste disponible pour les
+passes sans orchestration de serveurs.
 
 APK installable de validation :
 

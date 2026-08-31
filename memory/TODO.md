@@ -1,4 +1,4 @@
-# MÉMOIRE — TODO / PROCHAINES TÂCHES R28
+# MÉMOIRE — TODO / PROCHAINES TÂCHES R29
 
 > MAJ 31/08/2026. Roadmap détaillée : `docs/ROADMAP.md`. Checklist de
 > publication : `docs/RELEASE_CHECKLIST.md`. Spec produit : `MASTER TODO`.
@@ -43,6 +43,9 @@
 - [x] **R28 contrat social HTTP** : deux joueurs/deux instances, Attack,
       Firewall, revanche, réparation, Raid conservatif et Trade atomique ; gate
       complète fail-closed et verte sans APK/AAB.
+- [x] **R29 gate mono-commande** : build debug, deux serveurs cachés, readiness,
+      validation complète et arrêt/restauration garantis ; aucun processus/log
+      résiduel et aucun APK/AAB.
 
 ## Décisions produit encore ouvertes (ne pas inventer)
 

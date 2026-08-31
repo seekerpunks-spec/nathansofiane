@@ -213,3 +213,9 @@ playthrough social complet à deux joueurs sur deux instances DEV partageant la
 base et le secret JWT. Ce mode HTTP est fail-closed si la seconde instance
 manque. Le binaire serveur release et l'APK sont construits séparément afin que
 leur production échoue explicitement si la configuration est impropre.
+
+`tools/run_local_full_gate.ps1` est l'entrée mono-commande : build serveur debug,
+deux ports contrôlés, deux processus cachés, readiness, `validate_all`, puis arrêt
+garanti dans `finally`. Les identités et le secret JWT sont éphémères ; les logs
+temporaires sont supprimés uniquement en cas de succès et conservés pour
+diagnostic en cas d'échec. Aucun artefact Android n'est produit par cette gate.
