@@ -159,3 +159,24 @@
       `CYBERSEEKER_ALLOW_DB_TEST_SKIP` autour de la gate imbriquée.
 - [x] Test réel avec target relatif et variables sentinelles :
       `LOCAL_FULL_GATE_OK`, `ENV_RESTORE_OK`, zéro processus résiduel.
+
+## P13 — Budget d'assets mobile R31
+
+- [x] Inventaire exhaustif des références runtime : ~25 Mo d'assets jamais
+      chargés (staging `local_ai/` embarqué, copies promues `slot/`,
+      `rendered/`, `onboarding/` orphelines) supprimés du client.
+- [x] Conversion WebP calibrée des 18 textures runtime (décors q90, atlas
+      lossless, coffres 1024→256 px) : `client/assets` passe de 47,65 à
+      3,65 Mo, qualité vérifiée visuellement.
+- [x] Pipelines re-cadrées : staging ComfyUI sous `art/local_ai/staging/`,
+      rendus Blender sous `art/render_2_5d/staging/`, promotions du manifest
+      avec conversion WebP intégrée (quality/size par entrée).
+- [x] Gate budget dans `mobile_ux_check.ps1` : 5 Mo total, 1 024 Ko par
+      fichier, WebP obligatoire, zéro asset orphelin, zéro `.import` sans
+      source, staging interdit ; tests négatifs vérifiés.
+- [x] Hôte Windows PowerShell 5.1 fiabilisé : BOM UTF-8 sur les .ps1
+      accentués, `-Encoding UTF8` sur les `Get-Content` des gates,
+      `Add-Type System.Net.Http` avant `HttpClient`.
+- [x] Champ `image` mort retiré des cartes (config + `CardConfig`).
+- [x] `run_local_full_gate.ps1` exit 0 : `LOCAL_FULL_GATE_OK`, 39/39 Rust,
+      12/12 PostgreSQL, contrats API et social verts, zéro résidu.

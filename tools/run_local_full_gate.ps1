@@ -1,4 +1,4 @@
-param(
+﻿param(
     [string]$GodotPath = "",
     [string]$TestDatabaseUrl = "postgres://postgres:postgres@localhost:5432/cyberseeker_test",
     [string]$CargoTargetDir = "",
@@ -57,7 +57,7 @@ function Wait-Ready(
     for ($attempt = 0; $attempt -lt 80; $attempt++) {
         if ($Process.HasExited) {
             $tail = if (Test-Path -LiteralPath $ErrorLog) {
-                (Get-Content -LiteralPath $ErrorLog -Tail 80) -join [Environment]::NewLine
+                (Get-Content -Encoding UTF8 -LiteralPath $ErrorLog -Tail 80) -join [Environment]::NewLine
             } else { "journal absent" }
             throw "$Name s'est arrêté avant readiness (code $($Process.ExitCode))`n$tail"
         }
@@ -68,7 +68,7 @@ function Wait-Ready(
         Start-Sleep -Milliseconds 250
     }
     $tail = if (Test-Path -LiteralPath $ErrorLog) {
-        (Get-Content -LiteralPath $ErrorLog -Tail 80) -join [Environment]::NewLine
+        (Get-Content -Encoding UTF8 -LiteralPath $ErrorLog -Tail 80) -join [Environment]::NewLine
     } else { "journal absent" }
     throw "$Name n'est pas ready après 20 secondes`n$tail"
 }

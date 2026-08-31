@@ -1,9 +1,9 @@
 {
   "note": "PROVISIONAL — quatre paliers de coffres. Les poids de tirage vivent dans loot_tables.json, referencee par lootTableId, pour qu'un ajustement d'equilibrage ne touche pas la definition des coffres.",
   "items": [
-    { "chestId": "basic", "name": "Basic Cache", "image": "res://assets/generated/chests/basic_cache.png", "priceCredits": 250000, "cardsPerOpen": 2, "lootTableId": "cache_entry" },
-    { "chestId": "neon", "name": "Neon Cache", "image": "res://assets/generated/chests/neon_cache.png", "priceCredits": 1000000, "cardsPerOpen": 3, "lootTableId": "cache_standard" },
-    { "chestId": "quantum", "name": "Quantum Cache", "image": "res://assets/generated/chests/quantum_cache.png", "priceCredits": 2500000, "cardsPerOpen": 4, "lootTableId": "cache_rare" },
-    { "chestId": "elite", "name": "Black ICE Vault", "image": "res://assets/generated/chests/black_ice_vault.png", "priceCredits": 5000000, "cardsPerOpen": 5, "lootTableId": "cache_elite" }
+    { "chestId": "basic", "name": "Basic Cache", "image": "res://assets/generated/chests/basic_cache.webp", "priceCredits": 250000, "cardsPerOpen": 2, "lootTableId": "cache_entry" },
+    { "chestId": "neon", "name": "Neon Cache", "image": "res://assets/generated/chests/neon_cache.webp", "priceCredits": 1000000, "cardsPerOpen": 3, "lootTableId": "cache_standard" },
+    { "chestId": "quantum", "name": "Quantum Cache", "image": "res://assets/generated/chests/quantum_cache.webp", "priceCredits": 2500000, "cardsPerOpen": 4, "lootTableId": "cache_rare" },
+    { "chestId": "elite", "name": "Black ICE Vault", "image": "res://assets/generated/chests/black_ice_vault.webp", "priceCredits": 5000000, "cardsPerOpen": 5, "lootTableId": "cache_elite" }
   ]
 }

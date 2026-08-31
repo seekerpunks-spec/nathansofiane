@@ -1,4 +1,4 @@
-param(
+﻿param(
     [string]$BlenderPath = "C:\Users\danbi\Documents\Codex\tools\blender-5.2\runtime\blender-5.2.0-windows-x64\blender.exe",
     [string]$Output = "",
     [string]$Blend = ""
@@ -7,7 +7,7 @@ param(
 $ErrorActionPreference = "Stop"
 $root = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 if (-not $Output) {
-    $Output = Join-Path $root "client\assets\generated\rendered\slot_cabinet.png"
+    $Output = Join-Path $root "art\render_2_5d\staging\slot_cabinet.png"
 }
 if (-not $Blend) {
     $Blend = Join-Path $root "art\blender\cyberseeker_slot_master.blend"

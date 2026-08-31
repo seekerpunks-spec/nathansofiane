@@ -1,24 +1,24 @@
-$ErrorActionPreference = "Stop"
+﻿$ErrorActionPreference = "Stop"
 $workspace = Split-Path -Parent $PSScriptRoot
 $server = Join-Path $workspace "server\src"
 
-$auth = Get-Content -LiteralPath (Join-Path $server "auth.rs") -Raw
-$main = Get-Content -LiteralPath (Join-Path $server "main.rs") -Raw
-$spin = Get-Content -LiteralPath (Join-Path $server "spin.rs") -Raw
-$game = Get-Content -LiteralPath (Join-Path $server "game.rs") -Raw
-$commerce = Get-Content -LiteralPath (Join-Path $server "commerce.rs") -Raw
-$engagement = Get-Content -LiteralPath (Join-Path $server "engagement.rs") -Raw
-$collection = Get-Content -LiteralPath (Join-Path $server "collection.rs") -Raw
-$entitlements = Get-Content -LiteralPath (Join-Path $server "entitlements.rs") -Raw
-$db = Get-Content -LiteralPath (Join-Path $server "db.rs") -Raw
-$rate = Get-Content -LiteralPath (Join-Path $server "rate_limit.rs") -Raw
-$guardsMigration = Get-Content -LiteralPath (Join-Path $workspace "server\migrations\0016_distributed_guards.sql") -Raw
-$rewardPool = Get-Content -LiteralPath (Join-Path $server "reward_pool.rs") -Raw
-$rewardPoolConfig = Get-Content -LiteralPath (Join-Path $workspace "config\reward_pool.json") -Raw
-$rewardPoolMigration = Get-Content -LiteralPath (Join-Path $workspace "server\migrations\0017_reward_pool_ledger.sql") -Raw
-$refreshMigration = Get-Content -LiteralPath (Join-Path $workspace "server\migrations\0018_refresh_rotation.sql") -Raw
-$invariantsMigration = Get-Content -LiteralPath (Join-Path $workspace "server\migrations\0019_relational_invariants.sql") -Raw
-$net = Get-Content -LiteralPath (Join-Path $workspace "client\scripts\core\Net.gd") -Raw
+$auth = Get-Content -Encoding UTF8 -LiteralPath (Join-Path $server "auth.rs") -Raw
+$main = Get-Content -Encoding UTF8 -LiteralPath (Join-Path $server "main.rs") -Raw
+$spin = Get-Content -Encoding UTF8 -LiteralPath (Join-Path $server "spin.rs") -Raw
+$game = Get-Content -Encoding UTF8 -LiteralPath (Join-Path $server "game.rs") -Raw
+$commerce = Get-Content -Encoding UTF8 -LiteralPath (Join-Path $server "commerce.rs") -Raw
+$engagement = Get-Content -Encoding UTF8 -LiteralPath (Join-Path $server "engagement.rs") -Raw
+$collection = Get-Content -Encoding UTF8 -LiteralPath (Join-Path $server "collection.rs") -Raw
+$entitlements = Get-Content -Encoding UTF8 -LiteralPath (Join-Path $server "entitlements.rs") -Raw
+$db = Get-Content -Encoding UTF8 -LiteralPath (Join-Path $server "db.rs") -Raw
+$rate = Get-Content -Encoding UTF8 -LiteralPath (Join-Path $server "rate_limit.rs") -Raw
+$guardsMigration = Get-Content -Encoding UTF8 -LiteralPath (Join-Path $workspace "server\migrations\0016_distributed_guards.sql") -Raw
+$rewardPool = Get-Content -Encoding UTF8 -LiteralPath (Join-Path $server "reward_pool.rs") -Raw
+$rewardPoolConfig = Get-Content -Encoding UTF8 -LiteralPath (Join-Path $workspace "config\reward_pool.json") -Raw
+$rewardPoolMigration = Get-Content -Encoding UTF8 -LiteralPath (Join-Path $workspace "server\migrations\0017_reward_pool_ledger.sql") -Raw
+$refreshMigration = Get-Content -Encoding UTF8 -LiteralPath (Join-Path $workspace "server\migrations\0018_refresh_rotation.sql") -Raw
+$invariantsMigration = Get-Content -Encoding UTF8 -LiteralPath (Join-Path $workspace "server\migrations\0019_relational_invariants.sql") -Raw
+$net = Get-Content -Encoding UTF8 -LiteralPath (Join-Path $workspace "client\scripts\core\Net.gd") -Raw
 # -split (regex) est obligatoire ici : String.Split("#[cfg(test)]") resout vers la
 # surcharge char[] et tronquerait le runtime au premier caractere de l'ensemble.
 $authRuntime = ($auth -split '#\[cfg\(test\)\]')[0]
@@ -95,7 +95,7 @@ foreach ($scope in @('event_claim:', 'season_claim:')) {
 
 $mutationFiles = @("collection.rs", "commerce.rs", "district.rs", "engagement.rs", "friends.rs", "social.rs", "spin.rs", "teams.rs", "trading.rs")
 foreach ($file in $mutationFiles) {
-    $content = Get-Content -LiteralPath (Join-Path $server $file) -Raw
+    $content = Get-Content -Encoding UTF8 -LiteralPath (Join-Path $server $file) -Raw
     if ($content -notmatch 'request_id\(' -or $content -notmatch 'store_idempotent') {
         throw "Mutation sans contrat request-id/idempotence détectée dans $file"
     }

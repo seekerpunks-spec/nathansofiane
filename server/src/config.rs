@@ -374,7 +374,6 @@ pub struct CardConfig {
     pub name: String,
     pub rarity: Tier,
     pub drop_weight: u32,
-    pub image: String,
 }
 
 /// Prérequis de déblocage d'un set. Vide = disponible dès le départ.

@@ -4,9 +4,11 @@ extends Control
 signal navigate_requested(tab: String)
 
 ## Décor de secours quand un district n'a pas encore son art propre.
-const FALLBACK_BACKGROUND := "res://assets/generated/districts/neon_slums_bg.png"
-const HERO_ART := "res://assets/generated/api_gpt/heroes/district_hero.png"
+const FALLBACK_BACKGROUND := "res://assets/generated/districts/neon_slums_bg.webp"
+const HERO_ART := "res://assets/generated/api_gpt/heroes/district_hero.webp"
 const ASSET_ROOT := "res://assets/generated/"
+## WebP d'abord (budget mobile R31), PNG accepté pour un art pas encore converti.
+const ASSET_EXTENSIONS: Array[String] = [".webp", ".png"]
 
 var _credits: Label
 var _progress: ProgressBar
@@ -35,11 +37,14 @@ func _asset_texture(name: String) -> Texture2D:
 	var trimmed := name.strip_edges()
 	if trimmed.is_empty() or trimmed.contains("..") or trimmed.contains(":") or trimmed.begins_with("/"):
 		return null
-	var path := ASSET_ROOT + trimmed + ".png"
-	if not ResourceLoader.exists(path):
-		return null
-	var resource := load(path)
-	return resource if resource is Texture2D else null
+	for extension in ASSET_EXTENSIONS:
+		var path := ASSET_ROOT + trimmed + extension
+		if not ResourceLoader.exists(path):
+			continue
+		var resource := load(path)
+		if resource is Texture2D:
+			return resource
+	return null
 
 func _build_background() -> void:
 	_background = TextureRect.new()

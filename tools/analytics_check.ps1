@@ -1,4 +1,4 @@
-$ErrorActionPreference = "Stop"
+﻿$ErrorActionPreference = "Stop"
 $workspace = Split-Path -Parent $PSScriptRoot
 $expected = @(
     "session_start",
@@ -57,7 +57,7 @@ $expected = @(
 )
 
 $sources = Get-ChildItem -LiteralPath (Join-Path $workspace "client") -Filter "*.gd" -Recurse |
-    ForEach-Object { Get-Content -LiteralPath $_.FullName -Raw }
+    ForEach-Object { Get-Content -Encoding UTF8 -LiteralPath $_.FullName -Raw }
 $joined = $sources -join "`n"
 $missing = @($expected | Where-Object { $joined -notmatch [regex]::Escape('"' + $_ + '"') })
 if ($missing.Count -gt 0) {

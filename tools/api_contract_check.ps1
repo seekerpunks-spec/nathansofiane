@@ -1,10 +1,15 @@
-param(
+﻿param(
     [string]$BaseUrl = "http://127.0.0.1:8084",
     [string]$DevAddress = "dev-player-0001"
 )
 
 $ErrorActionPreference = "Stop"
 $BaseUrl = $BaseUrl.TrimEnd('/')
+
+# Windows PowerShell 5.1 ne charge pas System.Net.Http tout seul : sans ce
+# chargement explicite, le test de concurrence (HttpClient) ne marche que si
+# un autre outil a deja charge l'assembly dans la session.
+Add-Type -AssemblyName System.Net.Http
 
 $health = Invoke-RestMethod -Uri ($BaseUrl + "/health") -UseBasicParsing
 $ready = Invoke-RestMethod -Uri ($BaseUrl + "/ready") -UseBasicParsing

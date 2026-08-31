@@ -1,17 +1,17 @@
-$ErrorActionPreference = "Stop"
+﻿$ErrorActionPreference = "Stop"
 $workspace = Split-Path -Parent $PSScriptRoot
 $client = Join-Path $workspace "client"
-$project = Get-Content -LiteralPath (Join-Path $client "project.godot") -Raw
-$main = Get-Content -LiteralPath (Join-Path $client "scenes\Main.gd") -Raw
-$ui = Get-Content -LiteralPath (Join-Path $client "scripts\core\Ui.gd") -Raw
-$onboarding = Get-Content -LiteralPath (Join-Path $client "scenes\screens\OnboardingScreen.gd") -Raw
-$events = Get-Content -LiteralPath (Join-Path $client "scripts\core\Events.gd") -Raw
-$missions = Get-Content -LiteralPath (Join-Path $client "scenes\screens\MissionsScreen.gd") -Raw
+$project = Get-Content -Encoding UTF8 -LiteralPath (Join-Path $client "project.godot") -Raw
+$main = Get-Content -Encoding UTF8 -LiteralPath (Join-Path $client "scenes\Main.gd") -Raw
+$ui = Get-Content -Encoding UTF8 -LiteralPath (Join-Path $client "scripts\core\Ui.gd") -Raw
+$onboarding = Get-Content -Encoding UTF8 -LiteralPath (Join-Path $client "scenes\screens\OnboardingScreen.gd") -Raw
+$events = Get-Content -Encoding UTF8 -LiteralPath (Join-Path $client "scripts\core\Events.gd") -Raw
+$missions = Get-Content -Encoding UTF8 -LiteralPath (Join-Path $client "scenes\screens\MissionsScreen.gd") -Raw
 $spinPath = Join-Path $client "scenes\screens\SpinScreen.gd"
-$spinLines = (Get-Content -LiteralPath $spinPath).Count
-$smoke = Get-Content -LiteralPath (Join-Path $client "tests\SmokeScenes.gd") -Raw
+$spinLines = (Get-Content -Encoding UTF8 -LiteralPath $spinPath).Count
+$smoke = Get-Content -Encoding UTF8 -LiteralPath (Join-Path $client "tests\SmokeScenes.gd") -Raw
 $sources = Get-ChildItem -LiteralPath $client -Filter "*.gd" -Recurse |
-    ForEach-Object { Get-Content -LiteralPath $_.FullName -Raw }
+    ForEach-Object { Get-Content -Encoding UTF8 -LiteralPath $_.FullName -Raw }
 $joined = $sources -join "`n"
 
 if ($project -notmatch 'window/stretch/aspect="expand"') { throw "Stretch responsive expand absent" }
@@ -51,6 +51,65 @@ $petHits = Get-ChildItem -LiteralPath $gameplayRoots -File -Recurse |
     Select-String -Pattern '\b(pet|pets)\b' -CaseSensitive:$false
 if ($petHits) { throw "Système Pets détecté dans le runtime" }
 
+# --- Budget d'assets mobile (R31) ---
+# La derive de poids ne se voit qu'au build Android : la gate la rend visible
+# a chaque validation. Chiffres de reference apres conversion WebP : 3,64 Mo
+# au total, plus gros fichier 913 Ko (atlas du slot, sans perte).
+$assetsRoot = Join-Path $client "assets"
+$generatedRoot = Join-Path $assetsRoot "generated"
+$assetBudgetTotalMB = 5.0
+$assetBudgetFileKB = 1024
+
+if (Test-Path -LiteralPath (Join-Path $generatedRoot "local_ai")) {
+    throw "Staging local_ai present dans client/assets : il vit sous art/local_ai/staging"
+}
+
+$assetFiles = Get-ChildItem -LiteralPath $assetsRoot -Recurse -File
+$totalMB = [math]::Round((($assetFiles | Measure-Object Length -Sum).Sum) / 1MB, 2)
+if ($totalMB -gt $assetBudgetTotalMB) {
+    throw "Budget d'assets depasse: $totalMB Mo > $assetBudgetTotalMB Mo"
+}
+$oversized = $assetFiles | Where-Object { $_.Length -gt $assetBudgetFileKB * 1KB }
+if ($oversized) {
+    throw "Asset au-dessus de $assetBudgetFileKB Ko: $(($oversized | ForEach-Object Name) -join ', ')"
+}
+
+# WebP obligatoire pour les textures runtime : un PNG lossless de plusieurs Mo
+# passe inapercu a l'ecran mais pese dans l'APK. La conversion est fournie
+# (tools/asset_budget + promotions du manifest), donc aucun PNG n'est tolere.
+$textures = $assetFiles | Where-Object { $_.FullName.StartsWith($generatedRoot) -and $_.Extension -in @(".png", ".webp") }
+$pngLeft = $textures | Where-Object { $_.Extension -eq ".png" }
+if ($pngLeft) {
+    throw "PNG non converti en WebP: $(($pngLeft | ForEach-Object Name) -join ', ')"
+}
+
+# Zero asset orphelin : chaque texture doit etre referencee par un chemin
+# res:// dans les sources GDScript ou par la config (les districts stockent
+# des noms relatifs sans extension sous assets/generated/).
+$configTexts = (Get-ChildItem -LiteralPath (Join-Path $workspace "config") -Filter "*.json" -Recurse |
+    ForEach-Object { Get-Content -Encoding UTF8 -LiteralPath $_.FullName -Raw }) -join "`n"
+$references = $joined + "`n" + $configTexts
+$orphans = @()
+foreach ($texture in $textures) {
+    $relative = $texture.FullName.Substring($generatedRoot.Length + 1).Replace("\", "/")
+    $resPath = "res://assets/generated/" + $relative
+    $bareName = $relative.Substring(0, $relative.Length - $texture.Extension.Length)
+    if (-not ($references.Contains($resPath) -or $references.Contains('"' + $bareName + '"'))) {
+        $orphans += $relative
+    }
+}
+if ($orphans) {
+    throw "Assets orphelins (aucune reference code/config): $($orphans -join ', ')"
+}
+
+# Un .import sans source est un residu de suppression : Godot le regenere de
+# toute facon, et il fausse l'inventaire du projet.
+$staleImports = $assetFiles | Where-Object { $_.Extension -eq ".import" } |
+    Where-Object { -not (Test-Path -LiteralPath ($_.FullName.Substring(0, $_.FullName.Length - 7))) }
+if ($staleImports) {
+    throw "Fichiers .import orphelins: $(($staleImports | ForEach-Object Name) -join ', ')"
+}
+
 [pscustomobject]@{
     TouchInputs = $touchInputs
     DismissibleModals = $dismissibleModals
@@ -58,5 +117,7 @@ if ($petHits) { throw "Système Pets détecté dans le runtime" }
     AndroidBack = $true
     SpinScreenLines = $spinLines
     PetsRuntimeHits = 0
+    AssetsTotalMB = $totalMB
+    AssetTextures = @($textures).Count
 } | Format-List
 Write-Host "MOBILE_UX_CHECK_OK" -ForegroundColor Green

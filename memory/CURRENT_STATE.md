@@ -1,130 +1,77 @@
-# MÉMOIRE — ÉTAT ACTUEL R30
+# MÉMOIRE — ÉTAT ACTUEL R31
 
-> MAJ 31/08/2026. R26 = « volume de contenu + live-ops automatisée » —
-> intégralement commitée dans `da142f8` (22 commits au total avant R27). R27
-> ferme les dettes post-audit sans design final, wallet natif ni build Android.
-> R28 rend le playthrough social HTTP reproductible et fail-closed.
+> MAJ 31/08/2026. R26 = volume de contenu + live-ops (commit `da142f8`). R27 =
+> robustesse post-audit. R28 = contrat social HTTP. R29 = gate mono-commande.
+> R30 = correctifs de review. R31 = budget d'assets mobile + hôte PowerShell 5.1.
 
-## Lot R30 (validé après review)
+## Lot R31 (validé, gate complète verte)
 
-- Deux P2 Bugbot corrigés dans `run_local_full_gate.ps1` : target Cargo relatif
-  normalisé en absolu depuis `server/`, et restauration des deux variables DB de
-  test modifiées par `validate_all.ps1`.
-- Security Review : aucun constat.
-- Gate réelle avec chemin relatif et sentinelles : `LOCAL_FULL_GATE_OK`,
-  `ENV_RESTORE_OK`, 39/39 Rust, 12/12 PostgreSQL et aucun serveur résiduel.
+- **Budget d'assets** : `client/assets` passe de **47,65 Mo à 3,65 Mo** sans
+  perte visible (vérif visuelle décor + atlas). 18 textures runtime en WebP :
+  décors/api_gpt q90, atlas du slot lossless, coffres redimensionnés
+  1024→256 px (affichés 86 px). Conversion reproductible :
+  `tools/asset_budget/convert_runtime_assets.py` (venv de la pipeline).
+- **~25 Mo d'assets morts supprimés** : staging `local_ai/` (17,6 Mo qui
+  partaient dans l'APK) + copies promues `slot/`, `rendered/`, `onboarding/`
+  jamais référencées par l'UI actuelle (direction `api_gpt/`).
+- **Pipelines re-cadrées** : staging ComfyUI → `art/local_ai/staging/`,
+  rendus Blender → `art/render_2_5d/staging/` ; les promotions du manifest
+  convertissent en WebP calibré (quality/size par entrée). Aucun PNG de
+  staging ne peut revenir dans `client/assets/`.
+- **Gate mobile étendue** (`mobile_ux_check.ps1`) : plafond 5 Mo total,
+  1 024 Ko par fichier, WebP obligatoire sous `assets/generated`, zéro asset
+  orphelin (référence res:// dans les .gd ou nom relatif dans la config),
+  zéro `.import` sans source, staging interdit. Tests négatifs vérifiés
+  (orphelin et PNG déclenchent bien le rouge).
+- **Nettoyage config/serveur** : champ `image` mort retiré des 45 cartes et de
+  `CardConfig` ; `chests.json` pointe vers les .webp ;
+  `DistrictScreen._asset_texture` résout `.webp` puis `.png`.
+- **Hôte PowerShell 5.1 réparé** (les gates R28-R30 tournaient sous un shell
+  en codepage UTF-8) : BOM UTF-8 ajouté aux .ps1 accentués (sinon erreurs de
+  parse), `-Encoding UTF8` forcé sur tous les `Get-Content` des gates (sinon
+  les motifs accentués ne matchent plus les sources), et
+  `Add-Type System.Net.Http` dans `api_contract_check.ps1`.
 
-## Lot R29 (validé)
+## Validation exécutée R31 (verte, arbre de travail)
 
-- `tools/run_local_full_gate.ps1` rend la validation locale mono-commande : build
-  serveur debug, deux instances/identités DEV éphémères, readiness, gate R28,
-  arrêt garanti et restauration des variables.
-- Ports occupés refusés ; logs temporaires supprimés sur succès et conservés sur
-  échec. Test réel terminé par `LOCAL_FULL_GATE_OK`.
-- Après sortie : zéro processus `cyberseeker-server`, zéro log de gate résiduel,
-  aucun APK/AAB produit.
+`run_local_full_gate.ps1` exit 0 : 39/39 Rust, `DB_TESTS_PROVEN: 12/12`,
+smoke 6 scènes × 3 ratios, `API_CONTRACT_CHECK_OK`, `SOCIAL_CONTRACT_CHECK_OK`,
+`CYBERSEEKER_VALIDATION_OK`, `LOCAL_FULL_GATE_OK`, zéro processus résiduel.
+Clippy strict `-D warnings` vert.
 
-## Lot R28 (validé)
+## Historique condensé (R25→R30, tout commité, HEAD avant R31 `cf1de5d`)
 
-- `tools/social_contract_check.ps1` orchestre deux joueurs authentifiés par deux
-  instances DEV partageant PostgreSQL/JWT, sans injection SQL.
-- Couverture : amitié/ciblage, Firewall 0→3, trois Attack bloquées puis un dégât,
-  revanche, réparation, Raid conservatif et Trade 1-pour-1 atomique ; retries
-  byte-identiques sur les mutations critiques.
-- `validate_all.ps1` exige la seconde instance lorsqu'une gate HTTP est demandée.
-- Gate complète verte : 39/39 Rust, 12/12 PostgreSQL, 53 analytics, 18 smokes,
-  `API_CONTRACT_CHECK_OK`, `SOCIAL_CONTRACT_CHECK_OK`, validation finale verte.
+- R25 : gate sécurité réparée (`String.Split` char[]) ; travail R24 commité.
+- R26 : 5 districts data-driven, loot tables centralisées, tests Postgres
+  fail-closed prouvés, smoke non-zéro, live-ops automatisée (migration 0020).
+- R27 : rattrapage live-ops dérivé de la config (180 fenêtres), Clippy strict,
+  récompenses UI génériques, SpinScreen 989 lignes.
+- R28 : `social_contract_check.ps1` = playthrough deux joueurs/deux instances.
+- R29 : `run_local_full_gate.ps1` mono-commande, arrêt garanti.
+- R30 : target Cargo normalisé, variables DB de test restaurées.
 
-## Lot R27 (validé)
+## Périmètre livré (cumul R17→R31)
 
-- **Rattrapage live-ops complet** : les occurrences distribuables ne sont plus
-  limitées à quatre ; la profondeur dérive de `claimWindowHours` et de la
-  cadence. Le test extrême couvre 180 occurrences encore réclamables
-  (720 h / cadence 4 h). Le fallback `LIKE` des claims a aussi été supprimé.
-- **Qualité Rust** : `cargo fmt --check` et
-  `cargo clippy --all-targets -- -D warnings` passent avec Rust 1.97.1.
-- **Récompenses client data-driven** : un formateur partagé couvre spins,
-  crédits et coffres, y compris les récompenses credits-only/chest-only.
-- **Refactor Spin** : mapping des symboles dans `SpinVisuals`, télémétrie dans
-  `SpinTelemetry`; `SpinScreen.gd` passe de 1 067 à 989 lignes et la gate fixe
-  désormais la limite à 1 000.
-- **Validation R27** : `CYBERSEEKER_VALIDATION_OK`, 39/39 tests Rust,
-  `DB_TESTS_PROVEN: 12/12`, 53/53 analytics, smoke 6 scènes × 3 ratios et
-  `API_CONTRACT_CHECK_OK` sur une instance dédiée.
+Slot autoritaire ×1→×100K, 5 districts, collection de lancement, rétention,
+live-ops automatisée, social complet (Signal Jam/Ghost Vault/amis/crews/
+trading), achievements, entitlements NFT fail-closed, reward pool SKR
+désactivée. 21 modules Rust, 20 migrations. Client 47,65→3,65 Mo d'assets.
+Détail : `docs/ROADMAP.md`.
 
-## Lot R26
+## Environnement IA (R16/R25/R31)
 
- - **Volume de contenu livré (commité)** : 5 districts de lancement au lieu de 2
-   (Neon Slums, Chrome Heights, Rust Harbor, Spire Exchange, Nullzone Core),
-   progression data-driven par enveloppe de config, écran district piloté par
-   config, loot tables centralisées (« launch collection »). Commits `a766697`,
-   `ed13de4`, `1133fd1`.
- - **Qualité de gate (commité)** : tests PostgreSQL fail-closed avec preuve
-   d'exécution dans la gate (`DB_TESTS_PROVEN: 12/12`) ; smoke Godot signale
-   chaque échec et sort non-zéro au lieu de reposer sur `assert` (commits
-   `2afea86`, `f50e63b`).
- - **Live-ops automatisée (commitée, commit `da142f8`)** : migration 0020
-   (`event_reward_distributions`, `event_rank_rewards` — rang figé à la
-   distribution, fenêtre de claim bornée, grand-livre conservé post-expiration,
-   5 tables d'archives sans FK) ; `distribute_rank_rewards` +
-   `archive_expired_events` idempotents multi-instance ; `EventSchedule` /
-   `EventWindow` config (fenêtres actives/terminées, clés claimables) ;
-   rotation des missions quotidiennes par jour (`daily_missions_for`) ;
-   configs `daily.json` / `events.json` / `seasons.json` étendues ;
-   `MissionsScreen.gd` adapté. ~1254 insertions / 158 suppressions, 10 fichiers.
-   Revue de diff GO (rapport `REVIEW_R26_LIVEOPS.md`) ; migration 0020 vérifiée
-   présente dans le commit (hash blob `15a8fc2d` = working tree = index).
-
-## R25 (clos, pour mémoire)
-
- - Gate sécurité réparée : `String.Split("#[cfg(test)]")` résolu par PowerShell
-   vers la surcharge `char[]` tronquait l'analyse à 6 caractères ; corrigé en
-   `-split` regex + garde-fou de longueur. Aucune violation réelle masquée.
- - Versioning réparé : le travail R24 n'avait jamais été commité ; historique
-   porté de 13 à 15 commits, arbre propre.
-
-## Validation exécutée R26 (verte sur l'arbre commité)
-
- - `tools/validate_all.ps1` : **CYBERSEEKER_VALIDATION_OK** ; `cargo fmt` propre.
- - `economy_check` : 277 605 CR équivalents/spin, 9,4 % de spins vides ; coûts
-   cumulés attendus par district : 64,8 M → 1,38 Md (Neon Slums → Nullzone Core).
- - `analytics_check` 53/53 ; `security_check` + `mobile_ux_check` OK ;
-   Postgres `DB_TESTS_PROVEN: 12/12` ; smoke Godot `SMOKE_SCENES_OK: 6` aux
-   ratios 360×800, 540×1170, 720×1280.
-
-## Périmètre livré (cumul R17→R26)
-
-Slot autoritaire ×1→×100K, regen serveur, 5 districts de lancement séquentiels
-data-driven (Neon Slums → Nullzone Core), collection de lancement centralisée,
-daily streak + Signal Cache, missions à rotation par jour, moteur d'événements
-(Neon Rush + Crew Uplink), milestones auto/manuels, leaderboards cohortes
-`DENSE_RANK`, social Signal Jam / Ghost Vault / Firewalls, Network Power,
-amis + revanche, crews, trading 1-pour-1 de doublons, achievements,
-offres/pub/season pass derrière provider, entitlements NFT fail-closed,
-reward pool SKR livrée désactivée. Serveur : 21 modules Rust, 20 migrations
-additives, audit économique, rotation one-time-use des refresh tokens, nonces
-et rate-limit atomiques en PostgreSQL. Détail : `docs/ROADMAP.md` +
-`docs/QUALITY_AUDIT_R24.md`.
-
-## Environnement IA (R16/R25)
-
-- Le shell Cursor exige `required_permissions: ["all"]` sur cette machine
-  (aucun backend sandbox Windows) ; sans ça toute commande échoue à se lancer.
-- Git 2.55.0.3 installé (`C:\Program Files\Git`). Le `.git/` avait été créé par
-  le compte sandbox `CodexSandboxOnline` : propriété réattribuée à `danbi` sur
-  921 fichiers avec `icacls /setowner`, donc plus besoin d'exception
-  `safe.directory`. Historique intact, `git fsck` propre.
-- 31/08/2026 : `git fsck --full` passe ; seul le commit orphelin
-  `86157799592d6aafee81972bb0a3c0ad204eabf3` est signalé. Aucune corruption
-  active de l'object store et aucun `git gc` forcé nécessaire pour ce lot.
-- `core.autocrlf=false` en config locale : l'installateur Git for Windows force
-  `true` au niveau système alors que l'historique est en LF.
-- Identité git globale : Sofiane Deroide <sofiane.deroide1@gmail.com>.
-- Postgres 16 opérationnel (les tests d'intégration passent).
+- Shell Cursor : `required_permissions: ["all"]` obligatoire ; hôte réel =
+  **Windows PowerShell 5.1** (pas de pwsh installé) → les .ps1 accentués
+  DOIVENT garder leur BOM UTF-8 et tout `Get-Content` de gate son
+  `-Encoding UTF8`.
+- Git 2.55, `core.autocrlf=false` local, identité Sofiane Deroide
+  <sofiane.deroide1@gmail.com>. `git fsck` propre (un seul dangling connu).
+- Postgres 16 opérationnel ; venv pipeline (PIL) :
+  `C:\Users\danbi\Documents\Codex\2026-08-22\ex\local-ai\venv`.
+- Godot 4.7.2 : `%USERPROFILE%\Downloads\Godot_v4.7.2-stable_win64.exe\`.
 
 ## Ce qui dépend encore de l'extérieur
 
-Wallet Adapter et signature réelle sur Seeker, RPC/indexeur et trésorerie SKR,
-providers pub/paiement, API HTTPS, keystore de publication, QA appareil et compte
-dApp Store. Voir `docs/RELEASE_CHECKLIST.md` ; aucune de ces dépendances n'est
-simulée ou présentée comme prête. Aucun APK intermédiaire n'est un livrable.
+Wallet Adapter Seeker, RPC/indexeur/trésorerie SKR, providers pub/paiement,
+HTTPS production, keystore éditeur, QA appareil, fiche dApp Store. Voir
+`docs/RELEASE_CHECKLIST.md`. Aucun APK intermédiaire n'est un livrable.

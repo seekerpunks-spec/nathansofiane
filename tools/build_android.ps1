@@ -1,4 +1,4 @@
-param(
+﻿param(
     [string]$GodotPath = "",
     [string]$JavaHome = "",
     [string]$AndroidSdk = "",

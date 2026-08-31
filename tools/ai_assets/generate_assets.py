@@ -286,7 +286,7 @@ def validate_image(path: Path, width: int, height: int, transparent: bool) -> No
                 raise ValueError(f"Transparence absente pour {path}")
 
 
-def promote_assets(promotions: list[dict[str, str]]) -> dict[str, str]:
+def promote_assets(promotions: list[dict[str, Any]]) -> dict[str, str]:
     promoted: dict[str, str] = {}
     stamp = time.strftime("%Y%m%d-%H%M%S")
     backup_root = PROJECT_ROOT / "art" / "local_ai" / "previous_runtime" / stamp
@@ -301,7 +301,21 @@ def promote_assets(promotions: list[dict[str, str]]) -> dict[str, str]:
             shutil.copy2(target, backup)
         target.parent.mkdir(parents=True, exist_ok=True)
         temporary = target.with_suffix(target.suffix + ".next")
-        shutil.copy2(source, temporary)
+        if target.suffix == ".webp":
+            # Budget mobile R31 : le runtime n'embarque que du WebP calibré
+            # (redimensionné à la taille d'usage quand `size` est fourni).
+            with Image.open(source) as image:
+                converted = image.convert("RGBA")
+                size = item.get("size")
+                if size is not None:
+                    converted = converted.resize((int(size), int(size)), Image.LANCZOS)
+                quality = item.get("quality")
+                if quality is None:
+                    converted.save(temporary, "WEBP", lossless=True, method=6)
+                else:
+                    converted.save(temporary, "WEBP", quality=int(quality), method=6)
+        else:
+            shutil.copy2(source, temporary)
         os.replace(temporary, target)
         promoted[item["target"]] = item["source"]
         print(f"[promote] {source} -> {target}", flush=True)

@@ -1,4 +1,4 @@
-$ErrorActionPreference = "Stop"
+﻿$ErrorActionPreference = "Stop"
 $workspace = Split-Path -Parent $PSScriptRoot
 
 $rows = Get-ChildItem -Force -Directory -LiteralPath $workspace | ForEach-Object {

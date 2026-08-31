@@ -6,11 +6,11 @@ extends Control
 
 signal navigate_requested(tab: String)
 
-const SYMBOL_ATLAS := preload("res://assets/generated/api_gpt/slot_symbols_atlas.png")
-const SPIN_BG := preload("res://assets/generated/api_gpt/spin_background.png")
-const SLOT_FRAME := preload("res://assets/generated/api_gpt/slot_machine.png")
-const BYTE_MASCOT := preload("res://assets/generated/api_gpt/byte.png")
-const SPIN_BUTTON_ART := preload("res://assets/generated/api_gpt/spin_button.png")
+const SYMBOL_ATLAS := preload("res://assets/generated/api_gpt/slot_symbols_atlas.webp")
+const SPIN_BG := preload("res://assets/generated/api_gpt/spin_background.webp")
+const SLOT_FRAME := preload("res://assets/generated/api_gpt/slot_machine.webp")
+const BYTE_MASCOT := preload("res://assets/generated/api_gpt/byte.webp")
+const SPIN_BUTTON_ART := preload("res://assets/generated/api_gpt/spin_button.webp")
 const SpinVisuals := preload("res://scripts/components/SpinVisuals.gd")
 const SpinNetworkView := preload("res://scripts/components/SpinNetworkView.gd")
 const SpinEncounterView := preload("res://scripts/components/SpinEncounterView.gd")

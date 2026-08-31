@@ -9,7 +9,7 @@ var _busy := false
 
 func _ready() -> void:
 	var body := Ui.screen_body()
-	body.add_child(Ui.hero_card("res://assets/generated/api_gpt/heroes/collection_hero.png", "OPEN  •  REVEAL  •  COLLECT", "Collections", "Ouvre les caches et complète tes sets.", Ui.NEON_MAGENTA))
+	body.add_child(Ui.hero_card("res://assets/generated/api_gpt/heroes/collection_hero.webp", "OPEN  •  REVEAL  •  COLLECT", "Collections", "Ouvre les caches et complète tes sets.", Ui.NEON_MAGENTA))
 	_credits = Ui.label("", 18, Ui.GOLD)
 	_credits.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	body.add_child(_credits)

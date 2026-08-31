@@ -10,7 +10,8 @@ Le pipeline fixe :
 - éclairage studio trois points ;
 - rendu transparent PNG ;
 - fichier `.blend` maître conservé dans `art/blender/` ;
-- sortie runtime dans `client/assets/generated/rendered/`.
+- sortie en staging dans `art/render_2_5d/staging/` (budget mobile R31 : rien
+  n'entre dans `client/assets/` sans conversion WebP et référence runtime).
 
 Exécution :
 
@@ -27,7 +28,7 @@ avec :
 
 Sorties : `district_hero.png`, `collection_hero.png`, `missions_hero.png`,
 `store_hero.png` et la mascotte `mascot_hero.png` dans
-`client/assets/generated/rendered/`, avec leurs fichiers `.blend` dans
+`art/render_2_5d/staging/`, avec leurs fichiers `.blend` dans
 `art/blender/`.
 
 Les futurs GLB doivent être retopologisés avant import, conserver une silhouette

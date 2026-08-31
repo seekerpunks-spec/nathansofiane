@@ -11,7 +11,7 @@ var _eligible_offers: Array = []
 
 func _ready() -> void:
 	var body := Ui.screen_body()
-	body.add_child(Ui.hero_card("res://assets/generated/api_gpt/heroes/store_hero.png", "FREEBIES  •  BOOSTS  •  LOOT", "Neon Store", "Bonus gratuits et offres optionnelles.", Ui.NEON_MAGENTA))
+	body.add_child(Ui.hero_card("res://assets/generated/api_gpt/heroes/store_hero.webp", "FREEBIES  •  BOOSTS  •  LOOT", "Neon Store", "Bonus gratuits et offres optionnelles.", Ui.NEON_MAGENTA))
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED

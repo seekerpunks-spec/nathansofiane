@@ -95,7 +95,8 @@ le client.
   rouleaux Godot animés. Le rendu reste reproductible via
   `tools/render_2_5d/render.ps1`.
 - Source : `art/blender/cyberseeker_slot_master.blend`.
-- Runtime : `client/assets/generated/rendered/slot_cabinet.png`.
+- Staging : `art/render_2_5d/staging/slot_cabinet.png` (depuis R31, le runtime
+  n'embarque que les assets WebP réellement référencés par le client).
 
 ## Extension visuelle R20
 

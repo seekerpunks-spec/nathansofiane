@@ -17,7 +17,7 @@ func _ready() -> void:
 
 func _build() -> void:
 	var art := TextureRect.new()
-	art.texture = load("res://assets/generated/api_gpt/spin_background.png")
+	art.texture = load("res://assets/generated/api_gpt/spin_background.webp")
 	art.set_anchors_preset(Control.PRESET_FULL_RECT)
 	art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
@@ -37,7 +37,7 @@ func _build() -> void:
 	add_child(signal_label)
 
 	var mascot := Ui.HeroArt.new()
-	mascot.texture = load("res://assets/generated/api_gpt/byte.png")
+	mascot.texture = load("res://assets/generated/api_gpt/byte.webp")
 	mascot.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	mascot.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	mascot.position = Vector2(56, 72)

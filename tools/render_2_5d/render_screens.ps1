@@ -1,4 +1,4 @@
-param(
+﻿param(
     [string]$BlenderPath = "C:\Users\danbi\Documents\Codex\tools\blender-5.2\runtime\blender-5.2.0-windows-x64\blender.exe",
     [string]$OutputDir = "",
     [string]$BlendDir = ""
@@ -7,7 +7,7 @@ param(
 $ErrorActionPreference = "Stop"
 $root = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 if (-not $OutputDir) {
-    $OutputDir = Join-Path $root "client\assets\generated\rendered"
+    $OutputDir = Join-Path $root "art\render_2_5d\staging"
 }
 if (-not $BlendDir) {
     $BlendDir = Join-Path $root "art\blender"

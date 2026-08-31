@@ -11,79 +11,79 @@
     {
       "id": "slot_credits",
       "prompt": "A compact stack of three hexagonal cyber-credit chips, cyan circuit insets and small gold rims, energetic asymmetrical pose, centered single object, isolated on a perfectly flat solid chroma-green background, no floor and no cast shadow",
-      "output": "client/assets/generated/local_ai/slot/credits.png"
+      "output": "art/local_ai/staging/slot/credits.png"
     },
     {
       "id": "slot_shield",
       "prompt": "A friendly powerful hexagonal firewall shield, cobalt shell, luminous cyan core, two chunky side bolts, centered single object, isolated on a perfectly flat solid chroma-green background, no floor and no cast shadow",
-      "output": "client/assets/generated/local_ai/slot/shield.png"
+      "output": "art/local_ai/staging/slot/shield.png"
     },
     {
       "id": "slot_hack",
       "prompt": "An original playful hacker mask icon shaped like an angular smiling robot face, magenta shell with cyan circuit scars, centered single object, isolated on a perfectly flat solid chroma-green background, no skull anatomy, no floor and no cast shadow",
-      "output": "client/assets/generated/local_ai/slot/hack.png"
+      "output": "art/local_ai/staging/slot/hack.png"
     },
     {
       "id": "slot_vault",
       "prompt": "A chunky black-and-gold high-security data vault, circular cyan lock and magenta warning lights, heroic three-quarter view, centered single object, isolated on a perfectly flat solid chroma-green background, no floor and no cast shadow",
-      "output": "client/assets/generated/local_ai/slot/vault.png"
+      "output": "art/local_ai/staging/slot/vault.png"
     },
     {
       "id": "slot_energy",
       "prompt": "A compact electric-blue energy cell with a bold lightning-shaped plasma core and gold end caps, centered single object, isolated on a perfectly flat solid chroma-green background, no floor and no cast shadow",
-      "output": "client/assets/generated/local_ai/slot/energy.png"
+      "output": "art/local_ai/staging/slot/energy.png"
     },
     {
       "id": "slot_glitch",
       "prompt": "A fractured violet glitch crystal with cyan digital fragments and a mischievous unstable energy halo, centered single object, isolated on a perfectly flat solid chroma-green background, no floor and no cast shadow",
-      "output": "client/assets/generated/local_ai/slot/glitch.png"
+      "output": "art/local_ai/staging/slot/glitch.png"
     },
     {
       "id": "byte_mascot",
       "prompt": "BYTE, an original friendly round helper robot, compact floating body, cobalt-blue casing, large expressive cyan display eyes, small magenta antenna, stubby articulated arms, one hand waving, warm gold details, full body centered, isolated on a perfectly flat solid chroma-green background, no floor and no cast shadow",
-      "output": "client/assets/generated/local_ai/characters/byte.png",
+      "output": "art/local_ai/staging/characters/byte.png",
       "width": 896,
       "height": 1152
     },
     {
       "id": "district_hero",
       "prompt": "A playful miniature cyberpunk neighborhood module, three chunky cobalt toy-buildings connected by a magenta skyrail, cyan windows, warm gold upgrade sparks, heroic isometric cluster, centered isolated composition on a perfectly flat solid chroma-green background, no floor and no cast shadow",
-      "output": "client/assets/generated/local_ai/rendered/district_hero.png",
+      "output": "art/local_ai/staging/rendered/district_hero.png",
       "width": 896,
       "height": 640
     },
     {
       "id": "collection_hero",
       "prompt": "A joyful exploded loot composition with one open cobalt cyber-cache, several original holographic collectible cards flying upward, cyan glow, magenta ribbons and warm gold reward coins, centered isolated composition on a perfectly flat solid chroma-green background, no readable text, no floor and no cast shadow",
-      "output": "client/assets/generated/local_ai/rendered/collection_hero.png",
+      "output": "art/local_ai/staging/rendered/collection_hero.png",
       "width": 896,
       "height": 640
     },
     {
       "id": "missions_hero",
       "prompt": "A cute compact cyber courier drone carrying three glowing mission badges and a rolled holographic map, dynamic upward pose, cobalt shell, cyan eyes, magenta antenna and warm gold reward star, centered isolated composition on a perfectly flat solid chroma-green background, no readable text, no floor and no cast shadow",
-      "output": "client/assets/generated/local_ai/rendered/missions_hero.png",
+      "output": "art/local_ai/staging/rendered/missions_hero.png",
       "width": 896,
       "height": 640
     },
     {
       "id": "store_hero",
       "prompt": "A cheerful cyberpunk reward vending pod overflowing with energy cells, credit chips and gift capsules, chunky cobalt body, cyan display, magenta side panels and warm gold jackpot glow, centered isolated composition on a perfectly flat solid chroma-green background, no readable text, no floor and no cast shadow",
-      "output": "client/assets/generated/local_ai/rendered/store_hero.png",
+      "output": "art/local_ai/staging/rendered/store_hero.png",
       "width": 896,
       "height": 640
     },
     {
       "id": "slot_cabinet",
       "prompt": "A large original cyberpunk three-reel slot cabinet for a portrait casual mobile game, front view with slight three-quarter depth, chunky cobalt housing, cyan light strips, magenta side fins, warm gold reward accents, one wide empty dark window for three reels, big empty circular button base below, centered complete machine, isolated on a perfectly flat solid chroma-green background, no symbols inside the reel window, no text, no floor and no cast shadow",
-      "output": "client/assets/generated/local_ai/rendered/slot_cabinet.png",
+      "output": "art/local_ai/staging/rendered/slot_cabinet.png",
       "width": 1024,
       "height": 1344
     },
     {
       "id": "neon_slums",
       "prompt": "Portrait establishing background of the original Neon Slums district, cheerful dense cyberpunk toy-city at blue hour, elevated walkways, five clearly separated circular construction pads, cyan shop lights, magenta transit rails, warm gold windows, strong foreground-midground-background separation, open darker upper area for a mobile HUD, no people, no interface and no text",
-      "output": "client/assets/generated/local_ai/districts/neon_slums_bg.png",
+      "output": "art/local_ai/staging/districts/neon_slums_bg.png",
       "width": 768,
       "height": 1344,
       "variants": 2,
@@ -92,7 +92,7 @@
     {
       "id": "signal_gateway",
       "prompt": "An empty portrait establishing background of a cobalt cyberpunk toy-city at dusk beneath one giant abstract circular cyan energy portal, magenta energy arcs and warm gold windows, dramatic depth, uncluttered sky and center. Pure environment only: absolutely no living being, no human, no animal, no mascot, no robot, no statue, no vehicle, no sign, no billboard, no card, no display, no interface, no icon, no letter and no text anywhere",
-      "output": "client/assets/generated/local_ai/onboarding/signal_gateway.png",
+      "output": "art/local_ai/staging/onboarding/signal_gateway.png",
       "width": 768,
       "height": 1344,
       "variants": 3,
@@ -101,7 +101,7 @@
     {
       "id": "spin_sky_bg",
       "prompt": "Bright portrait background for an original casual mobile slot game: huge clean turquoise-blue daytime sky, soft chunky white and pale-violet clouds framing the bottom and side edges, a distant playful cobalt cyber-city with a few magenta energy rails and warm gold windows, cheerful handcrafted toy-like depth, broad simple shapes, empty central area reserved for the game machine. Environment only, absolutely no slot machine, no cabinet, no character, no interface, no button, no sign, no icon, no text, no letters and no numbers",
-      "output": "client/assets/generated/local_ai/slot/spin_sky_bg.png",
+      "output": "art/local_ai/staging/slot/spin_sky_bg.png",
       "width": 768,
       "height": 1344,
       "variants": 4,
@@ -110,7 +110,7 @@
     {
       "id": "slot_stage_frame",
       "prompt": "A single original front-facing compact three-reel slot-machine stage for a portrait casual mobile game, emphatically LANDSCAPE and WIDE with the complete object at least one-and-a-half times wider than it is tall, never a tall arcade cabinet. Chunky rounded cobalt and warm-gold housing with cyan tubes and small magenta accents, one enormous clean ivory reel window divided into three equal vertical bays, a shallow blank top marquee and a very shallow bottom plinth. The reel window must be empty with no symbols. Centered complete object, isolated on a perfectly flat solid chroma-green background, no separate spin button, no character, no interface, no words, no letters, no numbers, no logo, no floor and no cast shadow",
-      "output": "client/assets/generated/local_ai/rendered/slot_stage_frame.png",
+      "output": "art/local_ai/staging/rendered/slot_stage_frame.png",
       "width": 1344,
       "height": 896,
       "variants": 4,
@@ -119,17 +119,17 @@
     {
       "id": "basic_cache",
       "prompt": "A small starter cyber-cache chest, graphite body, cyan circuit latch, friendly chunky proportions, three-quarter view, centered single object, isolated on a perfectly flat solid chroma-green background, no floor and no cast shadow",
-      "output": "client/assets/generated/local_ai/chests/basic_cache.png"
+      "output": "art/local_ai/staging/chests/basic_cache.png"
     },
     {
       "id": "neon_cache",
       "prompt": "A medium rare cyber-cache chest, cobalt armored shell, magenta plasma seams, cyan lock and gold corner guards, three-quarter view, centered single object, isolated on a perfectly flat solid chroma-green background, no floor and no cast shadow",
-      "output": "client/assets/generated/local_ai/chests/neon_cache.png"
+      "output": "art/local_ai/staging/chests/neon_cache.png"
     },
     {
       "id": "black_ice_vault",
       "prompt": "A legendary black-ice reward vault, obsidian armored petals surrounding a suspended warm-gold energy core, cyan glyph lights and controlled magenta halo, monumental but cute chunky proportions, three-quarter view, centered single object, isolated on a perfectly flat solid chroma-green background, no floor and no cast shadow",
-      "output": "client/assets/generated/local_ai/chests/black_ice_vault.png"
+      "output": "art/local_ai/staging/chests/black_ice_vault.png"
     }
   ],
   "atlases": [
@@ -139,65 +139,32 @@
       "columns": 3,
       "rows": 2,
       "cell": 512,
-      "output": "client/assets/generated/local_ai/slot/slot_symbols_atlas.png"
+      "output": "art/local_ai/staging/slot/slot_symbols_atlas.png"
     }
   ],
   "promotions": [
     {
-      "source": "client/assets/generated/local_ai/slot/slot_symbols_atlas.png",
-      "target": "client/assets/generated/slot/slot_symbols_atlas.png"
+      "source": "art/local_ai/staging/districts/neon_slums_bg.png",
+      "target": "client/assets/generated/districts/neon_slums_bg.webp",
+      "quality": 90
     },
     {
-      "source": "client/assets/generated/local_ai/rendered/slot_cabinet.png",
-      "target": "client/assets/generated/rendered/slot_cabinet.png"
+      "source": "art/local_ai/staging/chests/basic_cache.png",
+      "target": "client/assets/generated/chests/basic_cache.webp",
+      "quality": 92,
+      "size": 256
     },
     {
-      "source": "client/assets/generated/local_ai/characters/byte.png",
-      "target": "client/assets/generated/rendered/mascot_hero.png"
+      "source": "art/local_ai/staging/chests/neon_cache.png",
+      "target": "client/assets/generated/chests/neon_cache.webp",
+      "quality": 92,
+      "size": 256
     },
     {
-      "source": "client/assets/generated/local_ai/rendered/district_hero.png",
-      "target": "client/assets/generated/rendered/district_hero.png"
-    },
-    {
-      "source": "client/assets/generated/local_ai/rendered/collection_hero.png",
-      "target": "client/assets/generated/rendered/collection_hero.png"
-    },
-    {
-      "source": "client/assets/generated/local_ai/rendered/missions_hero.png",
-      "target": "client/assets/generated/rendered/missions_hero.png"
-    },
-    {
-      "source": "client/assets/generated/local_ai/rendered/store_hero.png",
-      "target": "client/assets/generated/rendered/store_hero.png"
-    },
-    {
-      "source": "client/assets/generated/local_ai/onboarding/signal_gateway.png",
-      "target": "client/assets/generated/onboarding/signal_gateway.png"
-    },
-    {
-      "source": "client/assets/generated/local_ai/districts/neon_slums_bg.png",
-      "target": "client/assets/generated/districts/neon_slums_bg.png"
-    },
-    {
-      "source": "client/assets/generated/local_ai/slot/spin_sky_bg.png",
-      "target": "client/assets/generated/slot/spin_sky_bg.png"
-    },
-    {
-      "source": "client/assets/generated/local_ai/rendered/slot_stage_frame.png",
-      "target": "client/assets/generated/rendered/slot_stage_frame.png"
-    },
-    {
-      "source": "client/assets/generated/local_ai/chests/basic_cache.png",
-      "target": "client/assets/generated/chests/basic_cache.png"
-    },
-    {
-      "source": "client/assets/generated/local_ai/chests/neon_cache.png",
-      "target": "client/assets/generated/chests/neon_cache.png"
-    },
-    {
-      "source": "client/assets/generated/local_ai/chests/black_ice_vault.png",
-      "target": "client/assets/generated/chests/black_ice_vault.png"
+      "source": "art/local_ai/staging/chests/black_ice_vault.png",
+      "target": "client/assets/generated/chests/black_ice_vault.webp",
+      "quality": 92,
+      "size": 256
     }
   ]
 }

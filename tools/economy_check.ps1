@@ -1,9 +1,9 @@
-$ErrorActionPreference = "Stop"
+﻿$ErrorActionPreference = "Stop"
 $workspace = Split-Path -Parent $PSScriptRoot
-$spin = Get-Content -LiteralPath (Join-Path $workspace "config\spin_table.json") -Raw | ConvertFrom-Json
-$social = Get-Content -LiteralPath (Join-Path $workspace "config\social.json") -Raw | ConvertFrom-Json
-$chests = (Get-Content -LiteralPath (Join-Path $workspace "config\chests.json") -Raw | ConvertFrom-Json).items
-$curve = (Get-Content -LiteralPath (Join-Path $workspace "config\progression.json") -Raw | ConvertFrom-Json).districtCurve
+$spin = Get-Content -Encoding UTF8 -LiteralPath (Join-Path $workspace "config\spin_table.json") -Raw | ConvertFrom-Json
+$social = Get-Content -Encoding UTF8 -LiteralPath (Join-Path $workspace "config\social.json") -Raw | ConvertFrom-Json
+$chests = (Get-Content -Encoding UTF8 -LiteralPath (Join-Path $workspace "config\chests.json") -Raw | ConvertFrom-Json).items
+$curve = (Get-Content -Encoding UTF8 -LiteralPath (Join-Path $workspace "config\progression.json") -Raw | ConvertFrom-Json).districtCurve
 if ($null -eq $curve) { throw "progression.json : districtCurve absent" }
 $districtFiles = Get-ChildItem -LiteralPath (Join-Path $workspace "config\districts") -Filter "district_*.json" |
     Sort-Object Name
@@ -43,7 +43,7 @@ if ($glitchRate -gt 0.25) { throw "Taux de spin vide trop élevé: $glitchRate" 
 
 $districtResults = @()
 foreach ($districtFile in $districtFiles) {
-    $district = Get-Content -LiteralPath $districtFile.FullName -Raw | ConvertFrom-Json
+    $district = Get-Content -Encoding UTF8 -LiteralPath $districtFile.FullName -Raw | ConvertFrom-Json
     $districtCost = 0.0
     foreach ($element in $district.elements) {
         foreach ($level in $element.levels) { $districtCost += [double]$level.cost }

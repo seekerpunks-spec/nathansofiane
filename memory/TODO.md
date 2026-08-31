@@ -48,6 +48,11 @@
       résiduel et aucun APK/AAB.
 - [x] **R30 corrections de review** : target Cargo relatif cohérent et variables
       PostgreSQL imbriquées restaurées ; gate complète et sentinelles vertes.
+- [x] **R31 budget d'assets mobile** : client 47,65 → 3,65 Mo (WebP calibré,
+      coffres 256 px, ~25 Mo d'assets morts supprimés), staging des pipelines
+      hors de `client/assets`, gate budget/orphelins/WebP dans
+      `mobile_ux_check.ps1`, hôte PowerShell 5.1 réparé (BOM + `-Encoding
+      UTF8` + `Add-Type System.Net.Http`). `LOCAL_FULL_GATE_OK`.
 
 ## Décisions produit encore ouvertes (ne pas inventer)
 

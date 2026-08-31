@@ -27,7 +27,7 @@ Décor mobile 9:16 d'un district cyberpunk « Neon Slums », mégalopole vertica
 sous la pluie, cinq zones constructibles clairement séparées, marges HUD/navigation,
 illustration 3D casual premium, palette cyan/magenta/ambre, sans personnage ni UI.
 
-Sortie : `client/assets/generated/districts/neon_slums_bg.png`.
+Sortie : `client/assets/generated/districts/neon_slums_bg.webp (promotion WebP R31)`.
 
 ## Signal Gateway
 
@@ -35,7 +35,7 @@ Fond onboarding mobile 9:16, portail holographique abstrait au-dessus d'une
 mégalopole néon, lower-third sombre et dégagé, style 3D mobile premium, ambiance
 mystérieuse mais accueillante, sans personnage, texte, logo ni contrôle UI.
 
-Sortie : `client/assets/generated/onboarding/signal_gateway.png`.
+Sortie : `art/local_ai/staging/onboarding/signal_gateway.png (staging, plus embarque au runtime depuis R31)`.
 
 ## Basic Cache
 
@@ -43,7 +43,7 @@ Icône carrée sur fond réellement transparent : coffre cyberpunk basique compa
 métal graphite usé, verrou circuit cyan, vue trois-quarts, silhouette lisible,
 sans pièce, personnage, arme, texte, logo ni watermark.
 
-Sortie : `client/assets/generated/chests/basic_cache.png`.
+Sortie : `client/assets/generated/chests/basic_cache.webp (promotion WebP 256px R31)`.
 
 ## Neon Cache
 
@@ -51,7 +51,7 @@ Icône carrée sur fond réellement transparent : coffre cyberpunk intermédiair
 couvercle verre fumé facetté, coutures plasma magenta, verrou cyan et coins dorés,
 vue trois-quarts, rendu 3D casual premium, sans texte, logo ni watermark.
 
-Sortie : `client/assets/generated/chests/neon_cache.png`.
+Sortie : `client/assets/generated/chests/neon_cache.webp (promotion WebP 256px R31)`.
 
 ## Black ICE Vault
 
@@ -59,7 +59,7 @@ Icône carrée sur fond réellement transparent : coffre légendaire en alliage
 obsidienne autour d'un cœur énergétique doré suspendu, glyphes cyan et halo
 magenta, vue trois-quarts, silhouette monumentale, sans texte, logo ni watermark.
 
-Sortie : `client/assets/generated/chests/black_ice_vault.png`.
+Sortie : `client/assets/generated/chests/black_ice_vault.webp (promotion WebP 256px R31)`.
 
 ## Atlas de symboles du slot
 
@@ -85,7 +85,7 @@ Prompt final :
 > no words, letters, numbers, logos, borders, grid lines, watermarks, characters,
 > coins, slot cabinet or scenery. Each icon must remain readable at 96 px.
 
-Sortie : `client/assets/generated/slot/slot_symbols_atlas.png`.
+Sortie : `art/local_ai/staging/slot/slot_symbols_atlas.png (staging ; atlas runtime = api_gpt/slot_symbols_atlas.webp)`.
 
 ## Concept directeur GPT Image — écran principal v1
 
