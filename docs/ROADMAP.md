@@ -150,3 +150,12 @@
 - [x] Arrêt garanti des seuls PID créés et restauration de l'environnement.
 - [x] Gate complète verte jusqu'à `LOCAL_FULL_GATE_OK`, sans processus/log
       résiduel et sans build Android.
+
+## P12 — Correctifs de review R30
+
+- [x] `CargoTargetDir` relatif résolu une seule fois depuis `server/`, puis
+      réutilisé sous forme absolue pour le build et le lancement.
+- [x] Sauvegarde/restauration de `CYBERSEEKER_TEST_DATABASE_URL` et
+      `CYBERSEEKER_ALLOW_DB_TEST_SKIP` autour de la gate imbriquée.
+- [x] Test réel avec target relatif et variables sentinelles :
+      `LOCAL_FULL_GATE_OK`, `ENV_RESTORE_OK`, zéro processus résiduel.

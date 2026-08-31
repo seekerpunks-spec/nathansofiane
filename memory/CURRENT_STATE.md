@@ -1,9 +1,18 @@
-# MÉMOIRE — ÉTAT ACTUEL R29
+# MÉMOIRE — ÉTAT ACTUEL R30
 
 > MAJ 31/08/2026. R26 = « volume de contenu + live-ops automatisée » —
 > intégralement commitée dans `da142f8` (22 commits au total avant R27). R27
 > ferme les dettes post-audit sans design final, wallet natif ni build Android.
 > R28 rend le playthrough social HTTP reproductible et fail-closed.
+
+## Lot R30 (validé après review)
+
+- Deux P2 Bugbot corrigés dans `run_local_full_gate.ps1` : target Cargo relatif
+  normalisé en absolu depuis `server/`, et restauration des deux variables DB de
+  test modifiées par `validate_all.ps1`.
+- Security Review : aucun constat.
+- Gate réelle avec chemin relatif et sentinelles : `LOCAL_FULL_GATE_OK`,
+  `ENV_RESTORE_OK`, 39/39 Rust, 12/12 PostgreSQL et aucun serveur résiduel.
 
 ## Lot R29 (validé)
 

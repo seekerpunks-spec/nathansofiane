@@ -107,11 +107,19 @@ if (-not $CargoTargetDir) {
         Join-Path $serverDir "target"
     }
 }
+# Cargo résout un target relatif depuis son répertoire de travail (`server/`).
+# Figer le chemin absolu avant le build garantit que la recherche/lancement du
+# binaire utilise exactement le même emplacement après Pop-Location.
+if (-not [System.IO.Path]::IsPathRooted($CargoTargetDir)) {
+    $CargoTargetDir = Join-Path $serverDir $CargoTargetDir
+}
+$CargoTargetDir = [System.IO.Path]::GetFullPath($CargoTargetDir)
 $serverExe = Join-Path $CargoTargetDir "debug\cyberseeker-server.exe"
 
 $environmentNames = @(
     "CARGO_TARGET_DIR", "DATABASE_URL", "JWT_SECRET", "DEV_AUTH",
-    "DEV_ADDRESS", "PORT", "CONFIG_DIR", "RATE_LIMIT_PER_MINUTE", "RUST_LOG"
+    "DEV_ADDRESS", "PORT", "CONFIG_DIR", "RATE_LIMIT_PER_MINUTE", "RUST_LOG",
+    "CYBERSEEKER_TEST_DATABASE_URL", "CYBERSEEKER_ALLOW_DB_TEST_SKIP"
 )
 $savedEnvironment = @{}
 foreach ($name in $environmentNames) {

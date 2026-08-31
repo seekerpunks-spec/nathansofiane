@@ -1,4 +1,4 @@
-# MÉMOIRE — TODO / PROCHAINES TÂCHES R29
+# MÉMOIRE — TODO / PROCHAINES TÂCHES R30
 
 > MAJ 31/08/2026. Roadmap détaillée : `docs/ROADMAP.md`. Checklist de
 > publication : `docs/RELEASE_CHECKLIST.md`. Spec produit : `MASTER TODO`.
@@ -46,6 +46,8 @@
 - [x] **R29 gate mono-commande** : build debug, deux serveurs cachés, readiness,
       validation complète et arrêt/restauration garantis ; aucun processus/log
       résiduel et aucun APK/AAB.
+- [x] **R30 corrections de review** : target Cargo relatif cohérent et variables
+      PostgreSQL imbriquées restaurées ; gate complète et sentinelles vertes.
 
 ## Décisions produit encore ouvertes (ne pas inventer)
 
