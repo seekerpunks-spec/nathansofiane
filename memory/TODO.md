@@ -1,4 +1,4 @@
-# MÉMOIRE — TODO / PROCHAINES TÂCHES R32
+# MÉMOIRE — TODO / PROCHAINES TÂCHES R33
 
 > MAJ 31/08/2026. Roadmap détaillée : `docs/ROADMAP.md`. Checklist de
 > publication : `docs/RELEASE_CHECKLIST.md`. Spec produit : `MASTER TODO`.
@@ -57,6 +57,11 @@
       joueur, smoke ajusté (`CLAIM`), tripwire accents T37 dans
       `mobile_ux_check.ps1`, messages serveur/commentaires/`note` restent
       français (dev-facing).
+- [x] **R33 identité de boot + packaging Android** : boot splash navy + logo
+      (fini le splash Godot), 3 icônes launcher générées et câblées dans le
+      preset (main 192 + adaptive fg/bg 432, safe zone respectée),
+      description projet en anglais, version 0.3.0-r33, gate mobile étendue
+      avec test négatif.
 
 ## Décisions produit encore ouvertes (ne pas inventer)
 

@@ -149,6 +149,25 @@ if ($configFrench) {
     throw "Champs config joueur non anglais (accents) : $($configFrench -join ', ')"
 }
 
+# --- Identite de boot + packaging Android (R33) ---
+# Sans ces reglages, l'APK sort avec le splash et l'icone robot Godot par
+# defaut : invisible en desktop, humiliant en store review.
+if ($project -notmatch 'boot_splash/bg_color=Color\(') { throw "Boot splash: bg_color absent (splash Godot par defaut)" }
+if ($project -notmatch 'boot_splash/image="res://assets/boot_splash\.png"') { throw "Boot splash: image absente" }
+if (-not (Test-Path -LiteralPath (Join-Path $client "assets\boot_splash.png"))) { throw "assets/boot_splash.png manquant" }
+if ($project -match ('config/description="[^"]*' + $accentClass)) { throw "Description projet non anglaise" }
+
+$preset = Get-Content -Encoding UTF8 -LiteralPath (Join-Path $client "export_presets.cfg") -Raw
+foreach ($iconKey in @("main_192x192", "adaptive_foreground_432x432", "adaptive_background_432x432")) {
+    if ($preset -notmatch ('launcher_icons/' + $iconKey + '="res://export/icons/' + $iconKey + '\.png"')) {
+        throw "Preset Android: launcher_icons/$iconKey non cable"
+    }
+    if (-not (Test-Path -LiteralPath (Join-Path $client "export\icons\$iconKey.png"))) {
+        throw "Icone launcher manquante: export/icons/$iconKey.png"
+    }
+}
+if ($preset -notmatch 'exclude_filter="[^"]*export/\*') { throw "Preset Android: export/* doit rester hors du pck" }
+
 [pscustomobject]@{
     TouchInputs = $touchInputs
     DismissibleModals = $dismissibleModals
@@ -159,5 +178,7 @@ if ($configFrench) {
     AssetsTotalMB = $totalMB
     AssetTextures = @($textures).Count
     EnglishUiStrings = $true
+    BootSplash = $true
+    LauncherIcons = 3
 } | Format-List
 Write-Host "MOBILE_UX_CHECK_OK" -ForegroundColor Green

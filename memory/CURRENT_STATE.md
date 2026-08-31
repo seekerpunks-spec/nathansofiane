@@ -1,7 +1,21 @@
-# MÉMOIRE — ÉTAT ACTUEL R32
+# MÉMOIRE — ÉTAT ACTUEL R33
 
-> MAJ 31/08/2026. R31 = budget d'assets mobile + hôte PowerShell 5.1.
-> R32 = UI joueur 100 % anglaise (D12).
+> MAJ 31/08/2026. R32 = UI joueur 100 % anglaise (D12). R33 = identité de
+> boot + packaging Android (splash, icônes launcher, description EN).
+
+## Lot R33 (identité de boot + packaging Android)
+
+- **Boot splash** : fini le splash Godot par défaut — `boot_splash/bg_color`
+  navy #0B1024 + `assets/boot_splash.png` (logo 512, 32 Ko). Description
+  projet passée en anglais (dernier reliquat D12).
+- **Icônes launcher Android** câblées dans le preset (elles retombaient sur
+  l'icône robot Godot) : `main_192x192` + adaptive fg (logo 256 centré,
+  circumradius 119 px < safe zone 132 px) + bg dégradé, 42 Ko en tout,
+  générées par `client/tests/ExportIcon.gd` (Godot headless) puis
+  `tools/android_icons/build_icons.py` (venv PIL). `export/*` exclu du pck.
+- **Preset** : version 0.3.0-r33 (code 18). Gate mobile étendue : splash
+  configuré, 3 icônes présentes, description sans accents ; test négatif
+  vérifié (icône manquante → rouge).
 
 ## Lot R32 (UI anglaise, D12)
 

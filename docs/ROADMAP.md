@@ -195,3 +195,20 @@
       test négatif regex vérifié.
 - [x] Hors périmètre volontaire : commentaires code, `note` de config,
       messages d'erreur API et sorties de gate restent français (dev-facing).
+
+## P15 — Identité de boot + packaging Android R33
+
+- [x] Boot splash : `boot_splash/bg_color` navy #0B1024 +
+      `assets/boot_splash.png` (logo 512 px, 32 Ko) — plus de splash Godot
+      par défaut au lancement.
+- [x] Icônes launcher Android générées et câblées dans le preset :
+      `main_192x192`, adaptive foreground (logo 256 px centré, circumradius
+      119 px dans la safe zone de 132 px), adaptive background dégradé ;
+      pipeline `client/tests/ExportIcon.gd` (Godot headless, rasterise
+      l'icône SVG) + `tools/android_icons/build_icons.py` (PIL).
+- [x] Preset Android : `exclude_filter` étendu à `export/*` (icônes hors du
+      pck), version `0.3.0-r33` (code 18).
+- [x] `config/description` en anglais (dernier reliquat D12 : "cartes").
+- [x] Gate `mobile_ux_check.ps1` étendue : splash configuré, fichier splash
+      présent, 3 icônes câblées et présentes, description sans accents ;
+      test négatif vérifié (icône manquante → gate rouge).
