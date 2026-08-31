@@ -11,7 +11,7 @@ var _eligible_offers: Array = []
 
 func _ready() -> void:
 	var body := Ui.screen_body()
-	body.add_child(Ui.hero_card("res://assets/generated/api_gpt/heroes/store_hero.webp", "FREEBIES  •  BOOSTS  •  LOOT", "Neon Store", "Bonus gratuits et offres optionnelles.", Ui.NEON_MAGENTA))
+	body.add_child(Ui.hero_card("res://assets/generated/api_gpt/heroes/store_hero.webp", "FREEBIES  •  BOOSTS  •  LOOT", "Neon Store", "Free perks and optional offers.", Ui.NEON_MAGENTA))
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -40,11 +40,11 @@ func _refresh() -> void:
 		return
 	for child in _content.get_children():
 		child.queue_free()
-	_content.add_child(Ui.section_title("OPTIONS GRATUITES", Ui.NEON_CYAN))
+	_content.add_child(Ui.section_title("FREEBIES", Ui.NEON_CYAN))
 	var free_card := _free_card()
 	_content.add_child(free_card)
 	Ui.reveal(free_card)
-	_content.add_child(Ui.section_title("OFFRES LIMITÉES", Ui.NEON_MAGENTA))
+	_content.add_child(Ui.section_title("LIMITED OFFERS", Ui.NEON_MAGENTA))
 	var any_offer := false
 	for offer in _eligible_offers:
 		if typeof(offer) == TYPE_DICTIONARY:
@@ -53,9 +53,9 @@ func _refresh() -> void:
 			Ui.reveal(card, 0.05 if not any_offer else 0.10)
 			any_offer = true
 	if not any_offer:
-		_content.add_child(Ui.label("Aucune offre active. Le jeu reste entièrement jouable gratuitement.", 14, Ui.TEXT_DIM))
-	_content.add_child(Ui.section_title("COFFRES EN CRÉDITS", Ui.GOLD))
-	var cards_button := Ui.button("OUVRIR LA COLLECTION", Ui.GOLD, true)
+		_content.add_child(Ui.label("No active offers. The game stays fully playable for free.", 14, Ui.TEXT_DIM))
+	_content.add_child(Ui.section_title("CREDIT CACHES", Ui.GOLD))
+	var cards_button := Ui.button("OPEN COLLECTION", Ui.GOLD, true)
 	cards_button.pressed.connect(func() -> void: navigate_requested.emit("collection"))
 	_content.add_child(cards_button)
 
@@ -63,7 +63,7 @@ func _free_card() -> PanelContainer:
 	var panel := Ui.panel()
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 9)
-	box.add_child(Ui.label("RÉCOMPENSE VOLONTAIRE", 19, Ui.TEXT))
+	box.add_child(Ui.label("OPT-IN REWARD", 19, Ui.TEXT))
 	var cfg: Dictionary = Config.economy().get("adsConfig", {})
 	if not _ad_offer_tracked:
 		_ad_offer_tracked = true
@@ -73,8 +73,8 @@ func _free_card() -> PanelContainer:
 		})
 	var watched := int(Store.state.get("adsWatchedToday", 0))
 	var maximum := int(cfg.get("maxRewardedAdsPerDay", 0))
-	box.add_child(Ui.label("+%d SPINS  •  %d / %d AUJOURD'HUI" % [int(cfg.get("rewardPerAd", 0)), watched, maximum], 14, Ui.TEXT_DIM))
-	var ad := Ui.button("REGARDER UNE PUB", Ui.NEON_CYAN)
+	box.add_child(Ui.label("+%d SPINS  •  %d / %d TODAY" % [int(cfg.get("rewardPerAd", 0)), watched, maximum], 14, Ui.TEXT_DIM))
+	var ad := Ui.button("WATCH AN AD", Ui.NEON_CYAN)
 	ad.disabled = _busy or watched >= maximum or not Wallet.is_dev()
 	ad.pressed.connect(_reward_ad)
 	box.add_child(ad)
@@ -97,7 +97,7 @@ func _offer_card(offer: Dictionary) -> PanelContainer:
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 8)
 	box.add_child(Ui.label(str(offer.get("name", "Offer")).to_upper(), 23, Ui.NEON_MAGENTA))
-	box.add_child(Ui.label("%s  •  %d RESTANT(S)" % [str(offer.get("kind", "limited")).to_upper(), int(offer.get("remainingPurchases", 0))], 11, Ui.TEXT_DIM))
+	box.add_child(Ui.label("%s  •  %d LEFT" % [str(offer.get("kind", "limited")).to_upper(), int(offer.get("remainingPurchases", 0))], 11, Ui.TEXT_DIM))
 	var lines := ""
 	for content in offer.get("contents", []):
 		var typ := str(content.get("type", "reward")).to_upper()
@@ -105,12 +105,12 @@ func _offer_card(offer: Dictionary) -> PanelContainer:
 	var detail := Ui.label(lines.strip_edges(), 16, Ui.TEXT)
 	detail.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	box.add_child(detail)
-	box.add_child(Ui.label("EXPIRE DANS  " + Ui.mmss_long(int(offer.get("endsAtMs", 0)) - Store.now_ms()), 12, Ui.TEXT_DIM))
+	box.add_child(Ui.label("EXPIRES IN  " + Ui.mmss_long(int(offer.get("endsAtMs", 0)) - Store.now_ms()), 12, Ui.TEXT_DIM))
 	var buy := Ui.button("%s  %s" % [Ui.compact(int(offer.get("priceU64", 0))), str(offer.get("priceToken", "SKR"))], Ui.NEON_MAGENTA)
 	buy.disabled = _busy or not Wallet.is_dev()
 	buy.pressed.connect(_buy_offer.bind(offer))
 	box.add_child(buy)
-	var note := Ui.label("MODE TEST  •  AUCUN DÉBIT RÉEL", 11, Ui.TEXT_DIM)
+	var note := Ui.label("TEST MODE  •  NO REAL CHARGES", 11, Ui.TEXT_DIM)
 	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(note)
 	panel.add_child(box)

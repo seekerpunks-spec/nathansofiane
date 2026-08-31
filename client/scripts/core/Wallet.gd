@@ -13,5 +13,5 @@ func sign_nonce(_nonce: String) -> Dictionary:
 		return {"ok": true, "signature": "dev"}
 	return {
 		"ok": false,
-		"error": "Mobile Wallet Adapter requis sur un appareil Seeker.",
+		"error": "Mobile Wallet Adapter required on a Seeker device.",
 	}

@@ -131,7 +131,7 @@ func _build_friends(parent: VBoxContainer) -> void:
 	var friends: Array = host._network_snapshot.get("friends", [])
 	_section(parent, "FRIENDS  •  %d" % friends.size())
 	if friends.is_empty():
-		parent.add_child(Ui.label("Ajoute un joueur avec son code ami.", 13, Ui.TEXT_DIM))
+		parent.add_child(Ui.label("Add a player with their friend code.", 13, Ui.TEXT_DIM))
 		return
 	for friend in friends:
 		if typeof(friend) != TYPE_DICTIONARY:
@@ -283,7 +283,7 @@ func _build_trades(parent: VBoxContainer) -> void:
 					duplicates.append(card)
 					break
 	if friends.is_empty() or duplicates.is_empty():
-		parent.add_child(Ui.label("Ajoute un ami et garde au moins un doublon échangeable.", 12, Ui.TEXT_DIM))
+		parent.add_child(Ui.label("Add a friend and keep at least one tradeable duplicate.", 12, Ui.TEXT_DIM))
 		return
 	var friend_menu := OptionButton.new()
 	friend_menu.custom_minimum_size.y = 52

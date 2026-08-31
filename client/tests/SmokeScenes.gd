@@ -99,7 +99,7 @@ func _run() -> void:
 		"cards": [{"cardId":"ghost_terminal","qty":2}], "chests": [{"chestId":"basic","qty":1}],
 		"completedSets": [], "dailyStreak": 2, "dailyAvailable": true, "adsWatchedToday": 1,
 		"missions": [{"missionId":"use_spins","name":"Use 10 Spins","target":10,"progress":6,"claimed":false,"reward":{"spins":20}}],
-		"achievements": [{"achievementId":"signal_runner_1","name":"Signal Runner I","description":"Dépense 10 spins.","target":10,"progress":10,"claimed":false,"reward":{"spins":25,"credits":100000}}],
+		"achievements": [{"achievementId":"signal_runner_1","name":"Signal Runner I","description":"Spend 10 spins.","target":10,"progress":10,"claimed":false,"reward":{"spins":25,"credits":100000}}],
 		"entitlements": {"dailySpinBonus":0,"items":[],"verificationMode":"server_provider_required"},
 		"rewardPool": {"enabled":false,"settlementEnabled":false,"pools":[]},
 		"events": [{"eventId":"neon_rush_r17","name":"Neon Rush","endsAtMs":Store.now_ms()+86400000,"points":420}],
@@ -160,7 +160,7 @@ func _check_collection_screen(instance: Node) -> void:
 			"récompense de set nulle: " + str(set_data.get("setId", ""))
 		)
 		_check(
-			instance._reward_label(reward).contains("RÉCLAMER"),
+			instance._reward_label(reward).contains("CLAIM"),
 			"libellé de récompense vide: " + str(set_data.get("setId", ""))
 		)
 		if set_data.has("completionReward"):

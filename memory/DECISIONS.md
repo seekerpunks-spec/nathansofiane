@@ -16,6 +16,7 @@
 | D9 | Pas de marketplace, cash-out ou NFT par carte. Le refus historique de tout trading est remplacé par D11/T29 pour autoriser uniquement le swap social non financier de doublons. |
 | D10 | Carte blanche donnée aux agents IA pour builder ("carte blanche", "GO") |
 | D11 | Exécuter tout le MASTER TODO avec une boucle fidèle aux sensations Coin Master mais contenu original ; design et wallet natif différés temporairement |
+| D12 | **UI joueur 100 % anglaise** ("non UI 100 % english mec") : tout le copy client et les libellés joueur des configs (name/label/description) sont en anglais pour le dApp Store global ; commentaires code, `note` de config et messages de gate restent français (dev-facing) |
 
 ## Décisions techniques (agents)
 | # | Décision | Raison |
@@ -56,6 +57,7 @@
 | T34 | Les perks NFT passent exclusivement par des entitlements serveur actifs et non expirés ; aucun endpoint client d'ownership, définition OG désactivée, TTL remote-config et bonus limité au daily login | Le système est prêt pour un provider futur sans implémenter le wallet, échoue fermé en cas de panne/transfert et ne crée aucun rendement financier |
 | T35 | La gate locale inclut désormais invariants sécurité, absence de Pets, safe areas, Retour Android, cibles tactiles et smoke 360×800 / 540×1170 / 720×1280 ; les claims finaux événement/saison relisent l'idempotence sous verrou | Transforme l'audit transversal en régression automatique tout en séparant clairement la QA Seeker physique encore externe |
 | T36 | Le runtime client n'embarque que des textures WebP calibrées et référencées (budget gate : 5 Mo total, 1 024 Ko/fichier, zéro orphelin, zéro PNG) ; les pipelines d'art (ComfyUI, Blender) écrivent en staging sous `art/` et seules les promotions du manifest, avec conversion WebP intégrée, touchent `client/assets` | 47,65 Mo d'assets dont ~25 Mo jamais chargés partaient dans l'APK ; sans gate, la dérive de poids est invisible jusqu'au build Android |
+| T37 | Tripwire D12 dans `mobile_ux_check.ps1` : aucun caractère accentué dans une chaîne des `.gd` client (commentaires et `tests/` exclus) ni dans les champs joueur des configs (`name/label/description/title/subtitle`) ; la classe regex exclut U+00D7 (×) légitime dans "BET ×N" | Le français sans accent peut passer, mais tout retour naturel de copy français (accents) casse la gate au lieu d'être découvert en store review |
 
 ## Noms / brandings (à verrouiller — O1 GDD)
 - Jeu : **CyberSeeker** (provisoire, utilisé partout pour l'instant).

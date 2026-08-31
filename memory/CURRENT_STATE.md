@@ -1,61 +1,49 @@
-# MÉMOIRE — ÉTAT ACTUEL R31
+# MÉMOIRE — ÉTAT ACTUEL R32
 
-> MAJ 31/08/2026. R26 = volume de contenu + live-ops (commit `da142f8`). R27 =
-> robustesse post-audit. R28 = contrat social HTTP. R29 = gate mono-commande.
-> R30 = correctifs de review. R31 = budget d'assets mobile + hôte PowerShell 5.1.
+> MAJ 31/08/2026. R31 = budget d'assets mobile + hôte PowerShell 5.1.
+> R32 = UI joueur 100 % anglaise (D12).
 
-## Lot R31 (validé, gate complète verte)
+## Lot R32 (UI anglaise, D12)
 
-- **Budget d'assets** : `client/assets` passe de **47,65 Mo à 3,65 Mo** sans
-  perte visible (vérif visuelle décor + atlas). 18 textures runtime en WebP :
-  décors/api_gpt q90, atlas du slot lossless, coffres redimensionnés
-  1024→256 px (affichés 86 px). Conversion reproductible :
-  `tools/asset_budget/convert_runtime_assets.py` (venv de la pipeline).
-- **~25 Mo d'assets morts supprimés** : staging `local_ai/` (17,6 Mo qui
-  partaient dans l'APK) + copies promues `slot/`, `rendered/`, `onboarding/`
-  jamais référencées par l'UI actuelle (direction `api_gpt/`).
-- **Pipelines re-cadrées** : staging ComfyUI → `art/local_ai/staging/`,
-  rendus Blender → `art/render_2_5d/staging/` ; les promotions du manifest
-  convertissent en WebP calibré (quality/size par entrée). Aucun PNG de
-  staging ne peut revenir dans `client/assets/`.
-- **Gate mobile étendue** (`mobile_ux_check.ps1`) : plafond 5 Mo total,
-  1 024 Ko par fichier, WebP obligatoire sous `assets/generated`, zéro asset
-  orphelin (référence res:// dans les .gd ou nom relatif dans la config),
-  zéro `.import` sans source, staging interdit. Tests négatifs vérifiés
-  (orphelin et PNG déclenchent bien le rouge).
-- **Nettoyage config/serveur** : champ `image` mort retiré des 45 cartes et de
-  `CardConfig` ; `chests.json` pointe vers les .webp ;
-  `DistrictScreen._asset_texture` résout `.webp` puis `.png`.
-- **Hôte PowerShell 5.1 réparé** (les gates R28-R30 tournaient sous un shell
-  en codepage UTF-8) : BOM UTF-8 ajouté aux .ps1 accentués (sinon erreurs de
-  parse), `-Encoding UTF8` forcé sur tous les `Get-Content` des gates (sinon
-  les motifs accentués ne matchent plus les sources), et
-  `Add-Type System.Net.Http` dans `api_contract_check.ps1`.
+- **103 remplacements** : tout le copy français des `.gd` client (Main,
+  les 6 écrans, composants Spin, `Ui.gd`, `Wallet.gd`) et les libellés joueur
+  des configs (7 descriptions `achievements.json`, label GLITCH de
+  `spin_table.json`) passés en anglais. `Ui.mmss_long` : `%dj` → `%dd`.
+- **Périmètre vérifié** : le client n'affiche jamais le `message` brut du
+  serveur (tout est mappé sur des libellés locaux) → les messages d'erreur
+  API restent français (dev-facing), comme les commentaires code et les
+  `note` de config.
+- **Tripwire T37** dans `mobile_ux_check.ps1` : accents interdits dans les
+  chaînes des `.gd` client (hors commentaires/tests) et dans les champs
+  joueur des configs ; × (U+00D7) exclu. Test négatif regex vérifié.
+- **Smoke ajusté** : attente `CLAIM` (ex-RÉCLAMER), fixture achievement en
+  anglais. Inventaire rejouable : `tools/i18n_en/dump_ui_strings.py`.
 
-## Validation exécutée R31 (verte, arbre de travail)
+## Validation R32
 
-`run_local_full_gate.ps1` exit 0 : 39/39 Rust, `DB_TESTS_PROVEN: 12/12`,
-smoke 6 scènes × 3 ratios, `API_CONTRACT_CHECK_OK`, `SOCIAL_CONTRACT_CHECK_OK`,
-`CYBERSEEKER_VALIDATION_OK`, `LOCAL_FULL_GATE_OK`, zéro processus résiduel.
-Clippy strict `-D warnings` vert.
+`run_local_full_gate.ps1` : voir sentinelle `LOCAL_FULL_GATE_OK` du lot.
+Référence R31 (verte) : 39/39 Rust, `DB_TESTS_PROVEN: 12/12`, smoke 6 scènes
+× 3 ratios, `API_CONTRACT_CHECK_OK`, `SOCIAL_CONTRACT_CHECK_OK`, Clippy strict.
 
-## Historique condensé (R25→R30, tout commité, HEAD avant R31 `cf1de5d`)
+## Historique condensé (R25→R31, tout commité)
 
-- R25 : gate sécurité réparée (`String.Split` char[]) ; travail R24 commité.
-- R26 : 5 districts data-driven, loot tables centralisées, tests Postgres
-  fail-closed prouvés, smoke non-zéro, live-ops automatisée (migration 0020).
-- R27 : rattrapage live-ops dérivé de la config (180 fenêtres), Clippy strict,
-  récompenses UI génériques, SpinScreen 989 lignes.
+- R25 : gate sécurité réparée (`String.Split` char[]) ; R24 commité.
+- R26 : 5 districts data-driven, tests Postgres fail-closed prouvés,
+  live-ops automatisée (migration 0020, commit `da142f8`).
+- R27 : rattrapage live-ops (180 fenêtres), Clippy strict, SpinScreen 989 l.
 - R28 : `social_contract_check.ps1` = playthrough deux joueurs/deux instances.
 - R29 : `run_local_full_gate.ps1` mono-commande, arrêt garanti.
 - R30 : target Cargo normalisé, variables DB de test restaurées.
+- R31 : assets 47,65 → 3,65 Mo (WebP calibré, ~25 Mo morts supprimés),
+  staging pipelines sous `art/`, gate budget/orphelins/WebP, hôte
+  PowerShell 5.1 réparé (BOM + `-Encoding UTF8` + `Add-Type`).
 
-## Périmètre livré (cumul R17→R31)
+## Périmètre livré (cumul R17→R32)
 
 Slot autoritaire ×1→×100K, 5 districts, collection de lancement, rétention,
 live-ops automatisée, social complet (Signal Jam/Ghost Vault/amis/crews/
 trading), achievements, entitlements NFT fail-closed, reward pool SKR
-désactivée. 21 modules Rust, 20 migrations. Client 47,65→3,65 Mo d'assets.
+désactivée, UI 100 % anglaise. 21 modules Rust, 20 migrations.
 Détail : `docs/ROADMAP.md`.
 
 ## Environnement IA (R16/R25/R31)

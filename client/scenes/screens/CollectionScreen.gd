@@ -9,7 +9,7 @@ var _busy := false
 
 func _ready() -> void:
 	var body := Ui.screen_body()
-	body.add_child(Ui.hero_card("res://assets/generated/api_gpt/heroes/collection_hero.webp", "OPEN  •  REVEAL  •  COLLECT", "Collections", "Ouvre les caches et complète tes sets.", Ui.NEON_MAGENTA))
+	body.add_child(Ui.hero_card("res://assets/generated/api_gpt/heroes/collection_hero.webp", "OPEN  •  REVEAL  •  COLLECT", "Collections", "Open caches and complete your sets.", Ui.NEON_MAGENTA))
 	_credits = Ui.label("", 18, Ui.GOLD)
 	_credits.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	body.add_child(_credits)
@@ -32,7 +32,7 @@ func _refresh() -> void:
 	_credits.text = "SOLDE  " + Ui.compact(Store.credits()) + " CR"
 	for child in _content.get_children():
 		child.queue_free()
-	_content.add_child(Ui.section_title("CACHES DISPONIBLES", Ui.NEON_MAGENTA))
+	_content.add_child(Ui.section_title("AVAILABLE CACHES", Ui.NEON_MAGENTA))
 	var reveal_index := 0
 	for chest in Config.chests():
 		if typeof(chest) == TYPE_DICTIONARY:
@@ -41,7 +41,7 @@ func _refresh() -> void:
 			Ui.reveal(card, reveal_index * 0.04)
 			reveal_index += 1
 	_content.add_child(Ui.separator())
-	_content.add_child(Ui.section_title("SETS DE CARTES", Ui.NEON_CYAN))
+	_content.add_child(Ui.section_title("CARD SETS", Ui.NEON_CYAN))
 	for set_data in Config.sets():
 		if typeof(set_data) == TYPE_DICTIONARY:
 			var card := _set_card(set_data)
@@ -68,12 +68,12 @@ func _chest_card(chest: Dictionary) -> PanelContainer:
 	text.add_child(name)
 	var id := str(chest.get("chestId", ""))
 	var qty := Store.chest_qty(id)
-	var info := Ui.label("%d possédé(s) • %d cartes" % [qty, int(chest.get("cardsPerOpen", 0))], 12, Ui.TEXT_DIM)
+	var info := Ui.label("%d owned • %d cards" % [qty, int(chest.get("cardsPerOpen", 0))], 12, Ui.TEXT_DIM)
 	info.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	text.add_child(info)
 	row.add_child(text)
 	var actions := VBoxContainer.new()
-	var open := Ui.button("OUVRIR", Ui.NEON_CYAN, true)
+	var open := Ui.button("OPEN", Ui.NEON_CYAN, true)
 	open.disabled = _busy or qty < 1
 	open.pressed.connect(_open_chest.bind(id))
 	actions.add_child(open)
@@ -105,12 +105,12 @@ func _set_lock_reason(set_data: Dictionary) -> String:
 		return ""
 	var district_id := int(requirement.get("completedDistrictId", 0))
 	if district_id > 0 and int(Store.state.get("districtIndex", 0)) < district_id:
-		return "VERROUILLÉ  •  TERMINE LE DISTRICT %02d" % district_id
+		return "LOCKED  •  CLEAR DISTRICT %02d" % district_id
 	var required_set := str(requirement.get("completedSetId", ""))
 	if required_set != "":
 		var claimed: Array = Store.state.get("completedSets", [])
 		if not claimed.has(required_set):
-			return "VERROUILLÉ  •  COMPLÈTE %s" % _set_name(required_set).to_upper()
+			return "LOCKED  •  COMPLETE %s" % _set_name(required_set).to_upper()
 	return ""
 
 func _set_name(set_id: String) -> String:
@@ -132,7 +132,7 @@ func _set_reward(set_data: Dictionary) -> Dictionary:
 	return {"spins": int(set_data.get("completionSpins", 0)), "credits": 0, "chest": ""}
 
 func _reward_label(reward: Dictionary) -> String:
-	return "RÉCLAMER  " + Ui.reward_text(reward)
+	return "CLAIM  " + Ui.reward_text(reward)
 
 func _set_card(set_data: Dictionary) -> PanelContainer:
 	var accent := _theme_color(str(set_data.get("visualTheme", "")))
@@ -267,11 +267,11 @@ func _show_drops(cards: Array) -> void:
 	var box := VBoxContainer.new()
 	box.custom_minimum_size.x = 0
 	box.add_theme_constant_override("separation", 12)
-	box.add_child(Ui.label("CACHE DÉCRYPTÉ", 30, Ui.NEON_CYAN))
+	box.add_child(Ui.label("CACHE DECRYPTED", 30, Ui.NEON_CYAN))
 	for card in cards:
 		var rarity := str(card.get("rarity", "common"))
-		box.add_child(Ui.label(str(card.get("name", "Carte")) + ("  // DOUBLON" if card.get("duplicate", false) else ""), 17, Ui.tier_color(rarity)))
-	var close := Ui.button("COLLECTER", Ui.NEON_CYAN)
+		box.add_child(Ui.label(str(card.get("name", "Card")) + ("  // DUPLICATE" if card.get("duplicate", false) else ""), 17, Ui.tier_color(rarity)))
+	var close := Ui.button("COLLECT", Ui.NEON_CYAN)
 	close.pressed.connect(overlay.queue_free)
 	box.add_child(close)
 	center.add_child(box)

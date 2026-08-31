@@ -1,4 +1,4 @@
-# MÉMOIRE — TODO / PROCHAINES TÂCHES R30
+# MÉMOIRE — TODO / PROCHAINES TÂCHES R32
 
 > MAJ 31/08/2026. Roadmap détaillée : `docs/ROADMAP.md`. Checklist de
 > publication : `docs/RELEASE_CHECKLIST.md`. Spec produit : `MASTER TODO`.
@@ -53,6 +53,10 @@
       hors de `client/assets`, gate budget/orphelins/WebP dans
       `mobile_ux_check.ps1`, hôte PowerShell 5.1 réparé (BOM + `-Encoding
       UTF8` + `Add-Type System.Net.Http`). `LOCAL_FULL_GATE_OK`.
+- [x] **R32 UI 100 % anglaise (D12)** : 103 remplacements client + configs
+      joueur, smoke ajusté (`CLAIM`), tripwire accents T37 dans
+      `mobile_ux_check.ps1`, messages serveur/commentaires/`note` restent
+      français (dev-facing).
 
 ## Décisions produit encore ouvertes (ne pas inventer)
 

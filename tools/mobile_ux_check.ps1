@@ -110,6 +110,45 @@ if ($staleImports) {
     throw "Fichiers .import orphelins: $(($staleImports | ForEach-Object Name) -join ', ')"
 }
 
+# --- UI 100 % anglaise (R32 / D12) ---
+# Le copy joueur est anglais pour le dApp Store global. Tripwire : aucun
+# caractere accentue dans une chaine des scripts client (commentaires et tests
+# exclus, ils restent francais) ni dans les champs joueur des configs.
+# La classe exclut U+00D7 (signe multiplication, "BET x1") et U+00F7.
+$accentClass = '[\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u00FF\u0152\u0153]'
+$frenchHits = @()
+Get-ChildItem -LiteralPath $client -Filter "*.gd" -Recurse |
+    Where-Object { $_.FullName -notmatch '\\tests\\' } |
+    ForEach-Object {
+        $file = $_
+        $lineNum = 0
+        foreach ($line in (Get-Content -Encoding UTF8 -LiteralPath $file.FullName)) {
+            $lineNum++
+            $code = $line -replace '(^|\s)#.*$', ''
+            if ($code -match ('"[^"]*' + $accentClass + '[^"]*"')) {
+                $frenchHits += "$($file.Name):$lineNum"
+            }
+        }
+    }
+if ($frenchHits) {
+    throw "Chaines UI non anglaises (accents) : $($frenchHits -join ', ')"
+}
+$configFrench = @()
+Get-ChildItem -LiteralPath (Join-Path $workspace "config") -Filter "*.json" -Recurse |
+    ForEach-Object {
+        $file = $_
+        $lineNum = 0
+        foreach ($line in (Get-Content -Encoding UTF8 -LiteralPath $file.FullName)) {
+            $lineNum++
+            if ($line -match '"(name|label|description|title|subtitle)"\s*:' -and $line -match $accentClass) {
+                $configFrench += "$($file.Name):$lineNum"
+            }
+        }
+    }
+if ($configFrench) {
+    throw "Champs config joueur non anglais (accents) : $($configFrench -join ', ')"
+}
+
 [pscustomobject]@{
     TouchInputs = $touchInputs
     DismissibleModals = $dismissibleModals
@@ -119,5 +158,6 @@ if ($staleImports) {
     PetsRuntimeHits = 0
     AssetsTotalMB = $totalMB
     AssetTextures = @($textures).Count
+    EnglishUiStrings = $true
 } | Format-List
 Write-Host "MOBILE_UX_CHECK_OK" -ForegroundColor Green

@@ -72,7 +72,7 @@ func _apply_background() -> void:
 func _build() -> void:
 	var districts := Config.districts()
 	if districts.is_empty():
-		add_child(Ui.label("AUCUN DISTRICT CONFIGURÉ", 20, Ui.DANGER))
+		add_child(Ui.label("NO DISTRICT CONFIGURED", 20, Ui.DANGER))
 		return
 	var body := Ui.screen_body()
 	_hero_holder = VBoxContainer.new()
@@ -87,7 +87,7 @@ func _build() -> void:
 	credits_panel.add_child(_credits)
 	credits_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	stats.add_child(credits_panel)
-	var spin_button := Ui.button("RETOUR SPIN", Ui.NEON_CYAN, true)
+	var spin_button := Ui.button("BACK TO SPIN", Ui.NEON_CYAN, true)
 	spin_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	spin_button.pressed.connect(func() -> void: navigate_requested.emit("spin"))
 	stats.add_child(spin_button)
@@ -126,7 +126,7 @@ func _rebuild_hero() -> void:
 		HERO_ART,
 		kicker,
 		str(_district.get("name", "Neon Slums")),
-		"Améliore chaque bâtiment et rallume la ville.",
+		"Upgrade every building and light the city back up.",
 		Ui.NEON_CYAN
 	))
 
@@ -182,7 +182,7 @@ func _element_card(element: Dictionary, current: int, max_level: int) -> PanelCo
 	var name := Ui.label(str(element.get("name", "Structure")), 18, Ui.TEXT)
 	name.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	text.add_child(name)
-	var levels := Ui.label("NIVEAU %d / %d   %s" % [current, max_level, "◆".repeat(current) + "◇".repeat(maxi(0, max_level-current))], 12, Ui.NEON_CYAN)
+	var levels := Ui.label("LEVEL %d / %d   %s" % [current, max_level, "◆".repeat(current) + "◇".repeat(maxi(0, max_level-current))], 12, Ui.NEON_CYAN)
 	levels.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	text.add_child(levels)
 	if damaged:

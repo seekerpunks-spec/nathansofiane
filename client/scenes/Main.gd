@@ -179,7 +179,7 @@ func _on_nav_pressed(tab: String) -> void:
 	_open_tab(tab)
 
 func _boot() -> void:
-	_loading("CHARGEMENT…")
+	_loading("LOADING…")
 	var ok := await Config.load_remote()
 	if not ok:
 		_show_network_error()
@@ -220,12 +220,12 @@ func _show_network_error() -> void:
 	box.add_theme_constant_override("separation", 24)
 	box.custom_minimum_size = Vector2(0, 0)
 
-	var title := Ui.label("HORS LIGNE", 34, Ui.NEON_MAGENTA)
-	var msg := Ui.label("Serveur CyberSeeker injoignable.\nVérifie ta connexion et réessaie.", 18, Ui.TEXT_DIM)
+	var title := Ui.label("OFFLINE", 34, Ui.NEON_MAGENTA)
+	var msg := Ui.label("CyberSeeker server unreachable.\nCheck your connection and try again.", 18, Ui.TEXT_DIM)
 	msg.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 
 	var retry := Button.new()
-	retry.text = "RÉESSAYER"
+	retry.text = "RETRY"
 	retry.custom_minimum_size = Vector2(0, 64)
 	retry.pressed.connect(_on_retry)
 

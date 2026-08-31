@@ -8,7 +8,7 @@ var _busy := false
 
 func _ready() -> void:
 	var body := Ui.screen_body()
-	body.add_child(Ui.hero_card("res://assets/generated/api_gpt/heroes/missions_hero.webp", "DAILY REWARDS", "Missions", "Joue, progresse et récupère tes récompenses.", Ui.NEON_CYAN))
+	body.add_child(Ui.hero_card("res://assets/generated/api_gpt/heroes/missions_hero.webp", "DAILY REWARDS", "Missions", "Play, progress and stack your rewards.", Ui.NEON_CYAN))
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -33,11 +33,11 @@ func _refresh() -> void:
 		return
 	for child in _content.get_children():
 		child.queue_free()
-	_content.add_child(Ui.section_title("SIGNAL QUOTIDIEN", Ui.GOLD))
+	_content.add_child(Ui.section_title("DAILY SIGNAL", Ui.GOLD))
 	var daily := Ui.panel()
 	var daily_box := VBoxContainer.new()
-	daily_box.add_child(Ui.label("SÉRIE ACTUELLE  %d JOURS" % int(Store.state.get("dailyStreak", 0)), 18, Ui.TEXT))
-	var daily_btn := Ui.button("RÉCLAMER LE BONUS", Ui.GOLD)
+	daily_box.add_child(Ui.label("CURRENT STREAK  %d DAYS" % int(Store.state.get("dailyStreak", 0)), 18, Ui.TEXT))
+	var daily_btn := Ui.button("CLAIM BONUS", Ui.GOLD)
 	daily_btn.disabled = _busy or not bool(Store.state.get("dailyAvailable", true))
 	daily_btn.pressed.connect(_claim_daily)
 	daily_box.add_child(daily_btn)
@@ -47,15 +47,15 @@ func _refresh() -> void:
 	var bonus_panel := Ui.panel(Ui.PANEL_HI, Ui.NEON_CYAN)
 	var bonus_box := VBoxContainer.new()
 	bonus_box.add_child(Ui.label(str(bonus.get("name", "SIGNAL CACHE")).to_upper(), 18, Ui.NEON_CYAN))
-	bonus_box.add_child(Ui.label("Un signal gratuit par jour • récompense tirée côté serveur", 12, Ui.TEXT_DIM))
-	var bonus_btn := Ui.button("OUVRIR LE SIGNAL CACHE", Ui.NEON_CYAN)
+	bonus_box.add_child(Ui.label("One free signal per day • reward drawn server-side", 12, Ui.TEXT_DIM))
+	var bonus_btn := Ui.button("OPEN SIGNAL CACHE", Ui.NEON_CYAN)
 	bonus_btn.disabled = _busy or not bool(bonus.get("available", false))
 	bonus_btn.pressed.connect(_claim_daily_bonus)
 	bonus_box.add_child(bonus_btn)
 	bonus_panel.add_child(bonus_box)
 	_content.add_child(bonus_panel)
 
-	_content.add_child(Ui.section_title("MISSIONS DU JOUR", Ui.NEON_CYAN))
+	_content.add_child(Ui.section_title("DAILY MISSIONS", Ui.NEON_CYAN))
 	var reveal_index := 0
 	for mission in Store.state.get("missions", []):
 		if typeof(mission) == TYPE_DICTIONARY:
@@ -64,7 +64,7 @@ func _refresh() -> void:
 			Ui.reveal(card, reveal_index * 0.05)
 			reveal_index += 1
 
-	_content.add_child(Ui.section_title("CONTRATS PERMANENTS", Ui.GOLD))
+	_content.add_child(Ui.section_title("STANDING CONTRACTS", Ui.GOLD))
 	for achievement in Store.state.get("achievements", []):
 		if typeof(achievement) == TYPE_DICTIONARY:
 			var card := _achievement_card(achievement)
@@ -81,11 +81,11 @@ func _refresh() -> void:
 				var pool_box := VBoxContainer.new()
 				pool_box.add_child(Ui.label(str(pool.get("poolId", "POOL")).to_upper(), 17, Ui.GOLD))
 				pool_box.add_child(Ui.label("Pending %s • minimum %s" % [Ui.compact(int(pool.get("pendingU64", 0))), Ui.compact(int(pool.get("minClaimU64", 0)))], 13, Ui.TEXT_DIM))
-				pool_box.add_child(Ui.label("Provider requis" if not bool(pool.get("claimable", false)) else "Claim disponible", 12, Ui.TEXT_DIM))
+				pool_box.add_child(Ui.label("Provider required" if not bool(pool.get("claimable", false)) else "Claim available", 12, Ui.TEXT_DIM))
 				pool_panel.add_child(pool_box)
 				_content.add_child(pool_panel)
 
-	_content.add_child(Ui.section_title("ÉVÉNEMENT ACTIF", Ui.NEON_MAGENTA))
+	_content.add_child(Ui.section_title("LIVE EVENT", Ui.NEON_MAGENTA))
 	for event in Store.state.get("events", []):
 		if typeof(event) == TYPE_DICTIONARY:
 			var card := _event_card(event)
@@ -95,7 +95,7 @@ func _refresh() -> void:
 
 	var team_events: Array = Store.state.get("teamEvents", [])
 	if not team_events.is_empty():
-		_content.add_child(Ui.section_title("ÉVÉNEMENT D'ÉQUIPE", Ui.NEON_CYAN))
+		_content.add_child(Ui.section_title("CREW EVENT", Ui.NEON_CYAN))
 		for event in team_events:
 			if typeof(event) == TYPE_DICTIONARY:
 				var card := _team_event_card(event)
@@ -111,7 +111,7 @@ func _refresh() -> void:
 			Ui.reveal(card, reveal_index * 0.05)
 			reveal_index += 1
 
-	_content.add_child(Ui.section_title("ACCESSIBILITÉ", Ui.TEXT_DIM))
+	_content.add_child(Ui.section_title("ACCESSIBILITY", Ui.TEXT_DIM))
 	_content.add_child(_settings_card())
 
 func _mission_card(mission: Dictionary) -> PanelContainer:
@@ -130,7 +130,7 @@ func _mission_card(mission: Dictionary) -> PanelContainer:
 	bar.value = clampf(float(progress) / float(maxi(1, target)) * 100.0, 0.0, 100.0)
 	box.add_child(bar)
 	var reward: Dictionary = mission.get("reward", {})
-	var claim := Ui.button("RÉCLAMER  " + Ui.reward_text(reward), Ui.NEON_CYAN, progress < target)
+	var claim := Ui.button("CLAIM  " + Ui.reward_text(reward), Ui.NEON_CYAN, progress < target)
 	claim.disabled = _busy or progress < target or bool(mission.get("claimed", false))
 	claim.pressed.connect(_claim_mission.bind(str(mission.get("missionId", ""))))
 	box.add_child(claim)
@@ -156,7 +156,7 @@ func _achievement_card(achievement: Dictionary) -> PanelContainer:
 	var reward: Dictionary = achievement.get("reward", {})
 	var reward_text := Ui.reward_text(reward)
 	var claimed := bool(achievement.get("claimed", false))
-	var claim := Ui.button("RÉCUPÉRÉ" if claimed else "RÉCLAMER  " + reward_text, Ui.GOLD, true)
+	var claim := Ui.button("CLAIMED" if claimed else "CLAIM  " + reward_text, Ui.GOLD, true)
 	claim.disabled = _busy or claimed or progress < target
 	claim.pressed.connect(_claim_achievement.bind(str(achievement.get("achievementId", ""))))
 	box.add_child(claim)
@@ -169,7 +169,7 @@ func _event_card(event: Dictionary) -> PanelContainer:
 	box.add_theme_constant_override("separation", 8)
 	var title := str(event.get("name", "Event"))
 	if bool(event.get("recurring", false)):
-		title += "  •  VAGUE %d" % (int(event.get("occurrence", 0)) + 1)
+		title += "  •  WAVE %d" % (int(event.get("occurrence", 0)) + 1)
 	box.add_child(Ui.label(title, 21, Ui.NEON_MAGENTA))
 	var now := Store.now_ms()
 	var starts := int(event.get("startsAtMs", 0))
@@ -177,11 +177,11 @@ func _event_card(event: Dictionary) -> PanelContainer:
 	var points := int(event.get("points", 0))
 	var upcoming := starts > now
 	if upcoming:
-		box.add_child(Ui.label("PROCHAINE VAGUE DANS %s" % Ui.mmss_long(starts - now), 14, Ui.TEXT_DIM))
+		box.add_child(Ui.label("NEXT WAVE IN %s" % Ui.mmss_long(starts - now), 14, Ui.TEXT_DIM))
 	elif remain > 0:
-		box.add_child(Ui.label("%s RESTANT  •  %s POINTS" % [Ui.mmss_long(remain), Ui.compact(points)], 14, Ui.TEXT_DIM))
+		box.add_child(Ui.label("%s LEFT  •  %s POINTS" % [Ui.mmss_long(remain), Ui.compact(points)], 14, Ui.TEXT_DIM))
 	else:
-		box.add_child(Ui.label("VAGUE TERMINÉE  •  %s POINTS" % Ui.compact(points), 14, Ui.TEXT_DIM))
+		box.add_child(Ui.label("WAVE COMPLETE  •  %s POINTS" % Ui.compact(points), 14, Ui.TEXT_DIM))
 	for milestone in event.get("milestones", []):
 		if typeof(milestone) != TYPE_DICTIONARY:
 			continue
@@ -193,9 +193,9 @@ func _event_card(event: Dictionary) -> PanelContainer:
 		progress.value = clampf(float(points) / float(maxi(1, target)) * 100.0, 0.0, 100.0)
 		box.add_child(progress)
 		var reward_text := Ui.reward_text(reward)
-		var claim_text := "PALIER %s  •  %s" % [Ui.compact(target), reward_text]
+		var claim_text := "TIER %s  •  %s" % [Ui.compact(target), reward_text]
 		if claimed:
-			claim_text = "RÉCUPÉRÉ  •  " + reward_text
+			claim_text = "CLAIMED  •  " + reward_text
 		elif auto_claim:
 			claim_text = "AUTO  •  " + claim_text
 		var claim := Ui.button(claim_text, Ui.GOLD, true)
@@ -205,7 +205,7 @@ func _event_card(event: Dictionary) -> PanelContainer:
 		))
 		box.add_child(claim)
 	if not upcoming:
-		var leaderboard := Ui.button("VOIR LE CLASSEMENT", Ui.NEON_MAGENTA, true)
+		var leaderboard := Ui.button("VIEW LEADERBOARD", Ui.NEON_MAGENTA, true)
 		leaderboard.pressed.connect(_show_leaderboard.bind(str(event.get("eventId", ""))))
 		box.add_child(leaderboard)
 	# Récompense de rang : matérialisée par le serveur à la fin de la vague,
@@ -224,7 +224,7 @@ func _event_card(event: Dictionary) -> PanelContainer:
 			finish.pressed.connect(_claim_event_finish.bind(str(event.get("eventId", ""))))
 			box.add_child(finish)
 	elif remain <= 0 and not upcoming and points > 0 and not bool(event.get("rewardClaimed", false)):
-		box.add_child(Ui.label("CALCUL DES RANGS EN COURS…", 13, Ui.TEXT_DIM))
+		box.add_child(Ui.label("RANKING IN PROGRESS…", 13, Ui.TEXT_DIM))
 	panel.add_child(box)
 	return panel
 
@@ -233,13 +233,13 @@ func _team_event_card(event: Dictionary) -> PanelContainer:
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 8)
 	box.add_child(Ui.label(str(event.get("name", "Crew Event")), 21, Ui.NEON_CYAN))
-	box.add_child(Ui.label(str(event.get("teamName", "ÉQUIPE")).to_upper(), 13, Ui.TEXT_DIM))
+	box.add_child(Ui.label(str(event.get("teamName", "CREW")).to_upper(), 13, Ui.TEXT_DIM))
 	var remain := int(event.get("endsAtMs", 0)) - Store.now_ms()
 	var team_points := int(event.get("teamPoints", 0))
 	var contribution := int(event.get("contributionPoints", 0))
 	var minimum := int(event.get("minContributionPoints", 0))
 	box.add_child(Ui.label(
-		"%s RESTANT  •  ÉQUIPE %s  •  TOI %s/%s" % [
+		"%s LEFT  •  CREW %s  •  YOU %s/%s" % [
 			Ui.mmss_long(remain), Ui.compact(team_points), Ui.compact(contribution), Ui.compact(minimum)
 		], 13, Ui.TEXT_DIM
 	))
@@ -253,11 +253,11 @@ func _team_event_card(event: Dictionary) -> PanelContainer:
 		progress.value = clampf(float(team_points) / float(maxi(1, target)) * 100.0, 0.0, 100.0)
 		box.add_child(progress)
 		var reward_text := Ui.reward_text(reward)
-		var claim_text := "ÉQUIPE %s  •  %s" % [Ui.compact(target), reward_text]
+		var claim_text := "CREW %s  •  %s" % [Ui.compact(target), reward_text]
 		if contribution < minimum:
-			claim_text = "CONTRIBUE %s  •  %s" % [Ui.compact(minimum), reward_text]
+			claim_text = "CONTRIBUTE %s  •  %s" % [Ui.compact(minimum), reward_text]
 		elif claimed:
-			claim_text = "RÉCUPÉRÉ  •  " + reward_text
+			claim_text = "CLAIMED  •  " + reward_text
 		var claim := Ui.button(claim_text, Ui.NEON_CYAN, true)
 		claim.disabled = _busy or claimed or team_points < target or contribution < minimum
 		claim.pressed.connect(_claim_team_event_milestone.bind(
@@ -277,9 +277,9 @@ func _season_card(season: Dictionary) -> PanelContainer:
 	var remain := int(season.get("endsAtMs", 0)) - Store.now_ms()
 	var status := "PREMIUM" if premium else "FREE"
 	if remain > 0:
-		box.add_child(Ui.label("%s POINTS  •  %s  •  FIN DANS %s" % [Ui.compact(points), status, Ui.mmss_long(remain)], 13, Ui.TEXT_DIM))
+		box.add_child(Ui.label("%s POINTS  •  %s  •  ENDS IN %s" % [Ui.compact(points), status, Ui.mmss_long(remain)], 13, Ui.TEXT_DIM))
 	else:
-		box.add_child(Ui.label("%s POINTS  •  %s  •  SAISON TERMINÉE" % [Ui.compact(points), status], 13, Ui.TEXT_DIM))
+		box.add_child(Ui.label("%s POINTS  •  %s  •  SEASON OVER" % [Ui.compact(points), status], 13, Ui.TEXT_DIM))
 	# Paliers envoyés par /state (source serveur) ; la config embarquée reste
 	# le repli hors-ligne.
 	var tiers: Array = season.get("tiers", [])
@@ -295,7 +295,7 @@ func _season_card(season: Dictionary) -> PanelContainer:
 		var tier_points := int(tier.get("points", 0))
 		var reached := points >= tier_points
 		var free_reward: Dictionary = tier.get("freeReward", {})
-		var free_btn := Ui.button("PALIER %s  •  %s" % [Ui.compact(tier_points), Ui.reward_text(free_reward)], Ui.GOLD, true)
+		var free_btn := Ui.button("TIER %s  •  %s" % [Ui.compact(tier_points), Ui.reward_text(free_reward)], Ui.GOLD, true)
 		free_btn.disabled = _busy or not reached or free_claimed.has(i)
 		free_btn.pressed.connect(_claim_season.bind(season_id, i, false))
 		box.add_child(free_btn)
@@ -303,7 +303,7 @@ func _season_card(season: Dictionary) -> PanelContainer:
 		if typeof(premium_reward) == TYPE_DICTIONARY:
 			var premium_text := "PREMIUM %s  •  %s" % [Ui.compact(tier_points), Ui.reward_text(premium_reward)]
 			if not premium:
-				premium_text = "PREMIUM VERROUILLÉ  •  " + Ui.reward_text(premium_reward)
+				premium_text = "PREMIUM LOCKED  •  " + Ui.reward_text(premium_reward)
 			var premium_btn := Ui.button(premium_text, Ui.NEON_MAGENTA, true)
 			premium_btn.disabled = _busy or not premium or not reached or paid_claimed.has(i)
 			premium_btn.pressed.connect(_claim_season.bind(season_id, i, true))
@@ -314,7 +314,7 @@ func _season_card(season: Dictionary) -> PanelContainer:
 func _settings_card() -> PanelContainer:
 	var panel := Ui.panel()
 	var box := VBoxContainer.new()
-	for data in [["SONS", "sound_enabled"], ["VIBRATIONS", "haptics_enabled"], ["RÉDUIRE LES ANIMATIONS", "reduced_motion"]]:
+	for data in [["SOUND", "sound_enabled"], ["HAPTICS", "haptics_enabled"], ["REDUCE MOTION", "reduced_motion"]]:
 		var toggle := CheckButton.new()
 		toggle.custom_minimum_size.y = 52
 		toggle.text = data[0]
@@ -443,8 +443,8 @@ func _show_leaderboard(event_id: String) -> void:
 		box.add_child(Ui.label("#%d   %s   %s" % [int(row.get("rank", 0)), str(row.get("displayName", "Runner")), Ui.compact(int(row.get("points", 0)))], 14, Ui.TEXT))
 	var me: Dictionary = response.data.get("player", {})
 	var my_rank := int(me.get("rank", 0))
-	box.add_child(Ui.label("TON RANG  %s  •  %s PTS" % ["#%d" % my_rank if my_rank > 0 else "--", Ui.compact(int(me.get("points", 0)))], 16, Ui.GOLD))
-	var close := Ui.button("FERMER", Ui.NEON_MAGENTA)
+	box.add_child(Ui.label("YOUR RANK  %s  •  %s PTS" % ["#%d" % my_rank if my_rank > 0 else "--", Ui.compact(int(me.get("points", 0)))], 16, Ui.GOLD))
+	var close := Ui.button("CLOSE", Ui.NEON_MAGENTA)
 	close.pressed.connect(overlay.queue_free)
 	box.add_child(close)
 	center.add_child(box)

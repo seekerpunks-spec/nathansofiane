@@ -11,6 +11,6 @@
     { "id": "firewall",       "type": "shield",  "tier": "uncommon",  "weight": 500,  "label": "FIREWALL" },
     { "id": "basic_cache",    "type": "chest",   "tier": "uncommon",  "weight": 250,  "rewardId": "basic", "label": "CACHE DROP" },
     { "id": "signal_card",    "type": "card",    "tier": "rare",      "weight": 150,  "label": "CARD SIGNAL" },
-    { "id": "glitch",         "type": "none",    "tier": "common",    "weight": 940,  "label": "GLITCH — aucun gain" }
+    { "id": "glitch",         "type": "none",    "tier": "common",    "weight": 940,  "label": "GLITCH — no payout" }
   ]
 }

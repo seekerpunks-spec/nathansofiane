@@ -58,21 +58,21 @@ func _build() -> void:
 	chapter.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	root.add_child(chapter)
 
-	var sub := Ui.label("Fais tourner le slot. Rebâtis la ville.\nOuvre des caches avec BYTE.", 17, Ui.TEXT)
+	var sub := Ui.label("Spin the slot. Rebuild the city.\nCrack caches with BYTE.", 17, Ui.TEXT)
 	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	sub.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	root.add_child(sub)
 
 	var divider := Ui.separator()
 	root.add_child(divider)
-	_status = Ui.label("CONNECTE TON WALLET POUR COMMENCER", 13, Ui.NEON_CYAN)
+	_status = Ui.label("CONNECT YOUR WALLET TO START", 13, Ui.NEON_CYAN)
 	_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	root.add_child(_status)
 
 	_btn = _big_button("LET'S GO  •  CONNECT WALLET", Ui.GOLD)
 	root.add_child(_btn)
 
-	var mode_text := "MODE TEST  •  AUCUN ACHAT RÉEL" if Wallet.is_dev() else "CONNEXION SÉCURISÉE SOLANA"
+	var mode_text := "TEST MODE  •  NO REAL PURCHASES" if Wallet.is_dev() else "SECURE SOLANA CONNECTION"
 	var dev_note := Ui.label(mode_text, 11, Ui.TEXT_DIM)
 	root.add_child(dev_note)
 	panel.add_child(root)
@@ -121,33 +121,33 @@ func _connect() -> void:
 	_btn.disabled = true
 
 	# 1) Challenge → nonce.
-	_set_status("Demande d'un nonce…")
+	_set_status("Requesting nonce…")
 	var wallet_address := Wallet.address()
 	if wallet_address == "":
-		_finish_error("Wallet Seeker indisponible sur cet appareil.")
+		_finish_error("Seeker wallet unavailable on this device.")
 		return
 	var c := await Net.post("/auth/challenge", { "address": wallet_address }, false, "")
 	if not c.ok:
-		_finish_error("Réseau injoignable.")
+		_finish_error("Network unreachable.")
 		return
 
 	# 2) Signature. DEV : littérale "dev". PROD : signature Ed25519(nonce).
 	var signed := Wallet.sign_nonce(str(c.data.get("nonce", "")))
 	if not signed.get("ok", false):
-		_finish_error(str(signed.get("error", "Signature refusée.")))
+		_finish_error(str(signed.get("error", "Signature declined.")))
 		return
 	var signature := str(signed.get("signature", ""))
-	_set_status("Signature du nonce…")
+	_set_status("Signing nonce…")
 	var v := await Net.post("/auth/verify", { "address": wallet_address, "signature": signature }, false, "")
 	if not v.ok or typeof(v.data) != TYPE_DICTIONARY:
-		_finish_error("Authentification refusée.")
+		_finish_error("Authentication refused.")
 		return
 
 	# 3) Session établie + état initial.
 	Net.store_token(v.data["token"], v.data.get("refreshToken", ""))
 	Events.track("login", { "isNewPlayer": v.data.get("isNewPlayer", false) })
 
-	_set_status("Connexion établie. Chargement de ton district…")
+	_set_status("Connected. Loading your district…")
 	var st := await Net.fetch("/state")
 	if st.ok:
 		Store.apply_state(st.data)
@@ -157,7 +157,7 @@ func _connect() -> void:
 		Net.clear_session()
 		Store.reset_session()
 		Events.reset_session()
-		_finish_error("État joueur indisponible. Réessaie dans un instant.")
+		_finish_error("Player state unavailable. Try again in a moment.")
 		return
 
 	Haptics.vibrate(0.5, 40)

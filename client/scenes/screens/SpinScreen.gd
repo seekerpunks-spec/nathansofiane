@@ -358,18 +358,18 @@ func _build_no_spins() -> Control:
 	box.custom_minimum_size = Vector2(390, 0)
 	box.add_theme_constant_override("separation", 18)
 	box.add_child(Ui.label("ENERGY EMPTY!", 32, Ui.NEON_MAGENTA))
-	_no_spins_label = Ui.label("Recharge réseau en cours…", 16, Ui.TEXT_DIM)
+	_no_spins_label = Ui.label("Network recharging…", 16, Ui.TEXT_DIM)
 	_no_spins_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(_no_spins_label)
 
-	var store := Ui.button("OPTIONS DE RECHARGE", Ui.NEON_CYAN)
+	var store := Ui.button("RECHARGE OPTIONS", Ui.NEON_CYAN)
 	store.pressed.connect(func() -> void:
 		overlay.visible = false
 		navigate_requested.emit("store")
 	)
 	box.add_child(store)
 
-	var missions := Ui.button("RÉCUPÉRER DES RÉCOMPENSES", Ui.GOLD, true)
+	var missions := Ui.button("COLLECT REWARDS", Ui.GOLD, true)
 	missions.pressed.connect(func() -> void:
 		overlay.visible = false
 		navigate_requested.emit("missions")
@@ -386,7 +386,7 @@ func _process(_delta: float) -> void:
 	if _no_spins.visible:
 		var next: Variant = Store.state.get("nextSpinAtMs", null)
 		if next != null:
-			_no_spins_label.text = "Prochain signal dans " + Ui.mmss(Store.regen_remaining_ms())
+			_no_spins_label.text = "Next signal in " + Ui.mmss(Store.regen_remaining_ms())
 
 
 func _update_regen() -> void:
@@ -540,7 +540,7 @@ func _do_spin() -> void:
 		Haptics.error()
 		_status_label.text = "SIGNAL LOST"
 		_status_label.add_theme_color_override("font_color", Ui.NEON_MAGENTA)
-		_result_banner.text = "ERREUR RÉSEAU · RÉESSAIE"
+		_result_banner.text = "NETWORK ERROR · TRY AGAIN"
 		_result_banner.add_theme_color_override("font_color", Ui.NEON_MAGENTA)
 		_reset_idle_state(false)
 
@@ -790,7 +790,7 @@ func _parse_spin_error_details(data: Variant) -> Dictionary:
 
 func _show_no_spins(_next_ms: int) -> void:
 	_no_spins.visible = true
-	_no_spins_label.text = "Recharge réseau en cours…"
+	_no_spins_label.text = "Network recharging…"
 	Events.track("spins_empty")
 
 
@@ -929,7 +929,7 @@ func _resolve_attack(encounter: Dictionary, element_id: int, box: VBoxContainer)
 	else:
 		_social_busy = false
 		Sfx.error()
-		box.add_child(Ui.label("SIGNAL LOST — RÉESSAIE", 15, Ui.NEON_MAGENTA))
+		box.add_child(Ui.label("SIGNAL LOST — TRY AGAIN", 15, Ui.NEON_MAGENTA))
 
 
 func _raid_pick(encounter: Dictionary, node_index: int) -> void:

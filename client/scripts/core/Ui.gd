@@ -86,7 +86,7 @@ static func reward_text(reward: Dictionary, separator: String = "  •  ") -> St
 		parts.append("+%s CR" % compact(credits))
 	if chest_id != "":
 		parts.append("+1 " + _chest_name(chest_id).to_upper())
-	return separator.join(parts) if not parts.is_empty() else "RÉCOMPENSE"
+	return separator.join(parts) if not parts.is_empty() else "REWARD"
 
 static func _chest_name(chest_id: String) -> String:
 	for chest in Config.chests():
@@ -115,7 +115,7 @@ static func mmss_long(ms: int) -> String:
 	var days := seconds / 86400
 	var hours := (seconds % 86400) / 3600
 	var minutes := (seconds % 3600) / 60
-	return "%dj %02dh %02dm" % [days, hours, minutes] if days > 0 else "%02dh %02dm" % [hours, minutes]
+	return "%dd %02dh %02dm" % [days, hours, minutes] if days > 0 else "%02dh %02dm" % [hours, minutes]
 
 ## Panel avec bordure néon + fond.
 static func style_box(bg: Color = PANEL, border: Color = BORDER, radius: int = 18, width: int = 2) -> StyleBoxFlat:

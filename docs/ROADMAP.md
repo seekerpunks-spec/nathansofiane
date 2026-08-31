@@ -180,3 +180,18 @@
 - [x] Champ `image` mort retiré des cartes (config + `CardConfig`).
 - [x] `run_local_full_gate.ps1` exit 0 : `LOCAL_FULL_GATE_OK`, 39/39 Rust,
       12/12 PostgreSQL, contrats API et social verts, zéro résidu.
+
+## P14 — UI 100 % anglaise R32 (D12)
+
+- [x] Inventaire outillé du copy joueur (`tools/i18n_en/dump_ui_strings.py`) :
+      chaînes des `.gd` client hors commentaires/tests + champs joueur des
+      configs ; le client n'affiche jamais le `message` brut du serveur.
+- [x] 103 remplacements exacts (échec si chaîne source introuvable) : Main,
+      les 6 écrans, composants Spin, `Ui.gd` (`REWARD`, `%dd`), `Wallet.gd`,
+      7 descriptions d'achievements, label GLITCH de la spin table.
+- [x] Smoke ajusté : attente `CLAIM`, fixture achievement anglaise.
+- [x] Tripwire T37 dans `mobile_ux_check.ps1` : accents interdits dans les
+      chaînes UI client et les champs joueur des configs (× U+00D7 exclu),
+      test négatif regex vérifié.
+- [x] Hors périmètre volontaire : commentaires code, `note` de config,
+      messages d'erreur API et sorties de gate restent français (dev-facing).

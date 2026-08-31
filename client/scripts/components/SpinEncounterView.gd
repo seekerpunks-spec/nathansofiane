@@ -26,7 +26,7 @@ func show_encounter(encounter: Dictionary, banner: String = "") -> void:
 	if banner != "":
 		box.add_child(Ui.label(banner, 18, Ui.NEON_CYAN))
 	if kind == "attack":
-		box.add_child(Ui.label("Choisis le nœud à brouiller. Un Firewall adverse peut absorber l'impulsion.", 14, Ui.TEXT))
+		box.add_child(Ui.label("Pick a node to jam. A rival Firewall can absorb the pulse.", 14, Ui.TEXT))
 		var choices: Array = encounter.get("choices", [])
 		for element_id in choices:
 			var attack := Ui.button("JAM NODE %d" % int(element_id), Ui.NEON_MAGENTA)
@@ -35,7 +35,7 @@ func show_encounter(encounter: Dictionary, banner: String = "") -> void:
 	else:
 		var unbanked := int(encounter.get("unbankedCredits", 0))
 		box.add_child(Ui.label("UNBANKED  •  %s CR" % Ui.compact(unbanked), 19, Ui.GOLD))
-		box.add_child(Ui.label("Chaque cache augmente le butin. Une TRACE détruit tout le non-encaissé.", 14, Ui.TEXT))
+		box.add_child(Ui.label("Each cache grows the haul. A TRACE wipes everything unbanked.", 14, Ui.TEXT))
 		var grid := GridContainer.new()
 		grid.columns = 3
 		var picked: Array = encounter.get("picked", [])
@@ -49,7 +49,7 @@ func show_encounter(encounter: Dictionary, banner: String = "") -> void:
 			var cashout := Ui.button("CASH OUT  %s CR" % Ui.compact(unbanked), Ui.GOLD)
 			cashout.pressed.connect(host._raid_cashout.bind(encounter, box))
 			box.add_child(cashout)
-	var later := Ui.button("REVENIR PLUS TARD", Ui.TEXT_DIM, true)
+	var later := Ui.button("COME BACK LATER", Ui.TEXT_DIM, true)
 	later.pressed.connect(host._clear_social_overlay)
 	box.add_child(later)
 	panel.add_child(box)
