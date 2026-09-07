@@ -15,7 +15,7 @@ câblée**. Attente oui/non user.
 
 MASTER TODO local fermé : cadeau ami quotidien, chat rapide crew et entraide
 spins ajoutés. Challenge auth lié au domaine, confidentialité export/delete,
-rétentions configurables et workflow CI GitHub (exécution distante à confirmer).
+rétentions configurables et workflow CI GitHub validé sur Linux.
 22 modules Rust, 23 migrations.
 
 Revue du 07/09 : access JWT lié à sa session (invalide après recréation),
@@ -29,7 +29,8 @@ dans le contrôle i18n (corrigé), et RustSec RUSTSEC-2023-0071 via RSA/SQLx 0.8
 SQLx migré en 0.9 (Rust >=1.94), RSA retirée du lockfile ; audit local sans
 alerte ni exclusion, Clippy strict et 44 tests verts sur les migrations existantes.
 Les requêtes SQL assemblées à partir de constantes deviennent des littéraux.
-Checkout GitHub actualisé ; nouvelle exécution Linux à confirmer.
+Checkout GitHub actualisé. Deux jobs distants verts sur `c057320` :
+[full-gate et dependency-audit](https://github.com/seekerpunks-spec/nathansofiane/actions/runs/34076666433).
 
 ## Validation
 

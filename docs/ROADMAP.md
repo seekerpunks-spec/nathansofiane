@@ -272,6 +272,7 @@
       don de spins conservatif ; contrats HTTP négatifs et de rejeu inclus.
 - [x] Workflow CI GitHub Linux versionné : PostgreSQL 16, Rustfmt, Clippy strict,
       44 tests Rust, contrats API/social, smoke Godot et audit RustSec.
-- [ ] Première exécution distante des deux jobs à confirmer après push.
+- [x] Deux jobs distants validés le 07/09 sur `c057320`, run `34076666433`.
+      SQLx 0.9 sans RSA optionnelle, contrôle i18n Windows/Linux corrigé.
 - [x] Version logique `0.4.0-r41` / code 19 ; aucun APK/AAB construit.
 - [ ] Dépendances externes et QA appareil listées dans la checklist release.

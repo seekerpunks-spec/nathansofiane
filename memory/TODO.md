@@ -82,7 +82,8 @@
 - [x] **Review R41** : nonce validé avant consommation, sessions invalides après
       recréation, export sans wallets tiers, dons/regen/reliquat, demandes ouvertes,
       contrôle d'appartenance et rejeu concurrent après complétion.
-- [ ] **CI distante R41** : confirmer les deux jobs après push.
+- [x] **CI distante R41** : `full-gate` et `dependency-audit` verts sur `c057320`,
+      run GitHub `34076666433` (07/09/2026).
 - [x] **Corrections première CI** : chemins Linux i18n, SQLx 0.9 sans RSA,
       audit RustSec local vierge sans exception, export testé après combats/trade.
 - [ ] **DA skyline jour jouet** : frame 1 générée (monde vide 9:16,
