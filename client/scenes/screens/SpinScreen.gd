@@ -834,6 +834,22 @@ func _network_friend_action(path: String, player_id: String, event_name: String)
 	await _network_actions.friend_action(path, player_id, event_name)
 
 
+func _network_friend_gift(player_id: String) -> void:
+	await _network_actions.friend_gift(player_id)
+
+
+func _network_team_quick_message(phrase_id: String) -> void:
+	await _network_actions.team_quick_message(phrase_id)
+
+
+func _network_team_help_request() -> void:
+	await _network_actions.team_help_request()
+
+
+func _network_team_help_donate(help_id: String) -> void:
+	await _network_actions.team_help_donate(help_id)
+
+
 func _network_select_target(player_id: String, source: String) -> void:
 	await _network_actions.select_target(player_id, source)
 

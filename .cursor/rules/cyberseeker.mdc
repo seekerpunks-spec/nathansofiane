@@ -33,15 +33,15 @@ Hiérarchie de vérité : `server/src/*.rs` = contrat API définitif > `docs/` (
 6. **GDScript 4** : pas de méthode nommée `get()` (collision `Object.get`, warning = erreur) ; une `const` doit être une expression constante (pas d'appel de fonction) ; pas de variable et fonction au même nom.
 7. **Mémorisation (T14)** : tout changement significatif → mise à jour du/des `memory/*.md` dans la même session, condensé.
 
-## État actuel (R39 — 01/09/2026)
+## État actuel (R41 ingénierie — 07/09/2026 ; visuel R39)
 - Tout le MASTER TODO gameplay est livré (spin ×1→×100K, 5 districts de lancement,
  collection, rétention, liveops, social Signal Jam/Ghost Vault, crews, trading,
- achievements, entitlements NFT et reward pool SKR fail-closed). 21 modules Rust,
- 20 migrations. Historique R26→R30 : voir `memory/CURRENT_STATE.md`.
+ achievements, entitlements NFT et reward pool SKR fail-closed). 22 modules Rust,
+ 23 migrations. État validé : voir `memory/CURRENT_STATE.md`.
 - R31 validé : hygiène d'assets (orphelins/PNG/staging hors client). Le
  plafond 5 Mo R31 est **obsolète** (T40).
-- `run_local_full_gate.ps1` (R31) : `LOCAL_FULL_GATE_OK`, 39/39 Rust,
- 12/12 PostgreSQL, contrats API et social verts.
+- `run_local_full_gate.ps1` (R41, 07/09) : `LOCAL_FULL_GATE_OK`, 44/44 Rust dont
+ 16/16 PostgreSQL, contrats API/social et smoke des 6 scènes sur 3 résolutions.
 - R32 validé (D12) : **UI joueur 100 % anglaise** — 103 remplacements dans les
  `.gd` client + configs joueur (achievements, label GLITCH), smoke sur `CLAIM`,
  tripwire accents T37 dans `mobile_ux_check.ps1` (commentaires/tests exclus,
@@ -59,9 +59,10 @@ Hiérarchie de vérité : `server/src/*.rs` = contrat API définitif > `docs/` (
 - R35 validé (T39) : écran District en **diorama village** (5 pads 2.5D).
 - R36–R39 : villages 5 districts, tap/marteau Coin Master (feel, D8),
  T40 = 0 € outils pas cap APK. R39 = netteté (MSDF, mipmaps, alpha lissé).
- Identité originale.
-- Quirks machine : le shell Cursor exige `required_permissions: ["all"]` (aucun
- backend sandbox Windows). Hôte réel = **Windows PowerShell 5.1, pas de pwsh** :
+- R40 home chrome **abandonné** (03/09/2026). Runtime = R39. Brief DA :
+ **skyline jour jouet** — frame 1 monde vide en staging, pas câblée tant
+ que l'user n'a pas dit oui. Identité originale.
+- Quirks machine : PowerShell 7 (`pwsh`) disponible. Compatibilité PS 5.1 :
  les .ps1 accentués DOIVENT garder leur BOM UTF-8, les gates leur
  `Get-Content -Encoding UTF8`, et `HttpClient` exige `Add-Type System.Net.Http`
  (réparé R31 — les gates R28-R30 tournaient sous un shell en codepage UTF-8).
@@ -77,6 +78,6 @@ uniquement quand leur lot est rouvert → APK/AAB après gate shippable. Détail
 `memory/TODO.md` + `memory/GDD.md`.
 
 ## Contrat API M1 (vérifié client↔serveur)
-`POST /spin {requestId,multiplier}` → `{outcome,multiplier,spinsSpent,baseCreditsGained,creditsGained,spins,credits,nextSpinAtMs,serverTimeMs}` ; 403 `INSUFFICIENT_SPINS` expose required/available/next. Contrats complets : `docs/API_R17.md`.
+`POST /spin {requestId,multiplier}` → `{outcome,multiplier,spinsSpent,baseCreditsGained,creditsGained,spins,credits,nextSpinAtMs,serverTimeMs}` ; 403 `INSUFFICIENT_SPINS` expose required/available/next. Contrats complets : `docs/API_R41.md`.
 
 **Règle d'or anti-triche** : le client est une VUE — il ne calcule JAMAIS RNG/soldes/probas/récompenses ; tout vient du serveur (CSPRNG `OsRng`, horloge serveur, transactions atomiques, idempotence, audit). Les valeurs économiques sont 100 % dans `config/` (PROVISIONAL, hashé au boot).

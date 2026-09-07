@@ -18,6 +18,8 @@ $rewardPoolConfig = Get-Content -Encoding UTF8 -LiteralPath (Join-Path $workspac
 $rewardPoolMigration = Get-Content -Encoding UTF8 -LiteralPath (Join-Path $workspace "server\migrations\0017_reward_pool_ledger.sql") -Raw
 $refreshMigration = Get-Content -Encoding UTF8 -LiteralPath (Join-Path $workspace "server\migrations\0018_refresh_rotation.sql") -Raw
 $invariantsMigration = Get-Content -Encoding UTF8 -LiteralPath (Join-Path $workspace "server\migrations\0019_relational_invariants.sql") -Raw
+$privacyMigration = Get-Content -Encoding UTF8 -LiteralPath (Join-Path $workspace "server\migrations\0021_privacy_controls.sql") -Raw
+$account = Get-Content -Encoding UTF8 -LiteralPath (Join-Path $server "account.rs") -Raw
 $net = Get-Content -Encoding UTF8 -LiteralPath (Join-Path $workspace "client\scripts\core\Net.gd") -Raw
 # -split (regex) est obligatoire ici : String.Split("#[cfg(test)]") resout vers la
 # surcharge char[] et tronquerait le runtime au premier caractere de l'ensemble.
@@ -33,6 +35,10 @@ if ($entitlements -notmatch 'expires_at>now\(\)') { throw "Entitlements: expirat
 if ($authRuntime -match 'HashMap|Mutex') { throw "Auth: nonce encore stocké en mémoire" }
 if ($db -notmatch 'DELETE FROM auth_nonces WHERE address=\$1' -or $db -notmatch 'RETURNING nonce') {
     throw "Auth: consommation atomique PostgreSQL du nonce absente"
+}
+if ($authRuntime -notmatch 'sign_in_message' -or $authRuntime -notmatch 'auth_domain' -or
+    $db -notmatch 'CASE WHEN auth_nonces\.expires_at<now\(\)') {
+    throw "Auth: challenge non lié au domaine/adresse ou nonce actif remplaçable"
 }
 if ($rate -match 'HashMap|Mutex' -or $rate -notmatch 'ON CONFLICT\(client_key\) DO UPDATE') {
     throw "Rate limit: compteur PostgreSQL atomique absent"
@@ -85,6 +91,17 @@ if ($engagement -match '"address"\s*:\s*address' -or
     $engagement -notmatch 'pp\.friend_code,pp\.display_name,pp\.avatar_id') {
     throw "Vie privée: leaderboard événement expose l'adresse wallet"
 }
+if ($main -notmatch 'ANALYTICS_RETENTION_DAYS' -or
+    $main -notmatch 'DELETE FROM analytics_events' -or
+    $main -notmatch 'DELETE FROM economy_audit' -or
+    $main -notmatch 'account_deletion_tombstones') {
+    throw "Vie privée: politique de rétention exécutable absente"
+}
+if ($account -notmatch 'GET /account/export' -or $account -notmatch 'POST /account/delete' -or
+    $account -notmatch 'DELETE CYBERSEEKER ACCOUNT' -or
+    $privacyMigration -notmatch 'CREATE TABLE account_deletion_tombstones') {
+    throw "Vie privée: export ou effacement idempotent absent"
+}
 
 foreach ($scope in @('event_claim:', 'season_claim:')) {
     $start = $engagement.IndexOf($scope)
@@ -109,5 +126,7 @@ foreach ($file in $mutationFiles) {
     RewardPoolFailClosed = $true
     RefreshRotation = $true
     ReleaseDevAuthBlocked = $true
+    DomainBoundChallenge = $true
+    PrivacyControls = $true
 } | Format-List
 Write-Host "SECURITY_CHECK_OK" -ForegroundColor Green

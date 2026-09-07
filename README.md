@@ -91,11 +91,14 @@ curl -s -X POST localhost:8080/spin \
 - ✅ **M4 local** — daily, missions, leaderboard, événement et saison data-driven.
 - ✅ **M5 adaptateurs** — ads/offres simulables en debug et refusées sans preuve en release.
 - ✅ **M6 local** — polish, accessibilité, analytics, tests et design cyberpunk.
-- ✅ **M7 local** — serveur release et APK Android arm64 signé/debug vérifié.
+- ✅ **M7 historique** — un APK Android arm64 debug R33 a été vérifié ; il est
+  désormais obsolète et ne constitue pas un artefact R41 publiable.
+- ✅ **M8 R41** — MASTER TODO local fermé, confidentialité/auth durcies,
+  entraide sociale et CI complète sans build Android.
 - ⬜ **Publication externe** — Wallet Adapter, providers, API HTTPS, QA Seeker et
   compte dApp Store (voir la checklist release).
 
-La refonte R17 ajoute une navigation mobile complète, six écrans validés par
+Le runtime R41 possède une navigation mobile complète, six écrans validés par
 smoke test, un design system et des assets cyberpunk originaux. Voir
 `docs/REDESIGN.md`, `docs/ROADMAP.md` et `docs/RELEASE_CHECKLIST.md`.
 
@@ -111,7 +114,7 @@ gates statiques/Rust/Godot/API/sociales, puis arrête les deux processus. Elle n
 construit aucun APK/AAB. `tools\validate_all.ps1` reste disponible pour les
 passes sans orchestration de serveurs.
 
-APK installable de validation :
+Ancien APK de validation R33 (obsolète, ne pas distribuer) :
 
 ```text
 client/build/android/CyberSeeker-debug.apk
@@ -122,5 +125,5 @@ client/build/android/CyberSeeker-debug.apk
 - Les valeurs économiques sont data-driven et contrôlées par
   `tools/economy_check.ps1`; un live tuning ultérieur ne requiert pas de modifier
   le client.
-- Les configs restent un fichier typé par famille tant que le catalogue R17 tient
+- Les configs restent un fichier typé par famille tant que le catalogue actuel tient
   dans ce format ; le serveur valide toutes les références au boot.

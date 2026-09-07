@@ -61,6 +61,9 @@
 | T38 | Juice UI via `Control.offset_transform_*` Godot 4.7 (pas `scale`/`position` dans un Container) ; rythme slot extraits dans `SpinJuice.gd` ; `reduced_motion` fail-safe | 4.7 permet d'animer sans dummy node ; extraire le slot évite de recasser le plafond 1000 lignes de SpinScreen |
 | T39 | District = diorama village (pads 2.5D, 3 arts t0/t1/t2 pour 6 niveaux, glyphes fallback, voile ≤0.12) | DA R23 « le quartier se transforme » ; une liste dashboard n'atteint pas le standard visuel visé |
 | T40 | **D6 = 0 € outils**, pas un plafond APK. Qualité (D7) gagne ; « si le jeu fait 2 Go on s'en fout » (user 31/08/2026). Ne plus recompresser l'art pour rentrer dans 5 Mo | Lecture précédente de « 0 budget » comme cap poids était fausse ; D6 n'a jamais parlé de Mo |
+| T41 | **Reset DA 03/09/2026** : Punk City / home chrome R40 abandonnes. Runtime visuel = R39. Brief en cours : skyline jour jouet. Processus : 1 frame API → oui/non → Godot. Pas de soldes peints, pas de rails | User : "rien ne me va" puis brief "skyline jour jouet" |
+| T42 | Challenge wallet canonique lié à `AUTH_DOMAIN` + adresse Base58 + nonce ; un nonce encore valide est stable. Export/delete joueur et rétentions bornées sont des contrats de production, couverts en HTTP/SQL | Ferme replay/confusion de domaine, retry de challenge et obligations minimales de confidentialité sans implémenter MWA |
+| T43 | Cadeau ami = spin gratuit créé par quota quotidien ; entraide crew = transfert de spins plafonné et conservatif ; chat = phrases allowlist uniquement | Retrouve les leviers Coin Master sans transfert libre de crédits/SKR, farming illimité ni modération de texte libre |
 
 ## Noms / brandings (à verrouiller — O1 GDD)
 - Jeu : **CyberSeeker** (provisoire, utilisé partout pour l'instant).

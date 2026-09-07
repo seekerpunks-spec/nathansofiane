@@ -642,7 +642,8 @@ Selon architecture actuelle :
 - [x] friend system si pertinent ;
 - [x] inviter/retrouver joueur ;
 - [x] voir progression ;
-- [ ] envoyer certaines ressources si design validé.
+- [x] envoyer certaines ressources : cadeau quotidien gratuit et borné entre
+      amis, sans transfert libre de crédits/SKR.
 
 Statut R24 : code ami stable, recherche bornée, demandes idempotentes,
 accept/refus/suppression, classement global, journal Signal Jam et sélection
@@ -698,8 +699,9 @@ ajouter la complexité d'un réseau social complet :
       moteur Neon Rush, avec score partagé, contribution personnelle minimale,
       milestones data-driven et claim unique par joueur même après changement
       d'équipe ;
-- [ ] chat limité — différé, modération requise ;
-- [ ] donations — non retenues à ce stade, l'échange 1-pour-1 évite les abus.
+- [x] chat limité — phrases remote-config uniquement, aucun texte libre ;
+- [x] donations — demandes de spins en crew, plafonnées, atomiques et
+      conservatrices ; aucun crédit, SKR ou cash-out.
 
 ---
 

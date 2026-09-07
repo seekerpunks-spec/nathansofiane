@@ -94,12 +94,9 @@ function Stop-OwnedProcess([System.Diagnostics.Process]$Process) {
 if (Test-TcpPort $PrimaryPort) { throw "port $PrimaryPort déjà occupé" }
 if (Test-TcpPort $SecondaryPort) { throw "port $SecondaryPort déjà occupé" }
 
-$cargo = Join-Path $env:USERPROFILE ".cargo\bin\cargo.exe"
-if (-not (Test-Path -LiteralPath $cargo)) {
-    $cargoCommand = Get-Command cargo -ErrorAction SilentlyContinue
-    if (-not $cargoCommand) { throw "cargo introuvable" }
-    $cargo = $cargoCommand.Source
-}
+$cargoCommand = Get-Command cargo -ErrorAction SilentlyContinue
+if (-not $cargoCommand) { throw "cargo introuvable" }
+$cargo = $cargoCommand.Source
 if (-not $CargoTargetDir) {
     $CargoTargetDir = if ($env:CARGO_TARGET_DIR) {
         $env:CARGO_TARGET_DIR
@@ -114,12 +111,17 @@ if (-not [System.IO.Path]::IsPathRooted($CargoTargetDir)) {
     $CargoTargetDir = Join-Path $serverDir $CargoTargetDir
 }
 $CargoTargetDir = [System.IO.Path]::GetFullPath($CargoTargetDir)
-$serverExe = Join-Path $CargoTargetDir "debug\cyberseeker-server.exe"
+$isWindowsHost = [System.Environment]::OSVersion.Platform -eq [System.PlatformID]::Win32NT
+$serverBinary = if ($isWindowsHost) { "cyberseeker-server.exe" } else { "cyberseeker-server" }
+$serverExe = Join-Path (Join-Path $CargoTargetDir "debug") $serverBinary
 
 $environmentNames = @(
-    "CARGO_TARGET_DIR", "DATABASE_URL", "JWT_SECRET", "DEV_AUTH",
+    "CARGO_TARGET_DIR", "DATABASE_URL", "JWT_SECRET", "AUTH_DOMAIN", "DEV_AUTH",
     "DEV_ADDRESS", "PORT", "CONFIG_DIR", "RATE_LIMIT_PER_MINUTE", "RUST_LOG",
-    "CYBERSEEKER_TEST_DATABASE_URL", "CYBERSEEKER_ALLOW_DB_TEST_SKIP"
+    "CYBERSEEKER_TEST_DATABASE_URL", "CYBERSEEKER_ALLOW_DB_TEST_SKIP",
+    "ANALYTICS_RETENTION_DAYS", "ECONOMY_AUDIT_RETENTION_DAYS",
+    "LIVEOPS_ARCHIVE_RETENTION_DAYS", "DELETION_PROOF_RETENTION_DAYS",
+    "TEAM_ACTIVITY_RETENTION_DAYS"
 )
 $savedEnvironment = @{}
 foreach ($name in $environmentNames) {
@@ -142,6 +144,7 @@ try {
     $sharedEnvironment = @{
         DATABASE_URL = $TestDatabaseUrl
         JWT_SECRET = $jwtSecret
+        AUTH_DOMAIN = "cyberseeker.local"
         DEV_AUTH = "true"
         CONFIG_DIR = $configDir
         RATE_LIMIT_PER_MINUTE = "1000"
@@ -151,15 +154,27 @@ try {
 
     [Environment]::SetEnvironmentVariable("PORT", [string]$PrimaryPort, "Process")
     [Environment]::SetEnvironmentVariable("DEV_ADDRESS", $alphaAddress, "Process")
-    $primaryProcess = Start-Process -FilePath $serverExe -WorkingDirectory $serverDir `
-        -WindowStyle Hidden -RedirectStandardOutput $primaryOut `
-        -RedirectStandardError $primaryErr -PassThru
+    $primaryStart = @{
+        FilePath = $serverExe
+        WorkingDirectory = $serverDir
+        RedirectStandardOutput = $primaryOut
+        RedirectStandardError = $primaryErr
+        PassThru = $true
+    }
+    if ($isWindowsHost) { $primaryStart["WindowStyle"] = "Hidden" }
+    $primaryProcess = Start-Process @primaryStart
 
     [Environment]::SetEnvironmentVariable("PORT", [string]$SecondaryPort, "Process")
     [Environment]::SetEnvironmentVariable("DEV_ADDRESS", $betaAddress, "Process")
-    $secondaryProcess = Start-Process -FilePath $serverExe -WorkingDirectory $serverDir `
-        -WindowStyle Hidden -RedirectStandardOutput $secondaryOut `
-        -RedirectStandardError $secondaryErr -PassThru
+    $secondaryStart = @{
+        FilePath = $serverExe
+        WorkingDirectory = $serverDir
+        RedirectStandardOutput = $secondaryOut
+        RedirectStandardError = $secondaryErr
+        PassThru = $true
+    }
+    if ($isWindowsHost) { $secondaryStart["WindowStyle"] = "Hidden" }
+    $secondaryProcess = Start-Process @secondaryStart
 
     Wait-Ready $primaryProcess $primaryBaseUrl $primaryErr "instance primaire"
     Wait-Ready $secondaryProcess $secondaryBaseUrl $secondaryErr "instance secondaire"

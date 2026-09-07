@@ -121,10 +121,25 @@ pub struct SocialConfig {
     pub encounter_ttl_ms: u64,
     pub target_preference_ttl_ms: u64,
     pub revenge_window_ms: u64,
+    pub friend_gifts: FriendGiftConfig,
     pub teams: TeamConfig,
     pub trading: TradingConfig,
     pub attack: AttackConfig,
     pub raid: RaidConfig,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FriendGiftConfig {
+    pub reward_spins: u32,
+    pub max_sent_per_day: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct QuickChatPhrase {
+    pub id: String,
+    pub label: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -134,6 +149,12 @@ pub struct TeamConfig {
     pub create_cost_credits: u64,
     pub search_limit: u32,
     pub leaderboard_limit: u32,
+    pub quick_chat_phrases: Vec<QuickChatPhrase>,
+    pub chat_history_limit: u32,
+    pub donation_request_spins: u32,
+    pub donation_max_per_member: u32,
+    pub donation_request_cooldown_ms: u64,
+    pub donation_request_ttl_ms: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1193,6 +1214,10 @@ impl RemoteConfig {
             || self.social.target_preference_ttl_ms > 604_800_000
             || self.social.revenge_window_ms < 3_600_000
             || self.social.revenge_window_ms > 2_592_000_000
+            || self.social.friend_gifts.reward_spins == 0
+            || self.social.friend_gifts.reward_spins > 100
+            || self.social.friend_gifts.max_sent_per_day == 0
+            || self.social.friend_gifts.max_sent_per_day > 100
             || self.social.teams.max_members < 2
             || self.social.teams.max_members > 100
             || self.social.teams.create_cost_credits > i64::MAX as u64
@@ -1200,6 +1225,39 @@ impl RemoteConfig {
             || self.social.teams.search_limit > 50
             || self.social.teams.leaderboard_limit == 0
             || self.social.teams.leaderboard_limit > 100
+            || self.social.teams.quick_chat_phrases.is_empty()
+            || self.social.teams.quick_chat_phrases.len() > 12
+            || self.social.teams.quick_chat_phrases.iter().any(|phrase| {
+                phrase.id.is_empty()
+                    || phrase.id.len() > 32
+                    || !phrase.id.bytes().all(|byte| {
+                        byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'_'
+                    })
+                    || phrase.label.trim().is_empty()
+                    || phrase.label.chars().count() > 48
+                    || phrase.label.chars().any(char::is_control)
+            })
+            || self
+                .social
+                .teams
+                .quick_chat_phrases
+                .iter()
+                .enumerate()
+                .any(|(index, phrase)| {
+                    self.social.teams.quick_chat_phrases[index + 1..]
+                        .iter()
+                        .any(|other| other.id == phrase.id)
+                })
+            || self.social.teams.chat_history_limit == 0
+            || self.social.teams.chat_history_limit > 100
+            || self.social.teams.donation_request_spins == 0
+            || self.social.teams.donation_request_spins > 100
+            || self.social.teams.donation_max_per_member == 0
+            || self.social.teams.donation_max_per_member > self.social.teams.donation_request_spins
+            || self.social.teams.donation_request_cooldown_ms < 60_000
+            || self.social.teams.donation_request_cooldown_ms > 604_800_000
+            || self.social.teams.donation_request_ttl_ms < 60_000
+            || self.social.teams.donation_request_ttl_ms > 604_800_000
             || self.social.trading.offer_ttl_ms < 60_000
             || self.social.trading.offer_ttl_ms > 604_800_000
             || self.social.trading.max_pending_per_player == 0

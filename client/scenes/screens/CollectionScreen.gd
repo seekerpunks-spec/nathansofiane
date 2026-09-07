@@ -10,13 +10,18 @@ var _busy := false
 func _ready() -> void:
 	add_child(Ui.illustrated_stage("res://assets/generated/api_gpt/heroes/collection_hero.webp"))
 	var body := Ui.screen_body()
-	var head := HBoxContainer.new()
+	# Le kicker est volontairement long. En HBox avec le chip crédits, sa taille
+	# minimale poussait le chip hors écran à 540 px et 360 px. Une pile verticale
+	# garde les deux blocs visibles quelle que soit la largeur du téléphone.
+	var head := VBoxContainer.new()
+	head.add_theme_constant_override("separation", 6)
 	var title := Ui.kicker_block("OPEN  •  REVEAL  •  COLLECT", "Cards", Ui.NEON_MAGENTA)
 	head.add_child(title)
-	var spacer := Control.new()
-	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	head.add_child(spacer)
 	var credits_chip := Ui.hud_chip(Ui.GOLD)
+	credits_chip.name = "CreditsChip"
+	credits_chip.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	credits_chip.custom_minimum_size.y = 48
+	credits_chip.add_to_group("horizontal_bounds_check")
 	_credits = Ui.label("0 CR", 18, Color("#11225A"))
 	credits_chip.add_child(_credits)
 	head.add_child(credits_chip)
@@ -59,13 +64,15 @@ func _refresh() -> void:
 
 func _chest_card(chest: Dictionary) -> PanelContainer:
 	var panel := Ui.panel()
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 10)
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 12)
 	var art_path := str(chest.get("image", ""))
 	if art_path != "" and ResourceLoader.exists(art_path):
 		var art := TextureRect.new()
 		art.texture = load(art_path)
-		art.custom_minimum_size = Vector2(110, 110)
+		art.custom_minimum_size = Vector2(88, 88)
 		art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		Ui.soften_tex(art)
@@ -81,18 +88,24 @@ func _chest_card(chest: Dictionary) -> PanelContainer:
 	info.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	text.add_child(info)
 	row.add_child(text)
-	var actions := VBoxContainer.new()
+	var actions := HBoxContainer.new()
+	actions.add_theme_constant_override("separation", 8)
 	var open := Ui.button("OPEN", Color("#FF4F46"))
+	open.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	open.add_to_group("horizontal_bounds_check")
 	open.disabled = _busy or qty < 1
 	open.pressed.connect(_open_chest.bind(id))
 	actions.add_child(open)
 	var cost := int(chest.get("priceCredits", 0))
 	var buy := Ui.button(Ui.compact(cost) + " CR", Ui.NEON_MAGENTA, true)
+	buy.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	buy.add_to_group("horizontal_bounds_check")
 	buy.disabled = _busy or Store.credits() < cost
 	buy.pressed.connect(_buy_chest.bind(id))
 	actions.add_child(buy)
-	row.add_child(actions)
-	panel.add_child(row)
+	box.add_child(row)
+	box.add_child(actions)
+	panel.add_child(box)
 	return panel
 
 ## Couleur d'accent d'un set. Le thème vient de la config, donc un set ajouté

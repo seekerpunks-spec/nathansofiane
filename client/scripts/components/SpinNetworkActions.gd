@@ -154,6 +154,59 @@ func friend_action(path: String, player_id: String, event_name: String) -> void:
 	host._social_busy = false
 	host._render_network()
 
+func friend_gift(player_id: String) -> void:
+	if host._social_busy:
+		return
+	host._social_busy = true
+	var rid := Net.request_id()
+	var response := await Net.protected_request("POST", "/friends/gift", {"friendCode": player_id, "requestId": rid}, rid)
+	if response.ok:
+		Events.track("friend_gift_sent", {"playerId": player_id, "rewardSpins": response.data.get("rewardSpins", 0)})
+	host._network_message = "SPIN GIFT SENT" if response.ok else "GIFT UNAVAILABLE"
+	await host._fetch_network_data()
+	host._social_busy = false
+	host._render_network()
+
+func team_quick_message(phrase_id: String) -> void:
+	if host._social_busy:
+		return
+	host._social_busy = true
+	var rid := Net.request_id()
+	var response := await Net.protected_request("POST", "/teams/chat", {"phraseId": phrase_id, "requestId": rid}, rid)
+	if response.ok:
+		Events.track("team_quick_message_sent", {"phraseId": phrase_id})
+	host._network_message = "CREW SIGNAL SENT" if response.ok else "SIGNAL REFUSED"
+	await host._fetch_network_data()
+	host._social_busy = false
+	host._render_network()
+
+func team_help_request() -> void:
+	if host._social_busy:
+		return
+	host._social_busy = true
+	var rid := Net.request_id()
+	var response := await Net.protected_request("POST", "/teams/help/request", {"requestId": rid}, rid)
+	if response.ok:
+		Events.track("team_help_requested", {"requestedSpins": response.data.get("requestedSpins", 0)})
+	host._network_message = "SPIN HELP REQUESTED" if response.ok else "REQUEST ON COOLDOWN"
+	await host._fetch_network_data()
+	host._social_busy = false
+	host._render_network()
+
+func team_help_donate(help_id: String) -> void:
+	if host._social_busy:
+		return
+	host._social_busy = true
+	var rid := Net.request_id()
+	var response := await Net.protected_request("POST", "/teams/help/donate", {"helpId": help_id, "requestId": rid}, rid)
+	if response.ok:
+		Events.track("team_help_donated", {"helpId": help_id, "donatedSpins": response.data.get("donatedSpins", 0)})
+		Store.apply_mutation(response.data)
+	host._network_message = "SPINS DONATED" if response.ok else "DONATION UNAVAILABLE"
+	await host._fetch_network_data()
+	host._social_busy = false
+	host._render_network()
+
 func select_target(player_id: String, source: String) -> void:
 	if host._social_busy:
 		return

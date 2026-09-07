@@ -18,8 +18,9 @@ $securityCheck = Join-Path $PSScriptRoot "security_check.ps1"
 & $securityCheck
 $mobileCheck = Join-Path $PSScriptRoot "mobile_ux_check.ps1"
 & $mobileCheck
-$cargo = Join-Path $env:USERPROFILE ".cargo\bin\cargo.exe"
-if (-not (Test-Path -LiteralPath $cargo)) { throw "cargo.exe introuvable" }
+$cargoCommand = Get-Command cargo -ErrorAction SilentlyContinue
+if (-not $cargoCommand) { throw "cargo introuvable" }
+$cargo = $cargoCommand.Source
 
 Push-Location (Join-Path $workspace "server")
 try {

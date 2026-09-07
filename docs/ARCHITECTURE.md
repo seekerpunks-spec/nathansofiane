@@ -1,7 +1,7 @@
 # CYBERSEEKER — ARCHITECTURE TECHNIQUE R24
 
 > État effectivement implémenté au 22/08/2026. Le code serveur constitue le
-> contrat final ; les payloads détaillés sont dans `API_R17.md`.
+> contrat final ; les payloads détaillés sont dans `API_R41.md`.
 
 ## 1. Vue d'ensemble
 

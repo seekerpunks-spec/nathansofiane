@@ -1,0 +1,81 @@
+name: quality-gate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: quality-gate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  full-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: cyberseeker_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d cyberseeker_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: server
+
+      - name: Download Godot 4.7.2
+        shell: bash
+        run: |
+          mkdir -p .ci-tools
+          curl --fail --location --retry 3 \
+            --output .ci-tools/godot.zip \
+            https://github.com/godotengine/godot/releases/download/4.7.2-stable/Godot_v4.7.2-stable_linux.x86_64.zip
+          unzip -q .ci-tools/godot.zip -d .ci-tools
+          chmod +x .ci-tools/Godot_v4.7.2-stable_linux.x86_64
+
+      - name: Clippy strict
+        working-directory: server
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: Full server, API, social and Godot gate
+        shell: pwsh
+        run: >-
+          ./tools/run_local_full_gate.ps1
+          -GodotPath "$PWD/.ci-tools/Godot_v4.7.2-stable_linux.x86_64"
+          -TestDatabaseUrl "postgres://postgres:postgres@127.0.0.1:5432/cyberseeker_test"
+          -CargoTargetDir "$PWD/server/target"
+
+  dependency-audit:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: RustSec audit
+        uses: actions-rust-lang/audit@v1
+        with:
+          workingDirectory: server
+          createIssues: false

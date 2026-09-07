@@ -216,14 +216,24 @@ pub async fn list(
     State(state): State<AppState>,
     Extension(addr): Extension<Addr>,
 ) -> Result<Json<Value>, ApiError> {
-    let friends: Vec<(String, String, String, i64, i32)> = sqlx::query_as(
-        "SELECT p.friend_code,p.display_name,p.avatar_id,COALESCE(ps.score,0),s.district_index FROM ( \
+    let today = Utc::now().date_naive();
+    let friends: Vec<(String, String, String, i64, i32, bool)> = sqlx::query_as(
+        "SELECT p.friend_code,p.display_name,p.avatar_id,COALESCE(ps.score,0),s.district_index, \
+         EXISTS(SELECT 1 FROM friend_gifts g WHERE g.sender=$1 AND g.recipient=x.other AND g.gift_date=$2) FROM ( \
          SELECT CASE WHEN address_a=$1 THEN address_b ELSE address_a END AS other FROM friendships WHERE address_a=$1 OR address_b=$1 \
          ) x JOIN player_profiles p ON p.address=x.other JOIN player_state s ON s.address=p.address \
          LEFT JOIN progression_scores ps ON ps.address=p.address ORDER BY ps.score DESC,p.friend_code",
     )
     .bind(&addr.0)
+    .bind(today)
     .fetch_all(state.db.pool())
+    .await?;
+    let gifts_sent_today: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*)::bigint FROM friend_gifts WHERE sender=$1 AND gift_date=$2",
+    )
+    .bind(&addr.0)
+    .bind(today)
+    .fetch_one(state.db.pool())
     .await?;
     let incoming: Vec<(String, String, String, i64)> = sqlx::query_as(
         "SELECT p.friend_code,p.display_name,p.avatar_id,COALESCE(ps.score,0) FROM friend_requests r \
@@ -261,7 +271,8 @@ pub async fn list(
     .fetch_optional(state.db.pool())
     .await?;
     Ok(Json(json!({
-        "friends":friends.into_iter().map(|r|json!({"playerId":r.0,"displayName":r.1,"avatarId":r.2,"score":r.3,"districtIndex":r.4})).collect::<Vec<_>>(),
+        "friends":friends.into_iter().map(|r|json!({"playerId":r.0,"displayName":r.1,"avatarId":r.2,"score":r.3,"districtIndex":r.4,"giftedToday":r.5})).collect::<Vec<_>>(),
+        "giftRules":{"rewardSpins":state.config.social.friend_gifts.reward_spins,"maxSentPerDay":state.config.social.friend_gifts.max_sent_per_day,"sentToday":gifts_sent_today},
         "incoming":incoming.into_iter().map(|r|json!({"playerId":r.0,"displayName":r.1,"avatarId":r.2,"score":r.3})).collect::<Vec<_>>(),
         "outgoing":outgoing.into_iter().map(|r|json!({"playerId":r.0,"displayName":r.1})).collect::<Vec<_>>(),
         "recentAttacks":attacks.into_iter().map(|r|json!({"playerId":r.0,"displayName":r.1,"blocked":r.2,"attackedAtMs":r.3.timestamp_millis(),"canRevenge":r.3>revenge_cutoff})).collect::<Vec<_>>(),
@@ -402,6 +413,107 @@ friend_handler!(accept_friend, "friend_accept");
 friend_handler!(decline_friend, "friend_decline");
 friend_handler!(remove_friend, "friend_remove");
 
+/// Cadeau quotidien à un ami, inspiré de la boucle d'entraide Coin Master :
+/// le spin est créé par la limite sociale et n'est pas retiré à l'expéditeur.
+/// Un verrou sur l'expéditeur sérialise aussi les envois vers plusieurs amis.
+pub async fn gift(
+    State(state): State<AppState>,
+    Extension(addr): Extension<Addr>,
+    headers: HeaderMap,
+    Json(body): Json<FriendActionReq>,
+) -> Result<Json<Value>, ApiError> {
+    let friend_code = normalize_friend_code(&body.friend_code)?;
+    let rid = game::request_id(&headers, body.request_id.as_deref())?;
+    let key = game::idem_key("friend_gift", &addr.0, &rid);
+    if let Some(value) = state.db.fetch_idempotent(&key).await? {
+        return Ok(Json(value));
+    }
+    let mut tx = state.db.begin().await?;
+    let target = address_from_code_tx(&mut tx, &friend_code).await?;
+    if target == addr.0 {
+        return Err(ApiError::BadRequest("destinataire invalide".to_string()));
+    }
+    let locked: Vec<String> = sqlx::query_scalar(
+        "SELECT address FROM player_state WHERE address=$1 OR address=$2 ORDER BY address FOR UPDATE",
+    )
+    .bind(&addr.0)
+    .bind(&target)
+    .fetch_all(&mut *tx)
+    .await?;
+    if locked.len() != 2 || !are_friends_tx(&mut tx, &addr.0, &target).await? {
+        return Err(ApiError::Unavailable("ami requis".to_string()));
+    }
+    if let Some(value) = state.db.fetch_idempotent_locked(&mut tx, &key).await? {
+        tx.rollback().await?;
+        return Ok(Json(value));
+    }
+    let today = Utc::now().date_naive();
+    let sent_today: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*)::bigint FROM friend_gifts WHERE sender=$1 AND gift_date=$2",
+    )
+    .bind(&addr.0)
+    .bind(today)
+    .fetch_one(&mut *tx)
+    .await?;
+    if sent_today >= i64::from(state.config.social.friend_gifts.max_sent_per_day) {
+        return Err(ApiError::Unavailable(
+            "limite quotidienne de cadeaux atteinte".to_string(),
+        ));
+    }
+    let reward = i32::try_from(state.config.social.friend_gifts.reward_spins)
+        .map_err(|_| ApiError::Internal(anyhow!("friend gift overflow")))?;
+    let before: i32 = sqlx::query_scalar("SELECT spins FROM player_state WHERE address=$1")
+        .bind(&target)
+        .fetch_one(&mut *tx)
+        .await?;
+    let inserted = sqlx::query(
+        "INSERT INTO friend_gifts(sender,recipient,gift_date,reward_spins) VALUES($1,$2,$3,$4) ON CONFLICT DO NOTHING",
+    )
+    .bind(&addr.0)
+    .bind(&target)
+    .bind(today)
+    .bind(reward)
+    .execute(&mut *tx)
+    .await?
+    .rows_affected();
+    if inserted != 1 {
+        return Err(ApiError::Unavailable(
+            "cadeau déjà envoyé aujourd'hui".to_string(),
+        ));
+    }
+    game::grant_reward_tx(
+        &mut tx,
+        &target,
+        &crate::config::Reward {
+            spins: state.config.social.friend_gifts.reward_spins,
+            credits: 0,
+            chest: None,
+        },
+        &state.config,
+    )
+    .await?;
+    let after: i32 = sqlx::query_scalar("SELECT spins FROM player_state WHERE address=$1")
+        .bind(&target)
+        .fetch_one(&mut *tx)
+        .await?;
+    let response = json!({
+        "playerId":friend_code,"rewardSpins":reward,"sentToday":sent_today+1,
+        "serverTimeMs":Utc::now().timestamp_millis()
+    });
+    crate::db::Db::audit_tx(
+        &mut tx,
+        &target,
+        "friend_gift_received",
+        &json!({"spins":before}),
+        &json!({"spins":after,"rewardSpins":reward}),
+        Some(&rid),
+    )
+    .await?;
+    state.db.store_idempotent(&mut tx, &key, &response).await?;
+    tx.commit().await?;
+    Ok(Json(response))
+}
+
 pub async fn select_target(
     State(state): State<AppState>,
     Extension(addr): Extension<Addr>,
@@ -490,6 +602,30 @@ pub async fn select_target(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::RemoteConfig;
+    use crate::db::Db;
+    use crate::rate_limit::RateLimiter;
+    use std::sync::Arc;
+
+    fn state_for_tests(db: Db) -> anyhow::Result<AppState> {
+        let config = RemoteConfig::load(
+            &std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../config"),
+        )?;
+        Ok(AppState {
+            rate: Arc::new(RateLimiter::new(
+                db.pool().clone(),
+                std::time::Duration::from_secs(60),
+                10_000,
+            )),
+            db,
+            config: Arc::new(config),
+            jwt_secret: "qa-secret-0123456789-0123456789-012".to_string(),
+            auth_domain: "qa.cyberseeker.local".to_string(),
+            dev_auth: false,
+            dev_address: None,
+            started_at: std::time::Instant::now(),
+        })
+    }
 
     #[test]
     fn profile_names_are_trimmed_and_bounded() {
@@ -501,5 +637,68 @@ mod tests {
         assert!(valid_display_name("bad\nname").is_none());
         assert!(valid_display_name("bad👾name").is_none());
         assert!(valid_display_name(&"x".repeat(25)).is_none());
+    }
+
+    #[tokio::test]
+    async fn postgres_friend_gift_has_one_concurrent_winner() -> anyhow::Result<()> {
+        let Some(db) =
+            crate::testdb::connect("postgres_friend_gift_has_one_concurrent_winner").await
+        else {
+            return Ok(());
+        };
+        let state = state_for_tests(db.clone())?;
+        let sender = format!("qa-gift-sender-{}", uuid::Uuid::new_v4());
+        let recipient = format!("qa-gift-recipient-{}", uuid::Uuid::new_v4());
+        db.ensure_player(&sender, 0).await?;
+        db.ensure_player(&recipient, 0).await?;
+        // Le cadeau doit conserver le rattrapage d'un joueur hors ligne.
+        let interval = i64::try_from(state.config.economy.spin_regen_ms)?;
+        sqlx::query("UPDATE player_state SET last_spin_at=now()-($2 * interval '1 millisecond') WHERE address=$1")
+            .bind(&recipient).bind(interval * 2 + interval / 2).execute(db.pool()).await?;
+        sqlx::query(
+            "INSERT INTO friendships(address_a,address_b) VALUES(LEAST($1,$2),GREATEST($1,$2))",
+        )
+        .bind(&sender)
+        .bind(&recipient)
+        .execute(db.pool())
+        .await?;
+        let friend_code: String =
+            sqlx::query_scalar("SELECT friend_code FROM player_profiles WHERE address=$1")
+                .bind(&recipient)
+                .fetch_one(db.pool())
+                .await?;
+        let first = gift(
+            State(state.clone()),
+            Extension(Addr(sender.clone())),
+            HeaderMap::new(),
+            Json(FriendActionReq {
+                friend_code: friend_code.clone(),
+                request_id: Some(uuid::Uuid::new_v4().to_string()),
+            }),
+        );
+        let second = gift(
+            State(state),
+            Extension(Addr(sender)),
+            HeaderMap::new(),
+            Json(FriendActionReq {
+                friend_code,
+                request_id: Some(uuid::Uuid::new_v4().to_string()),
+            }),
+        );
+        let (first, second) = tokio::join!(first, second);
+        let outcomes = [first, second];
+        assert_eq!(outcomes.iter().filter(|result| result.is_ok()).count(), 1);
+        assert!(outcomes
+            .iter()
+            .any(|result| matches!(result, Err(ApiError::Unavailable(_)))));
+        let spins: i32 = sqlx::query_scalar("SELECT spins FROM player_state WHERE address=$1")
+            .bind(&recipient)
+            .fetch_one(db.pool())
+            .await?;
+        assert_eq!(
+            spins,
+            2 + i32::try_from(state_for_tests(db)?.config.social.friend_gifts.reward_spins)?
+        );
+        Ok(())
     }
 }

@@ -116,6 +116,7 @@ func _run() -> void:
 		"cards": [{"cardId":"ghost_terminal","qty":2}], "chests": [{"chestId":"basic","qty":1}],
 		"completedSets": [], "dailyStreak": 2, "dailyAvailable": true, "adsWatchedToday": 1,
 		"missions": [{"missionId":"use_spins","name":"Use 10 Spins","target":10,"progress":6,"claimed":false,"reward":{"spins":20}}],
+		"profile": {"playerId":"CYB-000000000001","displayName":"Smoke Runner","districtIndex":0},
 		"achievements": [{"achievementId":"signal_runner_1","name":"Signal Runner I","description":"Spend 10 spins.","target":10,"progress":10,"claimed":false,"reward":{"spins":25,"credits":100000}}],
 		"entitlements": {"dailySpinBonus":0,"items":[],"verificationMode":"server_provider_required"},
 		"rewardPool": {"enabled":false,"settlementEnabled":false,"pools":[]},
@@ -136,10 +137,28 @@ func _run() -> void:
 			await _check_district_screen(instance)
 		if path.ends_with("CollectionScreen.tscn"):
 			_check_collection_screen(instance)
+			_check_horizontal_bounds(instance)
 		if path.ends_with("SpinScreen.tscn"):
+			instance._network_snapshot = {
+				"giftRules":{"rewardSpins":1,"maxSentPerDay":20,"sentToday":0},
+				"friends":[{"playerId":"CYB-000000000002","displayName":"Long Friend Name","score":123456,"giftedToday":false}],
+				"incoming":[],"recentAttacks":[]
+			}
+			instance._team_snapshot = {"ownTeam":{
+				"name":"Smoke Crew","teamCode":"NET-0000000000000001","role":"owner","score":999999,
+				"members":[
+					{"playerId":"CYB-000000000001","displayName":"Smoke Runner","role":"owner","score":500000},
+					{"playerId":"CYB-000000000002","displayName":"Long Crew Member","role":"member","score":499999}
+				],
+				"quickChatPhrases":Config.social().get("teams", {}).get("quickChatPhrases", []),
+				"messages":[{"phraseId":"thanks","displayName":"Long Crew Member"}],
+				"helpRules":{"requestSpins":5,"maxPerMember":2},
+				"helpRequests":[{"helpId":"00000000-0000-4000-8000-000000000001","requesterPlayerId":"CYB-000000000002","displayName":"Long Crew Member","requestedSpins":5,"donatedSpins":2,"canDonate":true}]
+			}}
 			instance._render_network()
 			await get_tree().process_frame
 			_check(is_instance_valid(instance._social_overlay), "Modale Seeker Network absente")
+			_check_horizontal_bounds(instance._social_overlay)
 			instance._clear_social_overlay()
 			instance._show_social_encounter({"kind":"attack","encounterId":"smoke-attack","target":"Runner","choices":[1,2],"multiplier":4})
 			await get_tree().process_frame
@@ -157,6 +176,20 @@ func _run() -> void:
 		return
 	print("SMOKE_SCENES_OK: ", SCENES.size())
 	get_tree().quit(0)
+
+## Les scènes pouvaient être instanciées avec succès tout en poussant leurs
+## actions hors du viewport. Les contrôles critiques s'inscrivent explicitement
+## dans ce groupe afin que chaque résolution de la gate vérifie leurs bounds.
+func _check_horizontal_bounds(instance: Node) -> void:
+	var viewport_width: float = instance.get_viewport_rect().size.x
+	for child in instance.find_children("*", "Control", true, false):
+		if not child.is_in_group("horizontal_bounds_check") or not child.is_visible_in_tree():
+			continue
+		var rect: Rect2 = child.get_global_rect()
+		_check(
+			rect.position.x >= -1.0 and rect.end.x <= viewport_width + 1.0,
+			"contrôle hors viewport (%s): %.1f..%.1f / %.1f" % [child.name, rect.position.x, rect.end.x, viewport_width]
+		)
 
 ## Les sets existent sous deux formes de récompense et peuvent être verrouillés.
 ## Sans cette couverture, un set en completionReward afficherait « +0 SPINS »

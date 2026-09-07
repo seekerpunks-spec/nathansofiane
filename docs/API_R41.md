@@ -1,4 +1,4 @@
-# API R24 — CONTRATS CLIENT / SERVEUR
+# API R41 — CONTRATS CLIENT / SERVEUR
 
 Toutes les routes de mutation de gameplay exigent `Authorization: Bearer …`,
 `Content-Type: application/json` et `X-Request-Id`. Une même clé rejoue la même
@@ -20,12 +20,19 @@ calculé par le client.
 
 ## Auth
 
-- `POST /auth/challenge {address}`
-- `POST /auth/verify {address,signature}`
+- `POST /auth/challenge {address}` — renvoie un message canonique lié au
+  domaine, à l'adresse Base58 et au nonce. Un challenge encore valide est
+  renvoyé tel quel au lieu d'être invalidé par un second appel.
+- `POST /auth/verify {address,signature}` — signature Ed25519/base64 du champ
+  `message` UTF-8 retourné, pas du nonce seul. Une preuve invalide ne consomme
+  pas le challenge ; deux preuves valides concurrentes ont un seul succès.
 - `POST /auth/refresh {refreshToken}` — rotation one-time-use : le token présenté
   est consommé atomiquement et son replay renvoie `UNAUTHORIZED`.
 - `POST /auth/logout {refreshToken}` — révocation idempotente de la session
   courante ; le client purge ses jetons même si le réseau est indisponible.
+  L'access JWT expire après 15 minutes et reste utilisable après logout/rotation.
+  Il est lié à la session en base : supprimer puis recréer le compte ne le réactive
+  pas. Les anciens access JWT sans identifiant de session nécessitent un login.
 
 ## Mutations
 
@@ -44,6 +51,8 @@ calculé par le client.
 - `GET|POST /profile` — profil public minimal / mise à jour du nom.
 - `GET /players/search?q=...`, `GET /friends`
 - `POST /friends/request|accept|decline|remove {friendCode,requestId}`
+- `POST /friends/gift {friendCode,requestId}` — cadeau quotidien gratuit et
+  borné ; une paire expéditeur/destinataire ne passe qu'une fois par jour UTC.
 - `POST /social/target {friendCode,source,requestId}` — `friend` ou `revenge`,
   consommé par le prochain Signal Jam.
 - `GET /progression/leaderboard`
@@ -52,6 +61,12 @@ calculé par le client.
 - `POST /teams/join {teamCode,requestId}`
 - `POST /teams/leave {requestId}`
 - `POST /teams/kick|transfer {friendCode,requestId}`
+- `POST /teams/chat {phraseId,requestId}` — uniquement une phrase de
+  l'allowlist remote-config, jamais de texte libre.
+- `POST /teams/help/request {requestId}`
+- `POST /teams/help/donate {helpId,requestId}` — transfert de spins atomique,
+  plafonné et conservatif entre membres actuels de la même crew. Matérialise la
+  régénération des deux joueurs ; renvoie le solde et `nextSpinAtMs` du donneur.
 - `GET /trades` — incoming/outgoing, noms de cartes et règles actives.
 - `POST /trades/create {recipientFriendCode,offeredCardId,requestedCardId,requestId}`
 - `POST /trades/accept|decline|cancel {tradeId,requestId}` — échange direct
@@ -71,6 +86,11 @@ calculé par le client.
   — revalide fenêtre, prix, limite et éligibilité sous verrou avant tout crédit.
 - `POST /analytics {batchId,events:[{name,props}]}` — batch ≤ 100, props objet
   ≤ 8 Kio par événement, déduplication atomique par `(address,batchId)`.
+- `GET /account/export` — snapshot et historiques liés au compte.
+- `POST /account/delete {confirmation,requestId}` — confirmation exacte
+  `DELETE CYBERSEEKER ACCOUNT`, effacement transactionnel, transfert éventuel
+  de propriété de crew et retry idempotent. Le retry après effacement nécessite
+  le même `X-Request-Id`, y compris si le compte a été recréé entretemps.
 
 ## Erreurs
 

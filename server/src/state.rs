@@ -12,6 +12,9 @@ pub struct AppState {
     /// Remote config versionnée (hash SHA-256, validée au boot).
     pub config: Arc<RemoteConfig>,
     pub jwt_secret: String,
+    /// Domaine inclus dans le message signé afin qu'un challenge obtenu sur un
+    /// autre service ne puisse pas être relayé vers CyberSeeker.
+    pub auth_domain: String,
     /// DEV (à NE JAMAIS activer en production) : accepte la signature "dev".
     pub dev_auth: bool,
     pub dev_address: Option<String>,

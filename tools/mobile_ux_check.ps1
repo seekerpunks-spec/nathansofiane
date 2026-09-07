@@ -142,10 +142,12 @@ if ($staleImports) {
 
 # --- UI 100 % anglaise (R32 / D12) ---
 # Le copy joueur est anglais pour le dApp Store global. Tripwire : aucun
-# caractere accentue dans une chaine des scripts client (commentaires et tests
-# exclus, ils restent francais) ni dans les champs joueur des configs.
+# caractere accentue OU mot français ASCII courant dans une chaine des scripts
+# client (commentaires et tests exclus, ils restent francais) ni dans les champs
+# joueur des configs. Le second filet évite le faux vert historique ATTENDRE.
 # La classe exclut U+00D7 (signe multiplication, "BET x1") et U+00F7.
 $accentClass = '[\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u00FF\u0152\u0153]'
+$forbiddenFrenchWords = '(?i)\b(ATTENDRE|RETOUR|NIVEAU|AMELIORE|ACHETER|OUVRIR|FERMER|SUIVANT|PRECEDENT|RECOMPENSE|QUOTIDIEN|MISSION DU JOUR)\b'
 $frenchHits = @()
 Get-ChildItem -LiteralPath $client -Filter "*.gd" -Recurse |
     Where-Object { $_.FullName -notmatch '\\tests\\' } |
@@ -155,7 +157,7 @@ Get-ChildItem -LiteralPath $client -Filter "*.gd" -Recurse |
         foreach ($line in (Get-Content -Encoding UTF8 -LiteralPath $file.FullName)) {
             $lineNum++
             $code = $line -replace '(^|\s)#.*$', ''
-            if ($code -match ('"[^"]*' + $accentClass + '[^"]*"')) {
+            if ($code -match ('"[^"]*' + $accentClass + '[^"]*"') -or $code -match $forbiddenFrenchWords) {
                 $frenchHits += "$($file.Name):$lineNum"
             }
         }
@@ -170,7 +172,8 @@ Get-ChildItem -LiteralPath (Join-Path $workspace "config") -Filter "*.json" -Rec
         $lineNum = 0
         foreach ($line in (Get-Content -Encoding UTF8 -LiteralPath $file.FullName)) {
             $lineNum++
-            if ($line -match '"(name|label|description|title|subtitle)"\s*:' -and $line -match $accentClass) {
+            if ($line -match '"(name|label|description|title|subtitle)"\s*:' -and
+                ($line -match $accentClass -or $line -match $forbiddenFrenchWords)) {
                 $configFrench += "$($file.Name):$lineNum"
             }
         }

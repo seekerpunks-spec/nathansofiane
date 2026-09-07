@@ -386,6 +386,7 @@ mod tests {
             db,
             config: Arc::new(config),
             jwt_secret: "qa-secret-0123456789-0123456789-012".to_string(),
+            auth_domain: "qa.cyberseeker.local".to_string(),
             dev_auth: false,
             dev_address: None,
             started_at: std::time::Instant::now(),

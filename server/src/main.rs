@@ -1,4 +1,4 @@
-//! CYBERSEEKER — serveur (Rust/Axum) — R17
+//! CYBERSEEKER — serveur (Rust/Axum) — R41
 //!
 //! Backend AUTHORITATIVE (GDD §37-39, ARCH §4) :
 //!   - auth wallet (challenge/nonce Ed25519 + JWT HS256)
@@ -11,6 +11,7 @@
 //! Anti-triche : horloge serveur, transactions SQL, idempotence atomique,
 //! rate limiting, audit de chaque mutation et preuves externes refusées par défaut.
 
+mod account;
 mod auth;
 mod collection;
 mod commerce;
@@ -54,6 +55,19 @@ use tower_http::cors::CorsLayer;
 use tower_http::trace::TraceLayer;
 
 type RankRewardRow = (String, i64, Value, DateTime<Utc>, Option<DateTime<Utc>>);
+
+fn retention_days(name: &str, default: u32) -> anyhow::Result<i32> {
+    let value = std::env::var(name)
+        .ok()
+        .map(|raw| raw.parse::<u32>())
+        .transpose()
+        .map_err(|_| anyhow!("{name} doit être un nombre de jours"))?
+        .unwrap_or(default);
+    if !(1..=3650).contains(&value) {
+        return Err(anyhow!("{name} doit être compris entre 1 et 3650 jours"));
+    }
+    Ok(i32::try_from(value)?)
+}
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -99,10 +113,28 @@ async fn main() -> anyhow::Result<()> {
         return Err(anyhow!("DEV_AUTH=true est interdit dans un build release"));
     }
     let dev_address = std::env::var("DEV_ADDRESS").ok();
+    let auth_domain = std::env::var("AUTH_DOMAIN")
+        .unwrap_or_else(|_| "cyberseeker.local".to_string())
+        .trim()
+        .to_string();
+    if auth_domain.is_empty()
+        || auth_domain.len() > 253
+        || auth_domain.contains(char::is_whitespace)
+    {
+        return Err(anyhow!("AUTH_DOMAIN invalide"));
+    }
+    if !cfg!(debug_assertions) && auth_domain == "cyberseeker.local" {
+        return Err(anyhow!("AUTH_DOMAIN explicite requis en production"));
+    }
     let rate_per_min: u32 = std::env::var("RATE_LIMIT_PER_MINUTE")
         .ok()
         .and_then(|v| v.parse().ok())
         .unwrap_or(30);
+    let analytics_retention_days = retention_days("ANALYTICS_RETENTION_DAYS", 90)?;
+    let economy_audit_retention_days = retention_days("ECONOMY_AUDIT_RETENTION_DAYS", 730)?;
+    let liveops_archive_retention_days = retention_days("LIVEOPS_ARCHIVE_RETENTION_DAYS", 365)?;
+    let deletion_proof_retention_days = retention_days("DELETION_PROOF_RETENTION_DAYS", 30)?;
+    let team_activity_retention_days = retention_days("TEAM_ACTIVITY_RETENTION_DAYS", 30)?;
 
     let config = Arc::new(config::RemoteConfig::load(std::path::Path::new(
         &config_dir,
@@ -127,14 +159,15 @@ async fn main() -> anyhow::Result<()> {
         db,
         config: Arc::clone(&config),
         jwt_secret,
+        auth_domain,
         dev_auth,
         dev_address,
         rate,
         started_at: std::time::Instant::now(),
     });
 
-    // Maintenance bornée des réponses rejouables. Les audits économiques ne
-    // sont pas touchés par cette tâche et suivent la rétention de production.
+    // Maintenance bornée des réponses rejouables et données personnelles.
+    // Les durées sont explicites, validées au boot et configurables en prod.
     let maintenance_pool = state.db.pool().clone();
     tokio::spawn(async move {
         let mut interval = tokio::time::interval(Duration::from_secs(3600));
@@ -176,6 +209,74 @@ async fn main() -> anyhow::Result<()> {
             .await
             {
                 tracing::warn!(?error, "nettoyage refresh_sessions échoué");
+            }
+            if let Err(error) = sqlx::query(
+                "DELETE FROM analytics_events WHERE ts < now() - make_interval(days => $1)",
+            )
+            .bind(analytics_retention_days)
+            .execute(&maintenance_pool)
+            .await
+            {
+                tracing::warn!(?error, "rétention analytics_events échouée");
+            }
+            if let Err(error) = sqlx::query(
+                "DELETE FROM economy_audit WHERE ts < now() - make_interval(days => $1)",
+            )
+            .bind(economy_audit_retention_days)
+            .execute(&maintenance_pool)
+            .await
+            {
+                tracing::warn!(?error, "rétention economy_audit échouée");
+            }
+            for (table, days) in [
+                ("event_scores_archive", liveops_archive_retention_days),
+                (
+                    "team_event_contributions_archive",
+                    liveops_archive_retention_days,
+                ),
+                (
+                    "event_milestone_claims_archive",
+                    liveops_archive_retention_days,
+                ),
+                ("team_event_claims_archive", liveops_archive_retention_days),
+            ] {
+                let statement = format!(
+                    "DELETE FROM {table} WHERE archived_at < now() - make_interval(days => $1)"
+                );
+                if let Err(error) = sqlx::query(&statement)
+                    .bind(days)
+                    .execute(&maintenance_pool)
+                    .await
+                {
+                    tracing::warn!(?error, table, "rétention archive live-ops échouée");
+                }
+            }
+            if let Err(error) = sqlx::query(
+                "DELETE FROM account_deletion_tombstones WHERE deleted_at < now() - make_interval(days => $1)",
+            )
+            .bind(deletion_proof_retention_days)
+            .execute(&maintenance_pool)
+            .await
+            {
+                tracing::warn!(?error, "rétention des preuves d'effacement échouée");
+            }
+            if let Err(error) = sqlx::query(
+                "DELETE FROM team_quick_messages WHERE created_at < now() - make_interval(days => $1)",
+            )
+            .bind(team_activity_retention_days)
+            .execute(&maintenance_pool)
+            .await
+            {
+                tracing::warn!(?error, "rétention du chat rapide échouée");
+            }
+            if let Err(error) = sqlx::query(
+                "DELETE FROM team_help_requests WHERE created_at < now() - make_interval(days => $1)",
+            )
+            .bind(team_activity_retention_days)
+            .execute(&maintenance_pool)
+            .await
+            {
+                tracing::warn!(?error, "rétention des demandes d'entraide échouée");
             }
         }
     });
@@ -234,6 +335,8 @@ async fn main() -> anyhow::Result<()> {
         .route("/auth/verify", post(auth::verify))
         .route("/auth/refresh", post(auth::refresh))
         .route("/auth/logout", post(auth::logout))
+        .route("/account/export", get(account::export))
+        .route("/account/delete", post(account::delete))
         .route("/state", get(get_state))
         .route(
             "/profile",
@@ -245,6 +348,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/friends/accept", post(friends::accept_friend))
         .route("/friends/decline", post(friends::decline_friend))
         .route("/friends/remove", post(friends::remove_friend))
+        .route("/friends/gift", post(friends::gift))
         .route("/social/target", post(friends::select_target))
         .route("/progression/leaderboard", get(progression::leaderboard))
         .route("/teams", get(teams::list))
@@ -253,6 +357,9 @@ async fn main() -> anyhow::Result<()> {
         .route("/teams/leave", post(teams::leave))
         .route("/teams/kick", post(teams::kick))
         .route("/teams/transfer", post(teams::transfer))
+        .route("/teams/chat", post(teams::quick_message))
+        .route("/teams/help/request", post(teams::request_help))
+        .route("/teams/help/donate", post(teams::donate_help))
         .route("/teams/leaderboard", get(teams::leaderboard))
         .route("/trades", get(trading::list))
         .route("/trades/create", post(trading::create))
@@ -300,7 +407,7 @@ async fn main() -> anyhow::Result<()> {
         .with_state(state.as_ref().clone());
 
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
-    tracing::info!(%addr, "cyberseeker-server R17 en écoute");
+    tracing::info!(%addr, "cyberseeker-server R41 en écoute");
     let listener = tokio::net::TcpListener::bind(addr).await?;
     // Le middleware `guard` extrait `ConnectInfo<SocketAddr>` (IP client, rate limit) :
     // sans `into_make_service_with_connect_info`, l'extractor échoue et TOUTES les
@@ -340,7 +447,24 @@ async fn guard(
     }
 
     // Routes protégées : JWT obligatoire + rate limit par adresse.
-    let address = auth::auth_address(&state, req.headers())?;
+    let (address, session_hash) = auth::auth_session(&state, req.headers())?;
+    let session_exists = state
+        .db
+        .access_session_exists(&address, &session_hash)
+        .await?;
+    let deletion_retry = if !session_exists && path == "/account/delete" {
+        match game::request_id(req.headers(), None) {
+            Ok(rid) => account::deletion_was_recorded(state.db.pool(), &address, &rid).await?,
+            Err(_) => false,
+        }
+    } else {
+        false
+    };
+    if !session_exists && !deletion_retry {
+        return Err(ApiError::Unauthorized(
+            crate::error::AuthError::InvalidToken,
+        ));
+    }
     if !state.rate.check(&format!("wallet:{address}")).await? {
         return Err(ApiError::RateLimited);
     }

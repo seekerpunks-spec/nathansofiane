@@ -4,11 +4,26 @@
   "encounterTtlMs": 600000,
   "targetPreferenceTtlMs": 86400000,
   "revengeWindowMs": 604800000,
+  "friendGifts": {
+    "rewardSpins": 1,
+    "maxSentPerDay": 20
+  },
   "teams": {
     "maxMembers": 50,
     "createCostCredits": 500000,
     "searchLimit": 20,
-    "leaderboardLimit": 50
+    "leaderboardLimit": 50,
+    "quickChatPhrases": [
+      {"id": "need_spins", "label": "Need spins!"},
+      {"id": "nice_hit", "label": "Nice hit!"},
+      {"id": "thanks", "label": "Thanks, crew!"},
+      {"id": "event_push", "label": "Push the crew event!"}
+    ],
+    "chatHistoryLimit": 30,
+    "donationRequestSpins": 5,
+    "donationMaxPerMember": 2,
+    "donationRequestCooldownMs": 28800000,
+    "donationRequestTtlMs": 86400000
   },
   "trading": {
     "offerTtlMs": 86400000,

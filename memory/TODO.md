@@ -1,6 +1,6 @@
-# MÉMOIRE — TODO / PROCHAINES TÂCHES R35
+# MÉMOIRE — TODO / PROCHAINES TÂCHES R41
 
-> MAJ 31/08/2026. Roadmap détaillée : `docs/ROADMAP.md`. Checklist de
+> MAJ 07/09/2026. Roadmap détaillée : `docs/ROADMAP.md`. Checklist de
 > publication : `docs/RELEASE_CHECKLIST.md`. Spec produit : `MASTER TODO`.
 
 ## Fait (cumul)
@@ -75,13 +75,26 @@
       Cards/Quests/Shop en overlay illustré, plus de hero dashboard.
 - [x] **R39 netteté** : alpha lissé, mipmaps, Nunito MSDF, chrome supersamplé.
       Viewport 540 conservé (T2). Pas de FXAA Compatibility.
+- [x] **R41 fermeture MASTER TODO** : responsive Collection/Store, auth
+      challenge liée au domaine et stable, export/suppression de compte,
+      rétentions SQL, cadeau ami, chat rapide crew, entraide spins et CI GitHub.
+      Gate : 44/44 Rust dont 16/16 PostgreSQL, API/social et smoke 360/540/720.
+- [x] **Review R41** : nonce validé avant consommation, sessions invalides après
+      recréation, export sans wallets tiers, dons/regen/reliquat, demandes ouvertes,
+      contrôle d'appartenance et rejeu concurrent après complétion.
+- [ ] **CI distante R41** : confirmer les deux jobs après push.
+- [ ] **DA skyline jour jouet** : frame 1 générée (monde vide 9:16,
+      staging `art/api_gpt_image/skyline_jour_jouet_v1.png`). Attente oui/non.
+      Si non : régénérer cette frame seule. Si oui : composite Godot
+      (labels live, pas de soldes peints). Runtime visuel = R39 tant que non
+      validé.
 
-## Décisions produit encore ouvertes (ne pas inventer)
+## Décisions produit fermées en R41
 
-- [ ] §19 MASTER TODO : envoi de ressources entre amis. Actuellement fermé par
-      D9/T29 (aucun transfert libre de richesse). À confirmer ou rouvrir.
-- [ ] Phase 9 : chat d'équipe limité (différé, demande de la modération) et
-      donations (écartées au profit du swap 1-pour-1).
+- [x] §19 : cadeau quotidien de 1 spin créé par le quota social, sans coût
+      expéditeur et sans transfert de crédits/SKR.
+- [x] Phase 9 : chat par phrases allowlist uniquement ; demandes/dons de spins
+      bornés et conservatifs dans une crew.
 - [ ] Design final et Wallet Adapter natif : différés explicitement.
 
 ## Reste externe avant publication

@@ -113,7 +113,8 @@
       `char[]`, ce qui tronquait l'analyse à six caractères et neutralisait les
       checks négatifs Base58/nonce. Remplacé par un `-split` regex avec
       garde-fou de longueur ; `validate_all.ps1` repasse vert.
-- [ ] Autres systèmes restants du MASTER TODO.
+- [x] Tous les systèmes locaux restants du MASTER TODO ; cadeaux amis,
+      entraide spins et chat rapide crew fermés en R41.
 - [ ] Design et Wallet Adapter différés explicitement pour ce lot.
 
 ## P9 — Robustesse post-audit R27
@@ -257,3 +258,20 @@
 - [x] Nunito ExtraBold MSDF, mipmaps, snap pixels off, StyleBoxFlat AA.
 - [x] Pas de FXAA/MSAA 2D (non supportés en Compatibility 4.7).
 
+## P21 — Fermeture MASTER TODO et hardening R41
+
+- [x] Correctifs responsive Collection/Store et fixtures de capture réalistes ;
+      tripwire anglais étendu aux mots français non accentués.
+- [x] Challenge wallet canonique lié au domaine/adresse/nonce et nonce actif
+      stable entre deux appels ; Base58 toujours sensible à la casse.
+- [x] Export et effacement de compte transactionnel/idempotent, transfert de
+      propriété crew, invalidation des JWT d'un compte effacé.
+- [x] Rétention configurable des analytics, audits, archives live-ops, preuves
+      d'effacement et activités crew, avec index SQL dédiés.
+- [x] Cadeau quotidien entre amis, chat crew par phrases autorisées et demande/
+      don de spins conservatif ; contrats HTTP négatifs et de rejeu inclus.
+- [x] Workflow CI GitHub Linux versionné : PostgreSQL 16, Rustfmt, Clippy strict,
+      44 tests Rust, contrats API/social, smoke Godot et audit RustSec.
+- [ ] Première exécution distante des deux jobs à confirmer après push.
+- [x] Version logique `0.4.0-r41` / code 19 ; aucun APK/AAB construit.
+- [ ] Dépendances externes et QA appareil listées dans la checklist release.

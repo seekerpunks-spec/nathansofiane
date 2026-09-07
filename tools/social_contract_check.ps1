@@ -232,6 +232,106 @@ if (-not ($alphaNetwork.Data.friends | Where-Object playerId -eq $beta.PlayerId)
     throw "amitié absente d'un snapshot réseau"
 }
 
+# Cadeau quotidien gratuit à un ami : crédit exact côté destinataire, rejeu
+# byte-identique et second requestId refusé pour la même paire/journée.
+$betaBeforeGift = Get-State $beta
+$giftRid = "social-gift-$runId"
+$giftBody = @{ friendCode = $beta.PlayerId; requestId = $giftRid }
+$gift = Invoke-ProtectedPost "/friends/gift" $alpha.Token $giftBody $giftRid
+$giftReplay = Invoke-ProtectedPost "/friends/gift" $alpha.Token $giftBody $giftRid
+Assert-Ok $gift "cadeau ami"
+Assert-Ok $giftReplay "rejeu cadeau ami"
+if ($gift.Raw -cne $giftReplay.Raw) { throw "cadeau ami non idempotent" }
+$betaAfterGift = Get-State $beta
+if ([int64]$betaAfterGift.spins -ne [int64]$betaBeforeGift.spins + [int64]$gift.Data.rewardSpins) {
+    throw "crédit du cadeau ami incohérent"
+}
+$giftAgainRid = "social-gift-again-$runId"
+$giftAgain = Invoke-ProtectedPost "/friends/gift" $alpha.Token @{
+    friendCode = $beta.PlayerId
+    requestId = $giftAgainRid
+} $giftAgainRid
+if ($giftAgain.Code -ne 403 -or $giftAgain.Data.error.code -ne "UNAVAILABLE") {
+    throw "second cadeau quotidien non refusé"
+}
+
+# Crew : création/join, chat uniquement par phrase autorisée, puis transfert
+# conservatif de spins au travers d'une demande d'entraide bornée.
+$createTeamRid = "social-team-create-$runId"
+$team = Invoke-ProtectedPost "/teams/create" $alpha.Token @{
+    name = "Crew $runId"
+    requestId = $createTeamRid
+} $createTeamRid
+Assert-Ok $team "création crew"
+$joinTeamRid = "social-team-join-$runId"
+$joinTeam = Invoke-ProtectedPost "/teams/join" $beta.Token @{
+    teamCode = [string]$team.Data.teamCode
+    requestId = $joinTeamRid
+} $joinTeamRid
+Assert-Ok $joinTeam "join crew"
+$badChatRid = "social-team-chat-invalid-$runId"
+$badChat = Invoke-ProtectedPost "/teams/chat" $beta.Token @{
+    phraseId = "free_text_is_not_allowed"
+    requestId = $badChatRid
+} $badChatRid
+if ($badChat.Code -ne 400 -or $badChat.Data.error.code -ne "BAD_REQUEST") {
+    throw "chat libre/non autorisé accepté"
+}
+$chatRid = "social-team-chat-$runId"
+$chat = Invoke-ProtectedPost "/teams/chat" $beta.Token @{
+    phraseId = "thanks"
+    requestId = $chatRid
+} $chatRid
+$chatReplay = Invoke-ProtectedPost "/teams/chat" $beta.Token @{
+    phraseId = "thanks"
+    requestId = $chatRid
+} $chatRid
+Assert-Ok $chat "chat rapide crew"
+Assert-Ok $chatReplay "rejeu chat rapide crew"
+if ($chat.Raw -cne $chatReplay.Raw) { throw "chat rapide non idempotent" }
+$alphaBeforeHelp = Get-State $alpha
+$betaBeforeHelp = Get-State $beta
+$helpRid = "social-team-help-$runId"
+$help = Invoke-ProtectedPost "/teams/help/request" $alpha.Token @{ requestId = $helpRid } $helpRid
+$helpReplay = Invoke-ProtectedPost "/teams/help/request" $alpha.Token @{ requestId = $helpRid } $helpRid
+Assert-Ok $help "demande entraide"
+Assert-Ok $helpReplay "rejeu demande entraide"
+if ($help.Raw -cne $helpReplay.Raw) { throw "demande entraide non idempotente" }
+$donateRid = "social-team-donate-$runId"
+$donationBody = @{ helpId = [string]$help.Data.helpId; requestId = $donateRid }
+$donation = Invoke-ProtectedPost "/teams/help/donate" $beta.Token $donationBody $donateRid
+$donationReplay = Invoke-ProtectedPost "/teams/help/donate" $beta.Token $donationBody $donateRid
+Assert-Ok $donation "donation crew"
+Assert-Ok $donationReplay "rejeu donation crew"
+if ($donation.Raw -cne $donationReplay.Raw) { throw "donation crew non idempotente" }
+$donateAgainRid = "social-team-donate-again-$runId"
+$donateAgain = Invoke-ProtectedPost "/teams/help/donate" $beta.Token @{
+    helpId = [string]$help.Data.helpId
+    requestId = $donateAgainRid
+} $donateAgainRid
+if ($donateAgain.Code -ne 403 -or $donateAgain.Data.error.code -ne "UNAVAILABLE") {
+    throw "seconde donation du même membre non refusée"
+}
+$alphaAfterHelp = Get-State $alpha
+$betaAfterHelp = Get-State $beta
+if ([int64]$alphaAfterHelp.spins -ne [int64]$alphaBeforeHelp.spins + [int64]$donation.Data.donatedSpins -or
+    [int64]$betaAfterHelp.spins -ne [int64]$betaBeforeHelp.spins - [int64]$donation.Data.donatedSpins) {
+    throw "donation crew non conservative"
+}
+$teamSnapshot = Invoke-ProtectedGet "/teams" $alpha.Token
+Assert-Ok $teamSnapshot "snapshot entraide crew"
+if (-not ($teamSnapshot.Data.ownTeam.messages | Where-Object phraseId -eq "thanks") -or
+    -not ($teamSnapshot.Data.ownTeam.helpRequests | Where-Object helpId -eq $help.Data.helpId)) {
+    throw "chat ou demande d'entraide absent du snapshot crew"
+}
+
+$socialExport = Invoke-ProtectedGet "/account/export" $alpha.Token
+Assert-Ok $socialExport "export social"
+if ($socialExport.Raw.Contains($beta.Address) -or
+    -not ($socialExport.Data.friendships | Where-Object playerId -eq $beta.PlayerId)) {
+    throw "Export social: wallet tiers exposé ou ami absent"
+}
+
 # Une préférence ami doit être autorisée et consommable par le prochain Attack.
 $targetRid = "social-target-friend-$runId"
 $target = Invoke-ProtectedPost "/social/target" $alpha.Token @{
@@ -401,6 +501,9 @@ if ((Get-CardQuantity $alphaAfterTrade $alphaCard) -ne (Get-CardQuantity $alphaB
 [pscustomobject]@{
     Players = 2
     Friendship = "bilateral"
+    FriendGift = "daily + idempotent"
+    CrewQuickChat = "allowlist only"
+    CrewHelp = "$($donation.Data.donatedSpins) spins conserved"
     FriendTarget = "accepted"
     Firewall = "3 blocked + 1 damage"
     Revenge = "available"

@@ -75,9 +75,44 @@ function Invoke-ProtectedJsonPost(
     }
 }
 
+function Invoke-ProtectedGet([string]$Path, [string]$AccessToken) {
+    try {
+        $headers = @{ Authorization = "Bearer $AccessToken" }
+        $response = Invoke-WebRequest -Uri ($BaseUrl + $Path) -Headers $headers -UseBasicParsing
+        return [pscustomobject]@{
+            Code = [int]$response.StatusCode
+            Raw = $response.Content
+            Data = $response.Content | ConvertFrom-Json
+        }
+    } catch {
+        $code = [int]$_.Exception.Response.StatusCode
+        $raw = $_.ErrorDetails.Message
+        $data = $null
+        if ($raw) {
+            try { $data = $raw | ConvertFrom-Json } catch { }
+        }
+        return [pscustomobject]@{ Code = $code; Raw = $raw; Data = $data }
+    }
+}
+
 $challenge = Invoke-JsonPost "/auth/challenge" @{ address = $DevAddress }
-if ($challenge.Code -ne 200 -or -not $challenge.Data.nonce) {
+if ($challenge.Code -ne 200 -or -not $challenge.Data.nonce -or
+    -not $challenge.Data.message -or -not $challenge.Data.expiresAtMs -or
+    $challenge.Data.message -notmatch [regex]::Escape($DevAddress)) {
     throw "Auth challenge invalide: HTTP $($challenge.Code)"
+}
+$challengeRepeat = Invoke-JsonPost "/auth/challenge" @{ address = $DevAddress }
+if ($challengeRepeat.Code -ne 200 -or
+    $challengeRepeat.Data.nonce -cne $challenge.Data.nonce -or
+    $challengeRepeat.Data.message -cne $challenge.Data.message -or
+    [int64]$challengeRepeat.Data.expiresAtMs -ne [int64]$challenge.Data.expiresAtMs) {
+    throw "Un second challenge a invalidé le nonce actif"
+}
+$invalidProof = Invoke-JsonPost "/auth/verify" @{ address = $DevAddress; signature = "invalid" }
+if ($invalidProof.Code -ne 401) { throw "Signature invalide acceptée" }
+$afterInvalidProof = Invoke-JsonPost "/auth/challenge" @{ address = $DevAddress }
+if ($afterInvalidProof.Data.nonce -cne $challenge.Data.nonce) {
+    throw "Une signature invalide a consommé le challenge légitime"
 }
 $verify = Invoke-JsonPost "/auth/verify" @{ address = $DevAddress; signature = "dev" }
 if ($verify.Code -ne 200 -or -not $verify.Data.token -or -not $verify.Data.refreshToken) {
@@ -219,6 +254,13 @@ if ($cooldown.Code -ne 403 -or $cooldown.Data.error.code -ne "UNAVAILABLE") {
     throw "Cooldown publicitaire non appliqué"
 }
 
+$export = Invoke-ProtectedGet "/account/export" $verify.Data.token
+if ($export.Code -ne 200 -or $export.Data.formatVersion -ne 1 -or
+    $export.Data.gameState.address -cne $DevAddress -or
+    $null -eq $export.Data.analyticsEvents -or $null -eq $export.Data.economyAudit) {
+    throw "Export de compte incomplet ou invalide"
+}
+
 $logout = Invoke-JsonPost "/auth/logout" @{ refreshToken = $verify.Data.refreshToken }
 if ($logout.Code -ne 200 -or $logout.Data.revoked -ne $true) {
     throw "Logout non révoqué: HTTP $($logout.Code)"
@@ -226,6 +268,42 @@ if ($logout.Code -ne 200 -or $logout.Data.revoked -ne $true) {
 $refreshAfterLogout = Invoke-JsonPost "/auth/refresh" @{ refreshToken = $verify.Data.refreshToken }
 if ($refreshAfterLogout.Code -ne 401 -or $refreshAfterLogout.Data.error.code -ne "UNAUTHORIZED") {
     throw "Refresh révoqué encore accepté"
+}
+
+
+# Le bearer court reste cryptographiquement valide après logout, donc on
+# l'utilise pour vérifier l'effacement, son retry exact et l'invalidation de
+# toutes les routes joueur une fois la ligne supprimée.
+$deleteRequestId = "account-delete-" + [guid]::NewGuid().ToString("N")
+$deleteBody = @{
+    confirmation = "DELETE CYBERSEEKER ACCOUNT"
+    requestId = $deleteRequestId
+}
+$delete = Invoke-ProtectedJsonPost "/account/delete" $verify.Data.token $deleteBody $deleteRequestId
+$deleteReplay = Invoke-ProtectedJsonPost "/account/delete" $verify.Data.token $deleteBody $deleteRequestId
+if ($delete.Code -ne 200 -or $deleteReplay.Code -ne 200 -or
+    $delete.Data.deleted -ne $true -or $delete.Data.replayed -ne $false -or
+    $deleteReplay.Data.replayed -ne $true) {
+    throw "Effacement de compte non transactionnel ou non idempotent"
+}
+$stateAfterDelete = Invoke-ProtectedGet "/state" $verify.Data.token
+if ($stateAfterDelete.Code -ne 401 -or $stateAfterDelete.Data.error.code -ne "UNAUTHORIZED") {
+    throw "Un ancien JWT accède encore au compte effacé"
+}
+
+$recreatedChallenge = Invoke-JsonPost "/auth/challenge" @{ address = $DevAddress }
+$recreated = Invoke-JsonPost "/auth/verify" @{ address = $DevAddress; signature = "dev" }
+if ($recreatedChallenge.Code -ne 200 -or $recreated.Code -ne 200) { throw "Recréation impossible" }
+$oldState = Invoke-ProtectedGet "/state" $verify.Data.token
+$newDeleteRid = "stale-token-" + [guid]::NewGuid().ToString("N")
+$oldDelete = Invoke-ProtectedJsonPost "/account/delete" $verify.Data.token @{
+    confirmation = "DELETE CYBERSEEKER ACCOUNT"; requestId = $newDeleteRid
+} $newDeleteRid
+$oldReplay = Invoke-ProtectedJsonPost "/account/delete" $verify.Data.token $deleteBody $deleteRequestId
+$newState = Invoke-ProtectedGet "/state" $recreated.Data.token
+if ($oldState.Code -ne 401 -or $oldDelete.Code -ne 401 -or
+    $oldReplay.Code -ne 200 -or $oldReplay.Data.replayed -ne $true -or $newState.Code -ne 200) {
+    throw "Un ancien JWT peut accéder/supprimer un compte recréé, ou retry unsafe"
 }
 
 [pscustomobject]@{
@@ -243,5 +321,9 @@ if ($refreshAfterLogout.Code -ne 401 -or $refreshAfterLogout.Data.error.code -ne
     AdCooldown = 403
     LogoutRevoked = $true
     RefreshAfterLogout = 401
+    ChallengeBoundAndStable = $true
+    AccountExport = $true
+    AccountDeletionReplay = $true
+    DeletedJwtRejected = 401
 } | Format-List
 Write-Host "API_CONTRACT_CHECK_OK" -ForegroundColor Green

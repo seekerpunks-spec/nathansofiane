@@ -1,6 +1,6 @@
 # MÉMOIRE — ARCHITECTURE (CONDENSÉ R17)
 
-> Détail : `docs/ARCHITECTURE.md`. Contrats : `docs/API_R17.md`. Le code
+> Détail : `docs/ARCHITECTURE.md`. Contrats : `docs/API_R41.md`. Le code
 > serveur reste l'autorité en cas de divergence documentaire.
 
 ## Stack et règle d'or

@@ -1312,6 +1312,7 @@ mod tests {
             db: db.clone(),
             config: std::sync::Arc::clone(&config),
             jwt_secret: "qa-secret-0123456789-0123456789-012".to_string(),
+            auth_domain: "qa.cyberseeker.local".to_string(),
             dev_auth: false,
             dev_address: None,
             started_at: std::time::Instant::now(),
@@ -1401,7 +1402,16 @@ mod tests {
 
         // 4. Fenêtre encore ouverte : rien à archiver. Puis on force la
         // clôture et l'archivage doit vider les tables vivantes une seule fois.
-        assert_eq!(archive_expired_events(&db).await?, 0);
+        // Le worker traite toute la base partagée. Une ancienne fixture peut
+        // expirer entre deux runs : vérifier notre occurrence, pas le total.
+        archive_expired_events(&db).await?;
+        let before_archive: Option<DateTime<Utc>> = sqlx::query_scalar(
+            "SELECT archived_at FROM event_reward_distributions WHERE event_key=$1",
+        )
+        .bind(&event_id)
+        .fetch_one(db.pool())
+        .await?;
+        assert!(before_archive.is_none());
         sqlx::query(
             "UPDATE event_reward_distributions SET claim_until=now()-interval '1 hour' \
              WHERE event_key=$1",
@@ -1409,8 +1419,22 @@ mod tests {
         .bind(&event_id)
         .execute(db.pool())
         .await?;
-        assert_eq!(archive_expired_events(&db).await?, 1);
-        assert_eq!(archive_expired_events(&db).await?, 0);
+        archive_expired_events(&db).await?;
+        let first_archive: Option<DateTime<Utc>> = sqlx::query_scalar(
+            "SELECT archived_at FROM event_reward_distributions WHERE event_key=$1",
+        )
+        .bind(&event_id)
+        .fetch_one(db.pool())
+        .await?;
+        assert!(first_archive.is_some());
+        archive_expired_events(&db).await?;
+        let replay_archive: Option<DateTime<Utc>> = sqlx::query_scalar(
+            "SELECT archived_at FROM event_reward_distributions WHERE event_key=$1",
+        )
+        .bind(&event_id)
+        .fetch_one(db.pool())
+        .await?;
+        assert_eq!(first_archive, replay_archive);
         let live_scores: i64 =
             sqlx::query_scalar("SELECT COUNT(*) FROM event_scores WHERE event_id=$1")
                 .bind(&event_id)

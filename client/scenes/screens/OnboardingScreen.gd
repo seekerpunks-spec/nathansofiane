@@ -117,8 +117,10 @@ func _connect() -> void:
 		_finish_error("Network unreachable.")
 		return
 
-	# 2) Signature. DEV : littérale "dev". PROD : signature Ed25519(nonce).
-	var signed := Wallet.sign_nonce(str(c.data.get("nonce", "")))
+	# 2) Signature. DEV : littérale "dev". PROD : message v2 lié au domaine,
+	# à l'adresse et au nonce ; repli nonce uniquement pour un ancien serveur.
+	var message := str(c.data.get("message", c.data.get("nonce", "")))
+	var signed := Wallet.sign_nonce(message)
 	if not signed.get("ok", false):
 		_finish_error(str(signed.get("error", "Signature declined.")))
 		return

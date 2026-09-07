@@ -129,21 +129,35 @@ func _build_requests(parent: VBoxContainer) -> void:
 
 func _build_friends(parent: VBoxContainer) -> void:
 	var friends: Array = host._network_snapshot.get("friends", [])
+	var gift_rules: Dictionary = host._network_snapshot.get("giftRules", {})
+	var gifts_left := maxi(0, int(gift_rules.get("maxSentPerDay", 0)) - int(gift_rules.get("sentToday", 0)))
 	_section(parent, "FRIENDS  •  %d" % friends.size())
+	if not friends.is_empty():
+		parent.add_child(Ui.label("%d DAILY GIFTS LEFT  •  +%d SPIN" % [gifts_left, int(gift_rules.get("rewardSpins", 1))], 11, Ui.TEXT_DIM))
 	if friends.is_empty():
 		parent.add_child(Ui.label("Add a player with their friend code.", 13, Ui.TEXT_DIM))
 		return
 	for friend in friends:
 		if typeof(friend) != TYPE_DICTIONARY:
 			continue
-		var row := HBoxContainer.new()
+		var row := VBoxContainer.new()
 		var label := Ui.label("%s  •  %s PWR" % [str(friend.get("displayName", "Runner")), Ui.compact(int(friend.get("score", 0)))], 13, Ui.TEXT)
 		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 		label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		row.add_child(label)
+		var actions := HBoxContainer.new()
 		var target := Ui.button("TARGET", Ui.NEON_MAGENTA)
+		target.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		target.add_to_group("horizontal_bounds_check")
 		target.pressed.connect(host._network_select_target.bind(str(friend.get("playerId", "")), "friend"))
-		row.add_child(target)
+		actions.add_child(target)
+		var gift := Ui.button("SENT" if bool(friend.get("giftedToday", false)) else "GIFT", Ui.GREEN, true)
+		gift.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		gift.add_to_group("horizontal_bounds_check")
+		gift.disabled = bool(friend.get("giftedToday", false)) or gifts_left <= 0
+		gift.pressed.connect(host._network_friend_gift.bind(str(friend.get("playerId", ""))))
+		actions.add_child(gift)
+		row.add_child(actions)
 		parent.add_child(row)
 
 func _build_revenge(parent: VBoxContainer) -> void:
@@ -180,20 +194,27 @@ func _build_team(parent: VBoxContainer) -> void:
 		for member in team.get("members", []):
 			if typeof(member) != TYPE_DICTIONARY:
 				continue
-			var member_row := HBoxContainer.new()
+			var member_row := VBoxContainer.new()
 			var role_suffix := "  •  OWNER" if str(member.get("role", "member")) == "owner" else ""
 			var member_label := Ui.label("%s  •  %s PWR%s" % [str(member.get("displayName", "Runner")), Ui.compact(int(member.get("score", 0))), role_suffix], 12, Ui.TEXT)
 			member_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 			member_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			member_row.add_child(member_label)
 			if is_owner and str(member.get("role", "member")) != "owner":
+				var member_actions := HBoxContainer.new()
 				var transfer := Ui.button("LEAD", Ui.NEON_CYAN, true)
+				transfer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+				transfer.add_to_group("horizontal_bounds_check")
 				transfer.pressed.connect(host._network_team_member_action.bind("/teams/transfer", str(member.get("playerId", "")), "team_owner_transferred"))
-				member_row.add_child(transfer)
+				member_actions.add_child(transfer)
 				var kick := Ui.button("KICK", Ui.NEON_MAGENTA, true)
+				kick.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+				kick.add_to_group("horizontal_bounds_check")
 				kick.pressed.connect(host._network_team_member_action.bind("/teams/kick", str(member.get("playerId", "")), "team_member_kicked"))
-				member_row.add_child(kick)
+				member_actions.add_child(kick)
+				member_row.add_child(member_actions)
 			parent.add_child(member_row)
+		_build_team_support(parent, team)
 		var leave := Ui.button("DISBAND" if is_owner and team.get("members", []).size() == 1 else "LEAVE CREW", Ui.NEON_MAGENTA, true)
 		leave.disabled = is_owner and team.get("members", []).size() > 1
 		leave.pressed.connect(host._network_team_leave)
@@ -240,6 +261,53 @@ func _build_team(parent: VBoxContainer) -> void:
 		for entry in team_entries.slice(0, mini(5, team_entries.size())):
 			if typeof(entry) == TYPE_DICTIONARY:
 				parent.add_child(Ui.label("#%d  %s  •  %s PWR" % [int(entry.get("rank", 0)), str(entry.get("name", "Crew")), Ui.compact(int(entry.get("score", 0)))], 12, Ui.TEXT_DIM))
+
+func _build_team_support(parent: VBoxContainer, team: Dictionary) -> void:
+	parent.add_child(Ui.label("CREW SIGNALS", 13, Ui.GOLD))
+	var labels: Dictionary = {}
+	var phrases: Array = team.get("quickChatPhrases", [])
+	for phrase in phrases:
+		if typeof(phrase) == TYPE_DICTIONARY:
+			labels[str(phrase.get("id", ""))] = str(phrase.get("label", "Signal"))
+	for message in team.get("messages", []):
+		if typeof(message) == TYPE_DICTIONARY:
+			var phrase_id := str(message.get("phraseId", ""))
+			parent.add_child(Ui.label("%s  •  %s" % [str(message.get("displayName", "Runner")), str(labels.get(phrase_id, phrase_id))], 11, Ui.TEXT_DIM))
+	var quick_grid := GridContainer.new()
+	quick_grid.columns = 2
+	quick_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	for phrase in phrases:
+		if typeof(phrase) != TYPE_DICTIONARY:
+			continue
+		var quick := Ui.button(str(phrase.get("label", "SIGNAL")).to_upper(), Ui.NEON_CYAN, true)
+		quick.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		quick.add_to_group("horizontal_bounds_check")
+		quick.pressed.connect(host._network_team_quick_message.bind(str(phrase.get("id", ""))))
+		quick_grid.add_child(quick)
+	parent.add_child(quick_grid)
+	parent.add_child(Ui.label("SPIN HELP", 13, Ui.GOLD))
+	var own_player_id := str(Store.state.get("profile", {}).get("playerId", ""))
+	var requests: Array = team.get("helpRequests", [])
+	for request in requests:
+		if typeof(request) != TYPE_DICTIONARY:
+			continue
+		var help_row := VBoxContainer.new()
+		var help_label := Ui.label("%s  •  %d/%d" % [str(request.get("displayName", "Runner")), int(request.get("donatedSpins", 0)), int(request.get("requestedSpins", 0))], 11, Ui.TEXT)
+		help_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		help_row.add_child(help_label)
+		var donate := Ui.button("DONATE", Ui.GREEN, true)
+		donate.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		donate.add_to_group("horizontal_bounds_check")
+		donate.disabled = not bool(request.get("canDonate", false)) or str(request.get("requesterPlayerId", "")) == own_player_id
+		donate.pressed.connect(host._network_team_help_donate.bind(str(request.get("helpId", ""))))
+		help_row.add_child(donate)
+		parent.add_child(help_row)
+	var request_spins := int(team.get("helpRules", {}).get("requestSpins", 5))
+	var ask := Ui.button("REQUEST %d SPINS" % request_spins, Ui.NEON_MAGENTA, true)
+	ask.add_to_group("horizontal_bounds_check")
+	ask.disabled = requests.any(func(item): return typeof(item) == TYPE_DICTIONARY and str(item.get("requesterPlayerId", "")) == own_player_id)
+	ask.pressed.connect(host._network_team_help_request)
+	parent.add_child(ask)
 
 func _build_trades(parent: VBoxContainer) -> void:
 	_section(parent, "CARD SWAPS")

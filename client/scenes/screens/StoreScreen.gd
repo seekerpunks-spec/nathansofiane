@@ -24,8 +24,15 @@ func _ready() -> void:
 	body.add_child(scroll)
 	add_child(body)
 	Store.state_changed.connect(_refresh)
-	_refresh()
-	_load_offers.call_deferred()
+	# Les captures QA s'exécutent sans serveur. Un meta posé avant l'entrée dans
+	# l'arbre fournit alors un catalogue déterministe et évite une course entre
+	# le fixture et l'appel HTTP. Aucun écran de production ne pose ce meta.
+	if has_meta("qa_offers"):
+		_eligible_offers = get_meta("qa_offers", [])
+		_refresh()
+	else:
+		_refresh()
+		_load_offers.call_deferred()
 
 func _load_offers() -> void:
 	var response := await Net.protected_request("GET", "/offers")
@@ -79,7 +86,7 @@ func _free_card() -> PanelContainer:
 	ad.disabled = _busy or watched >= maximum or not Wallet.is_dev()
 	ad.pressed.connect(_reward_ad)
 	box.add_child(ad)
-	var wait := Ui.button("ATTENDRE  " + Ui.mmss(Store.regen_remaining_ms()), Ui.TEXT_DIM, true)
+	var wait := Ui.button("WAIT  " + Ui.mmss(Store.regen_remaining_ms()), Ui.TEXT_DIM, true)
 	wait.disabled = true
 	box.add_child(wait)
 	panel.add_child(box)

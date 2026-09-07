@@ -39,6 +39,8 @@ impl Db {
             .connect(database_url)
             .await
             .map_err(|e| anyhow!("connexion Postgres impossible : {}", e))?;
+        // Les migrations embarquées, immuables après application, incluent la
+        // cascade complète nécessaire à l'effacement transactionnel d'un compte.
         sqlx::migrate!("./migrations")
             .run(&pool)
             .await
@@ -50,43 +52,67 @@ impl Db {
         &self.pool
     }
 
+    /// Une session consommée par rotation/logout garde son access JWT jusqu'à
+    /// son expiration courte. L'effacement du compte détruit toutes les sessions.
+    pub async fn access_session_exists(&self, address: &str, jti_hash: &str) -> Result<bool> {
+        Ok(
+            sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM refresh_sessions WHERE address=$1 AND jti_hash=$2 AND expires_at>=now())")
+                .bind(address)
+                .bind(jti_hash)
+                .fetch_one(&self.pool)
+                .await?,
+        )
+    }
+
     /// Nouvelle transaction (commit/rollback par l'appelant).
     pub async fn begin(&self) -> Result<Transaction<'_, Postgres>> {
         Ok(self.pool.begin().await?)
     }
 
-    /// Crée ou remplace le challenge d'une adresse. PostgreSQL est la source
-    /// partagée entre instances ; un nouveau challenge invalide l'ancien.
+    /// Crée un challenge ou renvoie celui qui est encore valide. PostgreSQL est
+    /// la source partagée entre instances. Un appel public répété ne doit pas
+    /// écraser le nonce qu'un wallet est précisément en train de signer.
     pub async fn store_auth_nonce(
         &self,
         address: &str,
         nonce: &str,
         expires_at: DateTime<Utc>,
-    ) -> Result<()> {
-        sqlx::query(
+    ) -> Result<(String, DateTime<Utc>)> {
+        let stored = sqlx::query_as(
             "INSERT INTO auth_nonces(address,nonce,expires_at) VALUES($1,$2,$3) \
-             ON CONFLICT(address) DO UPDATE SET nonce=EXCLUDED.nonce, \
-             expires_at=EXCLUDED.expires_at,created_at=now()",
+             ON CONFLICT(address) DO UPDATE SET \
+             nonce=CASE WHEN auth_nonces.expires_at<now() THEN EXCLUDED.nonce ELSE auth_nonces.nonce END, \
+             expires_at=CASE WHEN auth_nonces.expires_at<now() THEN EXCLUDED.expires_at ELSE auth_nonces.expires_at END, \
+             created_at=CASE WHEN auth_nonces.expires_at<now() THEN now() ELSE auth_nonces.created_at END \
+             RETURNING nonce,expires_at",
         )
         .bind(address)
         .bind(nonce)
         .bind(expires_at)
-        .execute(&self.pool)
+        .fetch_one(&self.pool)
         .await?;
-        Ok(())
+        Ok(stored)
     }
 
-    /// Consomme exactement une fois le challenge, même si deux serveurs
-    /// reçoivent simultanément la même preuve. Un nonce expiré est aussi retiré.
-    pub async fn take_auth_nonce(&self, address: &str) -> Result<Option<String>> {
-        let row: Option<(String, bool)> = sqlx::query_as(
-            "DELETE FROM auth_nonces WHERE address=$1 \
-             RETURNING nonce, expires_at >= now()",
+    pub async fn peek_auth_nonce(&self, address: &str) -> Result<Option<String>> {
+        Ok(sqlx::query_scalar(
+            "SELECT nonce FROM auth_nonces WHERE address=$1 AND expires_at>=now()",
         )
         .bind(address)
         .fetch_optional(&self.pool)
+        .await?)
+    }
+
+    /// Comparaison/consommation atomique après vérification de signature.
+    pub async fn consume_auth_nonce(&self, address: &str, nonce: &str) -> Result<bool> {
+        let row: Option<String> = sqlx::query_scalar(
+            "DELETE FROM auth_nonces WHERE address=$1 AND nonce=$2 AND expires_at>=now() RETURNING nonce",
+        )
+        .bind(address)
+        .bind(nonce)
+        .fetch_optional(&self.pool)
         .await?;
-        Ok(row.and_then(|(nonce, valid)| valid.then_some(nonce)))
+        Ok(row.is_some())
     }
 
     pub async fn store_refresh_session(
@@ -158,6 +184,10 @@ impl Db {
     /// atomiques : pas de joueur sans ligne d'état.
     pub async fn ensure_player(&self, address: &str, new_player_spins: i32) -> Result<bool> {
         let mut tx = self.pool.begin().await?;
+        sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended($1,4))")
+            .bind(address)
+            .execute(&mut *tx)
+            .await?;
         let inserted = sqlx::query(
             "INSERT INTO players (address) VALUES ($1) ON CONFLICT (address) DO NOTHING",
         )
@@ -329,20 +359,44 @@ mod tests {
         };
         let address = format!("nonce-test-{}", uuid::Uuid::new_v4());
         let nonce = "a".repeat(64);
-        db.store_auth_nonce(&address, &nonce, Utc::now() + Duration::minutes(1))
+        let first_expiry = Utc::now() + Duration::minutes(1);
+        let stored = db.store_auth_nonce(&address, &nonce, first_expiry).await?;
+        assert_eq!(stored.0, nonce);
+
+        // Un second appel public pendant que le wallet signe ne doit jamais
+        // invalider le premier challenge.
+        let replacement = "b".repeat(64);
+        let repeated = db
+            .store_auth_nonce(&address, &replacement, Utc::now() + Duration::minutes(1))
             .await?;
+        assert_eq!(repeated.0, nonce);
+        assert_eq!(repeated.1, stored.1);
 
         let first_db = db.clone();
         let second_db = db.clone();
         let first_address = address.clone();
         let second_address = address.clone();
+        assert!(!db.consume_auth_nonce(&address, "wrong-proof").await?);
+        assert_eq!(
+            db.peek_auth_nonce(&address).await?.as_deref(),
+            Some(nonce.as_str())
+        );
+        let first_nonce = nonce.clone();
+        let second_nonce = nonce.clone();
         let (first, second) = tokio::join!(
-            async move { first_db.take_auth_nonce(&first_address).await },
-            async move { second_db.take_auth_nonce(&second_address).await }
+            async move {
+                first_db
+                    .consume_auth_nonce(&first_address, &first_nonce)
+                    .await
+            },
+            async move {
+                second_db
+                    .consume_auth_nonce(&second_address, &second_nonce)
+                    .await
+            }
         );
         let consumed = [first?, second?];
-        assert_eq!(consumed.iter().filter(|value| value.is_some()).count(), 1);
-        assert!(consumed.iter().flatten().all(|value| value == &nonce));
+        assert_eq!(consumed.iter().filter(|value| **value).count(), 1);
 
         db.store_auth_nonce(&address, &nonce, Utc::now() + Duration::minutes(1))
             .await?;
@@ -355,8 +409,8 @@ mod tests {
         .bind(&address)
         .execute(db.pool())
         .await?;
-        assert!(db.take_auth_nonce(&address).await?.is_none());
-        assert!(db.take_auth_nonce(&address).await?.is_none());
+        assert!(db.peek_auth_nonce(&address).await?.is_none());
+        assert!(!db.consume_auth_nonce(&address, &nonce).await?);
         Ok(())
     }
 

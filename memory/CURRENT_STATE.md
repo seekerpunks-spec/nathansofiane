@@ -1,26 +1,40 @@
-# MÉMOIRE — ÉTAT ACTUEL R39
+# MÉMOIRE — ÉTAT ACTUEL R41 + reset DA
 
-> MAJ 01/09/2026. R39 = netteté / lisse (D7). Layout R38 inchangé.
+> MAJ 07/09/2026. R41 = hardening/fermeture MASTER TODO local. Le runtime visuel
+> reste R39 ; le home/mockup R40 est **abandonné**.
 
-## Lot R39
+## Design
 
-- Bâtiments : knockout BFS + spread RGB + alpha gaussien, WebP lossless.
-  Stages natifs (plus d'upscale 1080). Chrome UI 8× (star/hammer/wrench).
-- Godot 4.7 : Nunito ExtraBold MSDF, Linear+mipmaps (filter=2), pas de snap
-  pixel, StyleBoxFlat AA. FXAA/MSAA 2D **non** (Compatibility, doc 4.7).
-- UI : outline 2, plus de grille SignalBackdrop, étoiles/marteaux en sprites.
+Reset user : rien ne va. Plus de Punk City, plus de rails, plus de
+`SpinHomeChrome`. Client visuel = commit `4bb98d3` (R34–R39).
+Brief DA : **skyline jour jouet**. Frame 1 (monde vide, pas de HUD/slot)
+en staging `art/api_gpt_image/skyline_jour_jouet_v1.png` — **pas encore
+câblée**. Attente oui/non user.
+
+## Gameplay et plateforme R41
+
+MASTER TODO local fermé : cadeau ami quotidien, chat rapide crew et entraide
+spins ajoutés. Challenge auth lié au domaine, confidentialité export/delete,
+rétentions configurables et workflow CI GitHub (exécution distante à confirmer).
+22 modules Rust, 23 migrations.
+
+Revue du 07/09 : access JWT lié à sa session (invalide après recréation),
+nonce consommé seulement après signature valide, effacement/recréation sérialisés,
+exports sociaux sans wallets tiers, dons avec régénération et reliquat conservés,
+retries concurrents après remplissage et contrôle des deux membres de crew.
+Le test d'archivage contrôle sa propre occurrence, pas les résidus d'autres runs.
 
 ## Validation
 
-`mobile_ux_check` + smoke 360/540/720. QA visuelle : `PLAY.bat` + F11.
-
-## Périmètre
-
-Gameplay MASTER TODO + villages R38. 21 modules Rust, 20 migs.
+`LOCAL_FULL_GATE_OK` du 07/09 : 44 tests Rust, dont 16 PostgreSQL réels,
+API + social à deux instances et smoke des 6 scènes en 360/540/720.
+Clippy strict vert. Gate rejouée hors sandbox sans erreur Godot.
+Aucun APK/AAB R41.
 
 ## Environnement IA
 
-Shell Cursor `all` ; PS 5.1 ; Godot 4.7.2 ; venv PIL `...\ex\local-ai\venv`.
+PowerShell 7 (`pwsh`) disponible ; compatibilité scripts PS 5.1 conservée ;
+Godot 4.7.2. Le sandbox peut bloquer les paramètres/certificats utilisateur Godot.
 
 ## Dépendances externes
 
