@@ -150,7 +150,7 @@ $accentClass = '[\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u00FF\u0152\u0153]'
 $forbiddenFrenchWords = '(?i)\b(ATTENDRE|RETOUR|NIVEAU|AMELIORE|ACHETER|OUVRIR|FERMER|SUIVANT|PRECEDENT|RECOMPENSE|QUOTIDIEN|MISSION DU JOUR)\b'
 $frenchHits = @()
 Get-ChildItem -LiteralPath $client -Filter "*.gd" -Recurse |
-    Where-Object { $_.FullName -notmatch '\\tests\\' } |
+    Where-Object { $_.FullName.Replace('\', '/') -notmatch '/tests/' } |
     ForEach-Object {
         $file = $_
         $lineNum = 0

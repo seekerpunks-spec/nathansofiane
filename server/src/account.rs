@@ -27,7 +27,11 @@ fn address_hash(address: &str) -> String {
         .collect()
 }
 
-async fn json_rows(pool: &PgPool, sql: &str, address: &str) -> Result<Vec<Value>, ApiError> {
+async fn json_rows(
+    pool: &PgPool,
+    sql: &'static str,
+    address: &str,
+) -> Result<Vec<Value>, ApiError> {
     Ok(sqlx::query_scalar(sql)
         .bind(address)
         .fetch_all(pool)
@@ -211,14 +215,13 @@ pub async fn delete_account_data(
     }
 
     transfer_or_delete_owned_team(&mut tx, address).await?;
-    for table in [
-        "event_scores_archive",
-        "team_event_contributions_archive",
-        "event_milestone_claims_archive",
-        "team_event_claims_archive",
+    for statement in [
+        "DELETE FROM event_scores_archive WHERE address=$1",
+        "DELETE FROM team_event_contributions_archive WHERE address=$1",
+        "DELETE FROM event_milestone_claims_archive WHERE address=$1",
+        "DELETE FROM team_event_claims_archive WHERE address=$1",
     ] {
-        let statement = format!("DELETE FROM {table} WHERE address=$1");
-        sqlx::query(&statement)
+        sqlx::query(statement)
             .bind(address)
             .execute(&mut *tx)
             .await?;

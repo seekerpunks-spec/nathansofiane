@@ -498,6 +498,13 @@ if ((Get-CardQuantity $alphaAfterTrade $alphaCard) -ne (Get-CardQuantity $alphaB
     throw "quantités de cartes incohérentes après échange"
 }
 
+$historyExport = Invoke-ProtectedGet "/account/export" $alpha.Token
+Assert-Ok $historyExport "export après combats et échange"
+if ($historyExport.Raw.Contains($beta.Address) -or
+    -not $historyExport.Data.encounters -or -not $historyExport.Data.trades) {
+    throw "Export des historiques: wallet tiers exposé ou historique absent"
+}
+
 [pscustomobject]@{
     Players = 2
     Friendship = "bilateral"

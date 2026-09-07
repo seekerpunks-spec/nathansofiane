@@ -247,7 +247,7 @@ impl Db {
         address: &str,
     ) -> Result<Option<StateRow>> {
         let row: Option<StateRow> =
-            sqlx::query_as::<Postgres, StateRow>(&format!("{STATE_SELECT} FOR UPDATE"))
+            sqlx::query_as::<Postgres, StateRow>("SELECT spins, credits, last_spin_at, district_index, daily_streak, last_daily_claim, ads_watched_today, ads_claimed_date, firewall_charges FROM player_state WHERE address=$1 FOR UPDATE")
                 .bind(address)
                 .fetch_optional(&mut **tx)
                 .await?;

@@ -83,6 +83,8 @@
       recréation, export sans wallets tiers, dons/regen/reliquat, demandes ouvertes,
       contrôle d'appartenance et rejeu concurrent après complétion.
 - [ ] **CI distante R41** : confirmer les deux jobs après push.
+- [x] **Corrections première CI** : chemins Linux i18n, SQLx 0.9 sans RSA,
+      audit RustSec local vierge sans exception, export testé après combats/trade.
 - [ ] **DA skyline jour jouet** : frame 1 générée (monde vide 9:16,
       staging `art/api_gpt_image/skyline_jour_jouet_v1.png`). Attente oui/non.
       Si non : régénérer cette frame seule. Si oui : composite Godot

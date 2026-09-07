@@ -24,6 +24,13 @@ exports sociaux sans wallets tiers, dons avec régénération et reliquat conser
 retries concurrents après remplissage et contrôle des deux membres de crew.
 Le test d'archivage contrôle sa propre occurrence, pas les résidus d'autres runs.
 
+Suivi CI du 07/09 : premier run Linux a détecté un filtre de chemins Windows
+dans le contrôle i18n (corrigé), et RustSec RUSTSEC-2023-0071 via RSA/SQLx 0.8.
+SQLx migré en 0.9 (Rust >=1.94), RSA retirée du lockfile ; audit local sans
+alerte ni exclusion, Clippy strict et 44 tests verts sur les migrations existantes.
+Les requêtes SQL assemblées à partir de constantes deviennent des littéraux.
+Checkout GitHub actualisé ; nouvelle exécution Linux à confirmer.
+
 ## Validation
 
 `LOCAL_FULL_GATE_OK` du 07/09 : 44 tests Rust, dont 16 PostgreSQL réels,

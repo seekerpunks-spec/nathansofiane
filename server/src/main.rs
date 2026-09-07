@@ -228,23 +228,20 @@ async fn main() -> anyhow::Result<()> {
             {
                 tracing::warn!(?error, "rétention economy_audit échouée");
             }
-            for (table, days) in [
-                ("event_scores_archive", liveops_archive_retention_days),
+            for (table, statement) in [
+                ("event_scores_archive", "DELETE FROM event_scores_archive WHERE archived_at < now() - make_interval(days => $1)"),
                 (
                     "team_event_contributions_archive",
-                    liveops_archive_retention_days,
+                    "DELETE FROM team_event_contributions_archive WHERE archived_at < now() - make_interval(days => $1)",
                 ),
                 (
                     "event_milestone_claims_archive",
-                    liveops_archive_retention_days,
+                    "DELETE FROM event_milestone_claims_archive WHERE archived_at < now() - make_interval(days => $1)",
                 ),
-                ("team_event_claims_archive", liveops_archive_retention_days),
+                ("team_event_claims_archive", "DELETE FROM team_event_claims_archive WHERE archived_at < now() - make_interval(days => $1)"),
             ] {
-                let statement = format!(
-                    "DELETE FROM {table} WHERE archived_at < now() - make_interval(days => $1)"
-                );
-                if let Err(error) = sqlx::query(&statement)
-                    .bind(days)
+                if let Err(error) = sqlx::query(statement)
+                    .bind(liveops_archive_retention_days)
                     .execute(&maintenance_pool)
                     .await
                 {

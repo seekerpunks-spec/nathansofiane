@@ -1189,13 +1189,17 @@ pub async fn claim_season(
         tx.rollback().await?;
         return Err(ApiError::AlreadyClaimed);
     }
-    let column = if body.premium {
-        "paid_claimed"
+    let claim_update = if body.premium {
+        "UPDATE season_progress SET paid_claimed=paid_claimed || jsonb_build_array($1::int) WHERE address=$2 AND season_id=$3"
     } else {
-        "free_claimed"
+        "UPDATE season_progress SET free_claimed=free_claimed || jsonb_build_array($1::int) WHERE address=$2 AND season_id=$3"
     };
-    sqlx::query(&format!("UPDATE season_progress SET {column}={column} || jsonb_build_array($1::int) WHERE address=$2 AND season_id=$3"))
-        .bind(body.tier as i32).bind(&addr.0).bind(&season.season_id).execute(&mut *tx).await?;
+    sqlx::query(claim_update)
+        .bind(body.tier as i32)
+        .bind(&addr.0)
+        .bind(&season.season_id)
+        .execute(&mut *tx)
+        .await?;
     game::grant_reward_tx(&mut tx, &addr.0, reward, &state.config).await?;
     let balances: (i32, i64) =
         sqlx::query_as("SELECT spins,credits FROM player_state WHERE address=$1")
