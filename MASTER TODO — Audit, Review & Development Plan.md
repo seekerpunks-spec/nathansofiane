@@ -1,5 +1,29 @@
 # MASTER TODO — AUDIT + REVIEW + DEVELOPMENT
 
+## Mise à jour R44 — Illustrations des bâtiments
+
+Les 55 anciens sprites sont archivés et remplacés par 75 nouvelles illustrations
+(25 bâtiments, trois évolutions), dans le thème de l'interface.
+Imagegen puis détourage automatique explicitement autorisé. Économie inchangée,
+gate complète verte : [livraison R44](docs/R44_BUILDING_ART.md).
+
+## Mise à jour R43 — MAP
+
+Refonte MAP dans le thème Punk City livrée et validée : sélection de bâtiments,
+fiche d'amélioration, Build Bay, liste des districts et complétion.
+Voir [livraison et tests MAP](docs/R43_MAP_DESIGN.md). Assets de bâtiments
+existants réutilisés, aucune réécriture économique ni APK/AAB.
+
+## Mise à jour R42 — 07/09/2026
+
+La nouvelle demande explicite de refonte d'après l'image Punk City remplace le
+gel du design et le brief skyline jour. L'accueil et le thème global sont en
+R42, sans réécriture économique : voir [livraison et restant R42](docs/R42_REFERENCE_DESIGN.md).
+Le remplacement de toutes les illustrations n'est **pas terminé** : la
+génération des bâtiments a rencontré la limite d'images. Aucun APK/AAB ni
+implémentation wallet dans ce lot. Ne pas rouvrir les fonctionnalités R41 déjà
+validées simplement parce qu'elles figurent dans l'inventaire historique.
+
 Tu travailles sur un jeu mobile live-service inspiré dans sa **structure de boucles** par Coin Master, mais avec une identité originale cyberpunk / crypto / Solana Seeker.
 
 Le projet existe déjà et une partie du développement a été réalisée.

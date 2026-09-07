@@ -1,0 +1,156 @@
+{
+  "district": 5,
+  "source": "district_05.png",
+  "sprites": [
+    {
+      "name": "d5_lattice_t0.webp",
+      "bounds": [
+        65,
+        78,
+        264,
+        269
+      ],
+      "transparent_fraction": 0.7753
+    },
+    {
+      "name": "d5_reactor_t0.webp",
+      "bounds": [
+        396,
+        67,
+        588,
+        261
+      ],
+      "transparent_fraction": 0.7771
+    },
+    {
+      "name": "d5_cipher_t0.webp",
+      "bounds": [
+        679,
+        102,
+        893,
+        261
+      ],
+      "transparent_fraction": 0.7859
+    },
+    {
+      "name": "d5_spine_t0.webp",
+      "bounds": [
+        988,
+        67,
+        1171,
+        264
+      ],
+      "transparent_fraction": 0.8077
+    },
+    {
+      "name": "d5_beacon_t0.webp",
+      "bounds": [
+        1277,
+        79,
+        1459,
+        268
+      ],
+      "transparent_fraction": 0.8347
+    },
+    {
+      "name": "d5_lattice_t1.webp",
+      "bounds": [
+        37,
+        327,
+        303,
+        563
+      ],
+      "transparent_fraction": 0.6363
+    },
+    {
+      "name": "d5_reactor_t1.webp",
+      "bounds": [
+        363,
+        313,
+        610,
+        565
+      ],
+      "transparent_fraction": 0.6363
+    },
+    {
+      "name": "d5_cipher_t1.webp",
+      "bounds": [
+        649,
+        349,
+        912,
+        567
+      ],
+      "transparent_fraction": 0.6514
+    },
+    {
+      "name": "d5_spine_t1.webp",
+      "bounds": [
+        959,
+        309,
+        1184,
+        567
+      ],
+      "transparent_fraction": 0.7067
+    },
+    {
+      "name": "d5_beacon_t1.webp",
+      "bounds": [
+        1247,
+        325,
+        1478,
+        567
+      ],
+      "transparent_fraction": 0.7058
+    },
+    {
+      "name": "d5_lattice_t2.webp",
+      "bounds": [
+        19,
+        594,
+        318,
+        934
+      ],
+      "transparent_fraction": 0.4595
+    },
+    {
+      "name": "d5_reactor_t2.webp",
+      "bounds": [
+        343,
+        613,
+        620,
+        932
+      ],
+      "transparent_fraction": 0.4658
+    },
+    {
+      "name": "d5_cipher_t2.webp",
+      "bounds": [
+        636,
+        598,
+        931,
+        929
+      ],
+      "transparent_fraction": 0.5048
+    },
+    {
+      "name": "d5_spine_t2.webp",
+      "bounds": [
+        942,
+        593,
+        1207,
+        936
+      ],
+      "transparent_fraction": 0.5364
+    },
+    {
+      "name": "d5_beacon_t2.webp",
+      "bounds": [
+        1222,
+        618,
+        1514,
+        931
+      ],
+      "transparent_fraction": 0.5278
+    }
+  ]
+}

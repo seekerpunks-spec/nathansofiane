@@ -1,0 +1,156 @@
+{
+  "district": 4,
+  "source": "district_04.png",
+  "sprites": [
+    {
+      "name": "d4_vault_t0.webp",
+      "bounds": [
+        59,
+        126,
+        271,
+        293
+      ],
+      "transparent_fraction": 0.7757
+    },
+    {
+      "name": "d4_atrium_t0.webp",
+      "bounds": [
+        352,
+        69,
+        586,
+        298
+      ],
+      "transparent_fraction": 0.7038
+    },
+    {
+      "name": "d4_bridge_t0.webp",
+      "bounds": [
+        639,
+        89,
+        904,
+        278
+      ],
+      "transparent_fraction": 0.8036
+    },
+    {
+      "name": "d4_suite_t0.webp",
+      "bounds": [
+        974,
+        65,
+        1178,
+        299
+      ],
+      "transparent_fraction": 0.7463
+    },
+    {
+      "name": "d4_crown_t0.webp",
+      "bounds": [
+        1300,
+        40,
+        1483,
+        297
+      ],
+      "transparent_fraction": 0.786
+    },
+    {
+      "name": "d4_vault_t1.webp",
+      "bounds": [
+        49,
+        376,
+        285,
+        585
+      ],
+      "transparent_fraction": 0.6959
+    },
+    {
+      "name": "d4_atrium_t1.webp",
+      "bounds": [
+        351,
+        364,
+        589,
+        593
+      ],
+      "transparent_fraction": 0.6724
+    },
+    {
+      "name": "d4_bridge_t1.webp",
+      "bounds": [
+        631,
+        365,
+        908,
+        590
+      ],
+      "transparent_fraction": 0.7161
+    },
+    {
+      "name": "d4_suite_t1.webp",
+      "bounds": [
+        952,
+        352,
+        1175,
+        598
+      ],
+      "transparent_fraction": 0.7031
+    },
+    {
+      "name": "d4_crown_t1.webp",
+      "bounds": [
+        1281,
+        327,
+        1491,
+        592
+      ],
+      "transparent_fraction": 0.7448
+    },
+    {
+      "name": "d4_vault_t2.webp",
+      "bounds": [
+        42,
+        629,
+        296,
+        932
+      ],
+      "transparent_fraction": 0.5687
+    },
+    {
+      "name": "d4_atrium_t2.webp",
+      "bounds": [
+        336,
+        638,
+        603,
+        944
+      ],
+      "transparent_fraction": 0.52
+    },
+    {
+      "name": "d4_bridge_t2.webp",
+      "bounds": [
+        623,
+        625,
+        922,
+        946
+      ],
+      "transparent_fraction": 0.532
+    },
+    {
+      "name": "d4_suite_t2.webp",
+      "bounds": [
+        935,
+        639,
+        1179,
+        947
+      ],
+      "transparent_fraction": 0.6034
+    },
+    {
+      "name": "d4_crown_t2.webp",
+      "bounds": [
+        1243,
+        612,
+        1501,
+        950
+      ],
+      "transparent_fraction": 0.5671
+    }
+  ]
+}

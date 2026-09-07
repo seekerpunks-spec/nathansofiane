@@ -1,6 +1,8 @@
 extends Control
 ## Coffres et collections — inventaire serveur, doublons visibles.
 
+const Neon := preload("res://scripts/components/NeonSkin.gd")
+
 signal navigate_requested(tab: String)
 
 var _content: VBoxContainer
@@ -8,21 +10,21 @@ var _credits: Label
 var _busy := false
 
 func _ready() -> void:
-	add_child(Ui.illustrated_stage("res://assets/generated/api_gpt/heroes/collection_hero.webp"))
+	add_child(Ui.illustrated_stage("res://assets/generated/punk_city/city.webp"))
 	var body := Ui.screen_body()
 	# Le kicker est volontairement long. En HBox avec le chip crédits, sa taille
 	# minimale poussait le chip hors écran à 540 px et 360 px. Une pile verticale
 	# garde les deux blocs visibles quelle que soit la largeur du téléphone.
 	var head := VBoxContainer.new()
 	head.add_theme_constant_override("separation", 6)
-	var title := Ui.kicker_block("OPEN  •  REVEAL  •  COLLECT", "Cards", Ui.NEON_MAGENTA)
+	var title := Neon.header("OPEN • REVEAL • COLLECT", "Cards", 7, Ui.NEON_MAGENTA)
 	head.add_child(title)
 	var credits_chip := Ui.hud_chip(Ui.GOLD)
 	credits_chip.name = "CreditsChip"
 	credits_chip.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	credits_chip.custom_minimum_size.y = 48
 	credits_chip.add_to_group("horizontal_bounds_check")
-	_credits = Ui.label("0 CR", 18, Color("#11225A"))
+	_credits = Ui.label("0 CR", 18, Ui.TEXT)
 	credits_chip.add_child(_credits)
 	head.add_child(credits_chip)
 	body.add_child(head)
@@ -90,7 +92,7 @@ func _chest_card(chest: Dictionary) -> PanelContainer:
 	row.add_child(text)
 	var actions := HBoxContainer.new()
 	actions.add_theme_constant_override("separation", 8)
-	var open := Ui.button("OPEN", Color("#FF4F46"))
+	var open := Ui.button("OPEN", Ui.GOLD)
 	open.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	open.add_to_group("horizontal_bounds_check")
 	open.disabled = _busy or qty < 1

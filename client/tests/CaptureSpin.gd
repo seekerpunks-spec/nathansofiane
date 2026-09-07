@@ -41,8 +41,9 @@ func _ready() -> void:
 
 	var slot := preload("res://scenes/screens/SpinScreen.tscn").instantiate()
 	add_child(slot)
-	for frame in 8:
+	for frame in 12:
 		await get_tree().process_frame
+	RenderingServer.force_draw()
 	await RenderingServer.frame_post_draw
 	var output := ProjectSettings.globalize_path("res://../captures/slot_runtime.png")
 	DirAccess.make_dir_recursive_absolute(output.get_base_dir())

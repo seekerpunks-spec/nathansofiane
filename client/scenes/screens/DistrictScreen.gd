@@ -13,8 +13,8 @@ const ASSET_ROOT := "res://assets/generated/"
 ## WebP runtime, PNG accepté si un art n'est pas encore converti.
 const ASSET_EXTENSIONS: Array[String] = [".webp", ".png"]
 
-const IVORY := Color("#FFF0C0")
-const INK := Color("#11225A")
+const IVORY := Color("#061224")
+const INK := Color("#F1FCFF")
 const PAD_SIZE := Vector2(250, 360)
 const ART_SIZE := Vector2(250, 270)
 const HAMMER := 68
@@ -29,6 +29,8 @@ var _busy := false
 var _district: Dictionary = {}
 var _layout_busy := false
 var _armed_element := -1
+var _map_view: RefCounted
+var _map_message := ""
 
 func _ready() -> void:
 	_district = _active_district()
@@ -82,89 +84,12 @@ func _apply_background() -> void:
 	_background.texture = texture
 
 func _build() -> void:
-	var districts := Config.districts()
-	if districts.is_empty():
-		add_child(Ui.label("NO DISTRICT CONFIGURED", 20, Ui.DANGER))
-		return
-	var safe := Ui.safe_insets()
-	_list = Control.new()
-	_list.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_list.offset_top = 118.0 + safe.y
-	_list.offset_bottom = -(Ui.NAV_HEIGHT + 8.0 + safe.w)
-	_list.clip_contents = false
-	_list.resized.connect(_layout_pads)
-	add_child(_list)
+	_map_view = preload("res://scripts/components/DistrictMapView.gd").new()
+	_map_view.build(self)
 
-	var credits_chip := _ivory_chip(Ui.GOLD)
-	credits_chip.position = Vector2(14 + safe.x, 12 + safe.y)
-	credits_chip.size = Vector2(200, 56)
-	_credits = Ui.label("0 CR", 20, INK)
-	credits_chip.add_child(_credits)
-	add_child(credits_chip)
-
-	_hero_holder = VBoxContainer.new()
-	_hero_holder.position = Vector2(224 + safe.x, 12 + safe.y)
-	_hero_holder.size = Vector2(302 - safe.z, 56)
-	add_child(_hero_holder)
-	_rebuild_hero()
-
-	_progress = Ui.progress_bar(Ui.GOLD, 14)
-	_progress.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_progress.set_anchors_preset(Control.PRESET_TOP_WIDE)
-	_progress.offset_left = 18 + safe.x
-	_progress.offset_right = -(18 + safe.z)
-	_progress.offset_top = 76.0 + safe.y
-	_progress.offset_bottom = 92.0 + safe.y
-	add_child(_progress)
-	_progress_label = Ui.label("", 12, Ui.TEXT)
-	_progress_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_progress_label.set_anchors_preset(Control.PRESET_TOP_WIDE)
-	_progress_label.offset_left = 18 + safe.x
-	_progress_label.offset_right = -(18 + safe.z)
-	_progress_label.offset_top = 94.0 + safe.y
-	_progress_label.offset_bottom = 114.0 + safe.y
-	add_child(_progress_label)
-
-	var bay := _round_tool(Ui.GOLD, false)
-	bay.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
-	bay.offset_left = 16.0 + safe.x
-	bay.offset_top = -(Ui.NAV_HEIGHT + 84.0 + safe.w)
-	bay.offset_right = 16.0 + safe.x + HAMMER
-	bay.offset_bottom = -(Ui.NAV_HEIGHT + 16.0 + safe.w)
-	bay.pressed.connect(_open_build_bay)
-	add_child(bay)
-
-func _ivory_chip(accent: Color) -> PanelContainer:
-	var chip := PanelContainer.new()
-	var box := Ui.style_box(IVORY, Color(accent, 0.98), 22, 4)
-	box.set_content_margin_all(8)
-	box.shadow_color = Color("#182356", 0.48)
-	box.shadow_size = 7
-	box.shadow_offset = Vector2(0, 5)
-	chip.add_theme_stylebox_override("panel", box)
-	return chip
-
-## Bandeau compact : le diorama a besoin du viewport, pas d'une carte héros 172 px.
 func _rebuild_hero() -> void:
-	if _hero_holder == null:
-		return
-	for child in _hero_holder.get_children():
-		child.queue_free()
-	var total := Config.districts().size()
-	var index := int(_district.get("id", 1))
-	var kicker := "NODE %02d" % index
-	if total > 1:
-		kicker = "NODE %02d / %02d" % [index, total]
-	var chip := _ivory_chip(Ui.NEON_CYAN)
-	var copy := VBoxContainer.new()
-	copy.add_theme_constant_override("separation", 0)
-	var k := Ui.label(kicker, 10, Ui.NEON_CYAN)
-	copy.add_child(k)
-	var title := Ui.label(str(_district.get("name", "Neon Slums")), 20, INK)
-	copy.add_child(title)
-	chip.add_child(copy)
-	chip.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_hero_holder.add_child(chip)
+	if _map_view != null:
+		_map_view.rebuild_header()
 
 func _refresh() -> void:
 	var active := _active_district()
@@ -173,84 +98,17 @@ func _refresh() -> void:
 		_armed_element = -1
 		_apply_background()
 		_rebuild_hero()
-	if _district.is_empty() or _list == null:
-		return
-	_credits.text = Ui.compact(Store.credits()) + " CR"
-	for child in _list.get_children():
-		child.queue_free()
-	var total_levels := 0
-	var earned_levels := 0
-	var reveal_index := 0
-	for element in _district.get("elements", []):
-		if typeof(element) != TYPE_DICTIONARY:
-			continue
-		var max_level := maxi(0, element.get("levels", []).size() - 1)
-		var current := Store.district_level(int(_district.get("id", 1)), int(element.get("id", 0)))
-		total_levels += max_level
-		earned_levels += mini(current, max_level)
-		var card := _element_card(element, current, max_level)
-		_list.add_child(card)
-		Ui.reveal(card, reveal_index * 0.045)
-		reveal_index += 1
-	call_deferred("_layout_pads")
-	var percent := 100.0 if total_levels == 0 else float(earned_levels) / float(total_levels) * 100.0
-	_progress.value = percent
-	_progress_label.text = "%s  •  %d / %d STARS" % [str(_district.get("name", "DISTRICT")).to_upper(), earned_levels, total_levels]
-
+	if _map_view != null:
+		_map_view.refresh()
 
 func _layout_pads() -> void:
-	if _list == null or _layout_busy:
-		return
-	_layout_busy = true
-	var live: Array[Control] = []
-	for child in _list.get_children():
-		if child is Control and not child.is_queued_for_deletion():
-			live.append(child)
-	var count := live.size()
-	var area := _list.size
-	if area.x < 8.0:
-		area.x = 500.0
-	if area.y < 8.0:
-		area.y = 640.0
-	var screen := size
-	if screen.x < 8.0:
-		screen.x = 540.0
-	if screen.y < 8.0:
-		screen.y = 1170.0
-	var bottom := 0.0
-	for i in count:
-		var pad: Control = live[i]
-		var slot := _pad_slot(i, count)
-		pad.size = PAD_SIZE
-		if count <= 5:
-			var foot := Vector2(screen.x * slot.x, screen.y * slot.y) - _list.position
-			pad.position = foot - Vector2(PAD_SIZE.x * 0.5, PAD_SIZE.y * 0.86)
-			Juice.arm(pad)
-			pad.offset_transform_scale = Vector2(slot.z, slot.z)
-		else:
-			pad.position = Vector2(8.0 + float(i % 2) * (area.x * 0.5), 8.0 + float(int(i / 2.0)) * (PAD_SIZE.y + 8.0))
-			pad.offset_transform_scale = Vector2.ONE
-		pad.z_index = int(pad.position.y * 0.2)
-		bottom = maxf(bottom, pad.position.y + PAD_SIZE.y)
-	var next_height := maxf(area.y, bottom + 12.0)
-	if not is_equal_approx(_list.custom_minimum_size.y, next_height):
-		_list.custom_minimum_size = Vector2(0, next_height)
-	_layout_busy = false
+	if _map_view != null:
+		_map_view.layout()
 
-
-func _pad_slot(index: int, _count: int) -> Vector3:
-	# Pied du bâtiment, fraction de l'écran : croix 2.5D sur l'île, avant plus gros.
-	var village: Array[Vector3] = [
-		Vector3(0.30, 0.38, 0.72),
-		Vector3(0.70, 0.38, 0.72),
-		Vector3(0.50, 0.50, 0.88),
-		Vector3(0.24, 0.66, 1.04),
-		Vector3(0.76, 0.68, 1.06),
-	]
-	if index < village.size():
-		return village[index]
-	return Vector3(0.50, 0.20 + float(index) * 0.12, 0.85)
-
+func _open_build_bay() -> void:
+	if not _busy and not _district.is_empty():
+		Sfx.click()
+		_map_view.open_bay()
 
 func _active_district() -> Dictionary:
 	var completed := int(Store.state.get("districtIndex", 0))
@@ -263,208 +121,6 @@ func _active_district() -> Dictionary:
 			return candidate
 	return fallback
 
-func _element_card(element: Dictionary, current: int, max_level: int) -> Control:
-	var element_id := int(element.get("id", 0))
-	var damaged := Store.district_damaged(int(_district.get("id", 1)), element_id)
-	var wrap := Control.new()
-	wrap.custom_minimum_size = PAD_SIZE
-	wrap.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var pad := Button.new()
-	pad.flat = true
-	pad.focus_mode = Control.FOCUS_NONE
-	pad.set_anchors_preset(Control.PRESET_FULL_RECT)
-	var empty := StyleBoxEmpty.new()
-	for style_name in ["normal", "hover", "pressed", "hover_pressed", "disabled", "focus"]:
-		pad.add_theme_stylebox_override(style_name, empty)
-	Juice.arm(pad, true)
-	var art := _element_visual(element, current)
-	art.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	art.set_anchors_preset(Control.PRESET_TOP_WIDE)
-	art.offset_bottom = ART_SIZE.y
-	pad.add_child(art)
-	var stars := _star_row(current, 5)
-	stars.position = Vector2(12, ART_SIZE.y - 4)
-	stars.size = Vector2(PAD_SIZE.x - 24, 18)
-	pad.add_child(stars)
-	var is_max := current >= max_level and not damaged
-	if not is_max:
-		var tool := _round_tool(Color("#FF8A3A") if damaged else Ui.GOLD, damaged)
-		tool.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		tool.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
-		tool.offset_left = -float(HAMMER) * 0.5
-		tool.offset_right = float(HAMMER) * 0.5
-		tool.offset_top = -float(HAMMER) - 6.0
-		tool.offset_bottom = -6.0
-		pad.add_child(tool)
-		if _armed_element == element_id:
-			var quote := _tool_quote(element, current, max_level, damaged)
-			var bubble := _ivory_chip(quote.get("accent", Ui.GOLD))
-			bubble.mouse_filter = Control.MOUSE_FILTER_IGNORE
-			bubble.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
-			bubble.offset_left = -86
-			bubble.offset_right = 86
-			bubble.offset_top = -float(HAMMER) - 58.0
-			bubble.offset_bottom = -float(HAMMER) - 10.0
-			var cost_label := Ui.label(str(quote.get("text", "")), 15, INK)
-			cost_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-			bubble.add_child(cost_label)
-			pad.add_child(bubble)
-	pad.pressed.connect(_on_tool.bind(element_id, damaged, is_max))
-	wrap.add_child(pad)
-	wrap.set_meta("element_id", element_id)
-	return wrap
-
-
-func _tool_quote(element: Dictionary, current: int, max_level: int, damaged: bool) -> Dictionary:
-	if damaged:
-		var current_cost := int(element.get("levels", [])[current].get("cost", 0))
-		var repair_bps := int(Config.social().get("attack", {}).get("repairCostBps", 2500))
-		var repair_cost := current_cost * repair_bps / 10000
-		return {"text": "FIX " + Ui.compact(repair_cost), "accent": Ui.NEON_MAGENTA}
-	if current >= max_level:
-		return {"text": "MAX", "accent": Ui.GREEN}
-	var next: Dictionary = element.get("levels", [])[current + 1]
-	return {"text": Ui.compact(int(next.get("cost", 0))) + " CR", "accent": Color("#FF4F46")}
-
-
-func _star_row(filled: int, total: int) -> HBoxContainer:
-	var row := HBoxContainer.new()
-	row.alignment = BoxContainer.ALIGNMENT_CENTER
-	row.add_theme_constant_override("separation", 4)
-	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var star: Texture2D = load(STAR_ART) if ResourceLoader.exists(STAR_ART) else null
-	for i in total:
-		if star != null:
-			var pip := TextureRect.new()
-			pip.texture = star
-			pip.custom_minimum_size = Vector2(16, 16)
-			pip.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-			pip.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-			pip.modulate = Color.WHITE if i < filled else Color(0.22, 0.28, 0.46, 0.55)
-			pip.mouse_filter = Control.MOUSE_FILTER_IGNORE
-			Ui.soften_tex(pip)
-			row.add_child(pip)
-		else:
-			var pip := ColorRect.new()
-			pip.custom_minimum_size = Vector2(14, 14)
-			pip.color = Ui.GOLD if i < filled else Color("#1A2A5A")
-			pip.mouse_filter = Control.MOUSE_FILTER_IGNORE
-			row.add_child(pip)
-	return row
-
-
-func _round_tool(_accent: Color, repair: bool) -> Button:
-	var button := Button.new()
-	button.custom_minimum_size = Vector2(HAMMER, HAMMER)
-	button.focus_mode = Control.FOCUS_NONE
-	button.flat = true
-	var empty := StyleBoxEmpty.new()
-	for style_name in ["normal", "hover", "pressed", "hover_pressed", "disabled", "focus"]:
-		button.add_theme_stylebox_override(style_name, empty)
-	Juice.arm(button, true)
-	var icon_path := WRENCH_ART if repair else HAMMER_ART
-	if ResourceLoader.exists(icon_path):
-		var icon := TextureRect.new()
-		icon.texture = load(icon_path)
-		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		icon.set_anchors_preset(Control.PRESET_FULL_RECT)
-		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		Ui.soften_tex(icon)
-		button.add_child(icon)
-	else:
-		var glyph := ToolGlyph.new()
-		glyph.repair = repair
-		glyph.set_anchors_preset(Control.PRESET_FULL_RECT)
-		glyph.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		button.add_child(glyph)
-	return button
-
-
-func _on_tool(element_id: int, damaged: bool, is_max: bool) -> void:
-	if _busy or is_max:
-		return
-	if _armed_element == element_id:
-		_armed_element = -1
-		if damaged:
-			_repair(element_id)
-		else:
-			_upgrade(element_id)
-	else:
-		_armed_element = element_id
-		Sfx.click()
-		_refresh()
-
-
-func _open_build_bay() -> void:
-	if _busy or _district.is_empty():
-		return
-	Sfx.click()
-	var overlay := ColorRect.new()
-	overlay.color = Color(0.02, 0.03, 0.08, 0.9)
-	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
-	overlay.add_to_group("dismiss_on_back")
-	var center := CenterContainer.new()
-	center.set_anchors_preset(Control.PRESET_FULL_RECT)
-	var box := VBoxContainer.new()
-	box.custom_minimum_size.x = 460
-	box.add_theme_constant_override("separation", 12)
-	box.add_child(Ui.label("BUILD BAY", 28, Ui.GOLD))
-	for element in _district.get("elements", []):
-		if typeof(element) != TYPE_DICTIONARY:
-			continue
-		var element_id := int(element.get("id", 0))
-		var max_level := maxi(0, element.get("levels", []).size() - 1)
-		var current := Store.district_level(int(_district.get("id", 1)), element_id)
-		var damaged := Store.district_damaged(int(_district.get("id", 1)), element_id)
-		var row := HBoxContainer.new()
-		row.add_theme_constant_override("separation", 10)
-		var thumb := _element_visual(element, current)
-		thumb.custom_minimum_size = Vector2(64, 64)
-		thumb.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		row.add_child(thumb)
-		var copy := VBoxContainer.new()
-		copy.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		var name := Ui.label(str(element.get("name", "Pad")), 16, Ui.TEXT)
-		name.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-		copy.add_child(name)
-		copy.add_child(_star_row(current, 5))
-		row.add_child(copy)
-		var quote := _tool_quote(element, current, max_level, damaged)
-		var action: Button
-		if current >= max_level and not damaged:
-			action = Ui.button("MAX", Ui.GREEN, true)
-			action.disabled = true
-		elif damaged:
-			action = Ui.button(str(quote.get("text", "FIX")), Ui.NEON_MAGENTA)
-			action.pressed.connect(_bay_act.bind(overlay, element_id, true))
-		else:
-			action = Ui.button(str(quote.get("text", "BUY")), Color("#FF4F46"))
-			action.pressed.connect(_bay_act.bind(overlay, element_id, false))
-		action.custom_minimum_size = Vector2(128, 52)
-		row.add_child(action)
-		box.add_child(row)
-	var close := Ui.button("CLOSE", Ui.NEON_CYAN, true)
-	close.pressed.connect(func() -> void:
-		overlay.queue_free()
-	)
-	box.add_child(close)
-	center.add_child(box)
-	overlay.add_child(center)
-	add_child(overlay)
-	Juice.modal(box)
-
-
-func _bay_act(overlay: Control, element_id: int, damaged: bool) -> void:
-	overlay.queue_free()
-	if damaged:
-		_repair(element_id)
-	else:
-		_upgrade(element_id)
-
-## Visuel d'un élément au niveau courant : le PNG du niveau s'il a été livré,
-## sinon le glyphe procédural. Les deux chemins gardent la même taille, donc la
-## carte ne bouge pas selon la présence de l'art.
 func _element_visual(element: Dictionary, current: int) -> Control:
 	var levels: Array = element.get("levels", [])
 	if current >= 0 and current < levels.size() and typeof(levels[current]) == TYPE_DICTIONARY:
@@ -492,6 +148,8 @@ func _repair(element_id: int) -> void:
 	if _busy:
 		return
 	_busy = true
+	_map_message = ""
+	_map_view.render_detail()
 	var district_id := int(_district.get("id", 1))
 	Events.track("repair_started", {"districtId": district_id, "elementId": element_id})
 	var rid := Net.request_id()
@@ -503,6 +161,7 @@ func _repair(element_id: int) -> void:
 		Events.track("currency_spent", {"currency": "credits", "amount": cost, "sink": "repair", "districtId": district_id, "elementId": element_id})
 		await _sync_state()
 	else:
+		_map_message = "ACTION NOT CONFIRMED • CHECK CONNECTION AND BALANCE"
 		Sfx.error()
 		Haptics.error()
 	_busy = false
@@ -517,6 +176,8 @@ func _upgrade(element_id: int) -> void:
 	if _busy:
 		return
 	_busy = true
+	_map_message = ""
+	_map_view.render_detail()
 	var upgraded_district_id := int(_district.get("id", 1))
 	var current_level := Store.district_level(upgraded_district_id, element_id)
 	var expected_cost := 0
@@ -553,6 +214,7 @@ func _upgrade(element_id: int) -> void:
 	elif response.code == 401:
 		Store.session_expired.emit()
 	else:
+		_map_message = "ACTION NOT CONFIRMED • CHECK CONNECTION AND BALANCE"
 		Sfx.error()
 		Haptics.error()
 	_busy = false
@@ -586,27 +248,7 @@ func _show_complete(reward: Dictionary, district_id: int, next_district_id: int,
 	Events.track("village_completed", {"districtId": district_id, "nextDistrictId": next_district_id, "allDistrictsComplete": all_complete})
 	if int(reward.get("credits", 0)) > 0:
 		Events.track("currency_earned", {"currency": "credits", "amount": int(reward.get("credits", 0)), "source": "village_completed", "districtId": district_id})
-	var overlay := ColorRect.new()
-	overlay.color = Color(0.02, 0.03, 0.08, 0.94)
-	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
-	overlay.add_to_group("dismiss_on_back")
-	var center := CenterContainer.new()
-	center.set_anchors_preset(Control.PRESET_FULL_RECT)
-	var box := VBoxContainer.new()
-	box.custom_minimum_size.x = 0
-	box.add_theme_constant_override("separation", 18)
-	box.add_child(Ui.label("DISTRICT COMPLETE", 34, Ui.GOLD))
-	box.add_child(Ui.label(Ui.reward_text(reward), 20, Ui.TEXT))
-	var close := Ui.button("CITY SECURED" if all_complete else "NEXT DISTRICT", Ui.GOLD)
-	close.pressed.connect(func() -> void:
-		overlay.queue_free()
-		navigate_requested.emit("spin")
-	)
-	box.add_child(close)
-	center.add_child(box)
-	overlay.add_child(center)
-	add_child(overlay)
-	Juice.modal(box)
+	_map_view.complete(reward, all_complete)
 	Sfx.result("legendary")
 	Haptics.win("legendary")
 

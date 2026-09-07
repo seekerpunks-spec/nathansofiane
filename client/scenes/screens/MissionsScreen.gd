@@ -1,15 +1,17 @@
 extends Control
 ## Centre de rétention : daily, missions, événement, saison et accessibilité.
 
+const Neon := preload("res://scripts/components/NeonSkin.gd")
+
 signal navigate_requested(tab: String)
 
 var _content: VBoxContainer
 var _busy := false
 
 func _ready() -> void:
-	add_child(Ui.illustrated_stage("res://assets/generated/api_gpt/heroes/missions_hero.webp"))
+	add_child(Ui.illustrated_stage("res://assets/generated/punk_city/city.webp"))
 	var body := Ui.screen_body()
-	body.add_child(Ui.kicker_block("DAILY REWARDS", "Missions", Ui.NEON_CYAN))
+	body.add_child(Neon.header("DAILY REWARDS • LIVE EVENTS", "Missions", 8, Ui.NEON_CYAN))
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -22,7 +24,8 @@ func _ready() -> void:
 	add_child(body)
 	Store.state_changed.connect(_refresh)
 	_refresh()
-	_load_fresh_state.call_deferred()
+	if not has_meta("qa_skip_sync"):
+		_load_fresh_state.call_deferred()
 
 func _load_fresh_state() -> void:
 	var response := await Net.protected_request("GET", "/state")

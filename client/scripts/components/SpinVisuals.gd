@@ -1,11 +1,11 @@
 extends RefCounted
+const Art := preload("res://scripts/components/NeonSkin.gd")
 ## Composants de rendu procédural du slot. Ils ne connaissent ni le réseau ni
 ## l'économie : SpinScreen leur transmet uniquement un état visuel.
 
 static func symbols_for_result(outcome: Dictionary) -> Array[String]:
 	var result: Array[String] = []
 	var result_type := str(outcome.get("type", "credits")).to_lower()
-	var tier := str(outcome.get("tier", "common")).to_lower()
 	if result_type in ["none", "glitch"]:
 		result.assign(["glitch", "credits", "energy"])
 		return result
@@ -18,21 +18,14 @@ static func symbols_for_result(outcome: Dictionary) -> Array[String]:
 		"shield":
 			symbol = "shield"
 		"chest":
-			symbol = "energy"
+			symbol = "chest"
 		"card":
-			symbol = "hack"
+			symbol = "card"
 	if result_type != "credits":
 		result.assign([symbol, symbol, symbol])
 		return result
-	match tier:
-		"uncommon":
-			symbol = "energy"
-		"rare":
-			symbol = "shield"
-		"epic":
-			symbol = "hack"
-		"legendary":
-			symbol = "vault"
+	# Credit tiers share a coin symbol. RAID must never imply an encounter
+	# when the server actually awarded only credits.
 	result.assign([symbol, symbol, symbol])
 	return result
 
@@ -118,68 +111,56 @@ class SlotReel extends Control:
 			queue_redraw()
 
 	func _draw() -> void:
-		var panel := StyleBoxFlat.new()
-		panel.bg_color = Color(1, 1, 1, 0.015)
-		panel.set_corner_radius_all(8)
-		draw_style_box(panel, Rect2(0, 0, size.x, size.y))
-		var row_height := (size.y - 16.0) / 3.0
-		for row in 3:
-			var cell := StyleBoxFlat.new()
-			cell.bg_color = Color("#FFFDF4", 0.105) if row == 1 else Color("#FFFDF4", 0.065)
-			cell.border_color = Color(Ui.GOLD, 0.32)
-			cell.set_border_width_all(1)
-			cell.set_corner_radius_all(7)
-			draw_style_box(cell, Rect2(4, 5 + row * row_height, size.x - 8, row_height - 2))
+		# Continuous silver drum, not a grid of nine independent slots.
+		for band in 40:
+			var y := float(band) / 40.0
+			var shade := 0.52 + 0.45 * sin(y * PI)
+			draw_rect(Rect2(0, y * size.y, size.x, size.y / 40.0 + 1), Color(shade, shade, minf(1, shade + 0.04)))
+		draw_line(Vector2.ZERO, Vector2(0, size.y), Color("#242038"), 3, true)
+		draw_line(Vector2(size.x - 2, 0), size - Vector2(2, 0), Color("#F9F8FF"), 2, true)
+		for row in [1, 2]:
+			draw_line(Vector2(0, size.y * row / 3.0), Vector2(size.x, size.y * row / 3.0), Color("#716D82", 0.65), 2, true)
 		if spinning:
 			_draw_scrolling()
 		else:
 			_draw_resting()
-		var center_y := size.y / 2.0
-		draw_rect(Rect2(4, center_y - 34, size.x - 8, 68), Color(Ui.GOLD, 0.045 + tick_flash * 0.09))
-		var center_box := StyleBoxFlat.new()
-		center_box.bg_color = Color(1, 1, 1, 0.018)
-		center_box.border_color = Color("#FFB82E", 0.90)
-		center_box.set_border_width_all(2)
-		center_box.set_corner_radius_all(8)
-		draw_style_box(center_box, Rect2(4, center_y - 34, size.x - 8, 68))
+		if tick_flash > 0:
+			draw_rect(Rect2(1, size.y / 3.0, size.x - 2, size.y / 3.0), Color(Ui.GOLD, tick_flash * 0.25), false, 4)
 
 	func _draw_resting() -> void:
-		var index := symbols.find(final_symbol)
-		if index < 0:
-			index = 0
-		var top: String = symbols[posmod(index - 1, symbols.size())]
-		var bottom: String = symbols[posmod(index + 1, symbols.size())]
-		var bob := sin(_time * 1.7 + reel_index) * (1.8 if not Preferences.reduced_motion else 0.0)
-		var center_y := size.y / 2.0
-		_draw_symbol(top, Rect2(14, center_y - CELL_HEIGHT - 23 + bob, size.x - 28, 46), Color(1, 1, 1, 0.76))
-		_draw_symbol(final_symbol, Rect2(9, center_y - 32 + bob, size.x - 18, 64), Color.WHITE)
-		_draw_symbol(bottom, Rect2(14, center_y + CELL_HEIGHT - 23 + bob, size.x - 28, 46), Color(1, 1, 1, 0.76))
+		var index := maxi(0, symbols.find(final_symbol))
+		var row_height := size.y / 3.0
+		for row in 3:
+			var symbol: String = symbols[posmod(index + row - 1, symbols.size())]
+			_draw_symbol(symbol, Rect2(4, row * row_height + 5, size.x - 8, row_height - 10), Color.WHITE)
 
 	func _draw_scrolling() -> void:
 		var phase := roll_offset / CELL_HEIGHT
 		var base := floori(phase)
 		var fraction := phase - float(base)
+		var row_height := size.y / 3.0
 		for slot in range(-2, 4):
 			var symbol: String = symbols[posmod(base + slot + reel_index, symbols.size())]
-			var y := size.y / 2.0 - 32.0 + (float(slot) - fraction) * CELL_HEIGHT
-			var alpha := 1.0 if y > 26 and y < size.y - 58 else 0.45
-			_draw_symbol(symbol, Rect2(9, y, size.x - 18, 64), Color(1, 1, 1, alpha))
-		for streak in 5:
-			var streak_y := 18.0 + streak * 32.0 + fmod(roll_offset * 0.42, 16.0)
-			draw_rect(Rect2(14, streak_y, size.x - 28, 3), Color(Ui.GOLD, 0.14 + streak % 2 * 0.10))
+			var y := row_height + (float(slot) - fraction) * row_height
+			_draw_symbol(symbol, Rect2(4, y + 5, size.x - 8, row_height - 10), Color.WHITE)
 
 	func _draw_symbol(symbol: String, destination: Rect2, tint: Color) -> void:
 		if atlas == null or symbols.is_empty():
 			return
-		var index := symbols.find(symbol)
-		if index < 0:
-			index = 0
-		var column := index % 3
-		var row := index / 3
-		var cell_width := float(atlas.get_width()) / 3.0
-		var cell_height := float(atlas.get_height()) / 2.0
-		var source := Rect2(column * cell_width, row * cell_height, cell_width, cell_height)
-		draw_texture_rect_region(atlas, destination, source, tint, false, true)
+		var mapping := {"credits": 0, "shield": 1, "hack": 2, "vault": 2, "energy": 4, "glitch": 5, "chest": 3, "card": 7}
+		var index: int = mapping.get(symbol, 0)
+		var source: Rect2 = Art.ICON_RECTS[index]
+		var fit := minf(destination.size.x / source.size.x, destination.size.y / source.size.y)
+		var dimensions := source.size * fit
+		var target := Rect2(destination.get_center() - dimensions / 2.0, dimensions)
+		draw_texture_rect_region(atlas, target, source, tint, false, true)
+		if symbol in ["hack", "vault"]:
+			var copy := "ATTACK" if symbol == "hack" else "RAID"
+			var text_size := 22 if copy == "ATTACK" else 27
+			var width := Ui.FACE.get_string_size(copy, HORIZONTAL_ALIGNMENT_LEFT, -1, text_size).x
+			var baseline := target.get_center() + Vector2(-width / 2, 9)
+			draw_string_outline(Ui.FACE, baseline, copy, HORIZONTAL_ALIGNMENT_LEFT, -1, text_size, 6, Color("#0B0319"))
+			draw_string(Ui.FACE, baseline, copy, HORIZONTAL_ALIGNMENT_LEFT, -1, text_size, Ui.NEON_MAGENTA if symbol == "hack" else Ui.NEON_CYAN)
 
 
 class AnimatedBackdrop extends Control:

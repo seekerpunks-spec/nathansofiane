@@ -5,6 +5,7 @@ extends Control
 ##   1. téléchargement de la remote config (GET /config) — échec → "no network"
 ##   2. session existante (token) ? GET /state → Spin. Sinon → Onboarding.
 
+const Neon := preload("res://scripts/components/NeonSkin.gd")
 const SPIN := "res://scenes/screens/SpinScreen.tscn"
 const ONBOARDING := "res://scenes/screens/OnboardingScreen.tscn"
 const SCREENS := {
@@ -102,6 +103,9 @@ func _open_tab(tab: String) -> void:
 		return
 	_current_tab = tab
 	var inst: Control = load(SCREENS[tab]).instantiate()
+	if qa_bypass_boot:
+		inst.set_meta("qa_skip_sync", true)
+		inst.set_meta("qa_offers", [])
 	if inst.has_signal("navigate_requested"):
 		inst.connect("navigate_requested", _open_tab)
 	_show(inst)
@@ -115,6 +119,7 @@ func _open_tab(tab: String) -> void:
 		var btn: Button = _nav_buttons[key]
 		btn.add_theme_color_override("font_color", Color.WHITE if key == tab or key == "spin" else Color("#B9C7F2"))
 		btn.button_pressed = key == tab
+		Neon.select(btn, key == tab)
 
 
 func _nav_box(bg: Color, border: Color = Color.TRANSPARENT, width: int = 0) -> StyleBoxFlat:
@@ -123,63 +128,64 @@ func _nav_box(bg: Color, border: Color = Color.TRANSPARENT, width: int = 0) -> S
 	return box
 
 func _build_nav() -> void:
-	_nav = Ui.panel(Color("#15183C", 0.98), Color("#FFF0C0"))
+	_nav = PanelContainer.new()
+	_nav.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
 	_nav.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
 	var safe := Ui.safe_insets()
 	_nav.offset_left = 8 + safe.x
 	_nav.offset_right = -(8 + safe.z)
-	_nav.offset_top = -Ui.NAV_HEIGHT
+	_nav.offset_top = -(Ui.NAV_HEIGHT + safe.w)
 	_nav.offset_bottom = -(6 + safe.w)
-	var stack := VBoxContainer.new()
-	stack.add_theme_constant_override("separation", 2)
-	var active_rail := ColorRect.new()
-	active_rail.color = Color(Ui.GOLD, 0.94)
-	active_rail.custom_minimum_size.y = 3
-	active_rail.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	stack.add_child(active_rail)
 	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 4)
-	var labels := {
-		"district": "BASE",
-		"collection": "CARDS",
-		"spin": "SPIN",
-		"missions": "QUESTS",
-		"store": "SHOP",
-	}
+	row.add_theme_constant_override("separation", 6)
+	var labels := {"district": "MAP", "missions": "MISSIONS", "raid": "RAID", "spin": "SPIN", "events": "EVENTS", "clan": "CLAN"}
+	var icons := {"district": 9, "missions": 8, "raid": 11, "spin": 4, "events": 10, "clan": 1}
 	for key in labels:
-		var button := Button.new()
-		button.text = labels[key]
-		button.toggle_mode = true
-		button.focus_mode = Control.FOCUS_NONE
+		var button := Neon.button(row, "", Rect2(0, 0, 74, 76), Ui.NEON_MAGENTA if key == "spin" else Ui.NEON_CYAN)
 		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		button.custom_minimum_size.y = 84 if key == "spin" else 64
-		button.add_theme_font_override("font", Ui.FACE)
-		button.add_theme_font_size_override("font_size", 16 if key == "spin" else 12)
-		button.add_theme_color_override("font_hover_color", Color.WHITE)
-		button.add_theme_color_override("font_pressed_color", Color.WHITE)
-		if key == "spin":
-			button.add_theme_stylebox_override("normal", _nav_box(Color("#FF4F46"), Color.WHITE, 3))
-			button.add_theme_stylebox_override("hover", _nav_box(Color("#FF6A5C"), Color.WHITE, 3))
-			button.add_theme_stylebox_override("pressed", _nav_box(Color("#FF4F46"), Ui.GOLD, 4))
-		else:
-			button.add_theme_stylebox_override("normal", _nav_box(Color.TRANSPARENT))
-			button.add_theme_stylebox_override("hover", _nav_box(Color("#31529A", 0.72)))
-			button.add_theme_stylebox_override("pressed", _nav_box(Color("#334D9A"), Ui.GOLD, 3))
+		button.toggle_mode = true
+		button.custom_minimum_size = Vector2(0, 76)
+		button.tooltip_text = labels[key]
+		var picture := Neon.art(button, Neon.icon(icons[key]), Rect2(10, 3, 52, 50))
+		picture.set_anchors_preset(Control.PRESET_TOP_WIDE)
+		picture.offset_left = 10
+		picture.offset_right = -10
+		picture.offset_top = 3
+		picture.offset_bottom = 53
+		var label := Neon.text(button, labels[key], Rect2(0, 53, 74, 19), 12)
+		label.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
+		label.offset_left = 0
+		label.offset_right = 0
+		label.offset_top = -22
+		label.offset_bottom = -3
 		button.pressed.connect(_on_nav_pressed.bind(key))
-		Juice.arm(button, true)
-		row.add_child(button)
 		_nav_buttons[key] = button
-	stack.add_child(row)
-	_nav.add_child(stack)
+	_nav.add_child(row)
 	add_child(_nav)
 	_nav.visible = false
 
 func _on_nav_pressed(tab: String) -> void:
-	if tab == _current_tab:
-		return
 	Sfx.click()
 	Haptics.vibrate(0.18, 12)
-	_open_tab(tab)
+	match tab:
+		"clan":
+			_open_tab("spin")
+			_screen.call("_open_network")
+		"raid":
+			_open_tab("spin")
+			if typeof(Store.state.get("pendingEncounter")) == TYPE_DICTIONARY:
+				_screen.call("_resume_pending_encounter")
+			else:
+				_screen._status_label.text = "RAID"
+				_screen._result_banner.text = "LAND 3 RAID SYMBOLS TO BREACH"
+		"events":
+			_open_tab("missions")
+		_:
+			_open_tab(tab)
+	for key in _nav_buttons:
+		_nav_buttons[key].button_pressed = key == tab
+		Neon.select(_nav_buttons[key], key == tab)
+
 
 func _boot() -> void:
 	_loading("LOADING…")

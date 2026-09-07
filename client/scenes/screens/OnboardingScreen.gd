@@ -6,6 +6,8 @@ extends Control
 ## côté serveur quand DEV_AUTH=true). En production, `signature` sera la vraie
 ## signature Ed25519 du nonce par le SDK wallet Seeker (même contrat API).
 
+const Neon := preload("res://scripts/components/NeonSkin.gd")
+
 signal connected
 
 var _btn: Button
@@ -16,69 +18,47 @@ func _ready() -> void:
 	_build()
 
 func _build() -> void:
-	var art := TextureRect.new()
-	art.texture = load("res://assets/generated/api_gpt/spin_background.webp")
-	art.set_anchors_preset(Control.PRESET_FULL_RECT)
-	art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
-	Ui.soften_tex(art)
-	art.modulate = Color.WHITE
-	art.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(art)
-	var shade := ColorRect.new()
-	shade.color = Color("#06143E", 0.10)
-	shade.set_anchors_preset(Control.PRESET_FULL_RECT)
-	shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(shade)
-	var signal_label := Ui.label("BYTE ONLINE  •  SEEKER NETWORK", 13, Color("#172A63"))
-	signal_label.position = Vector2(90, 38)
-	signal_label.size = Vector2(360, 32)
-	signal_label.add_theme_color_override("font_outline_color", Color.WHITE)
-	signal_label.add_theme_constant_override("outline_size", 2)
-	add_child(signal_label)
-
-	var mascot := Ui.HeroArt.new()
-	mascot.texture = load("res://assets/generated/api_gpt/byte.webp")
-	mascot.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	mascot.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	mascot.position = Vector2(56, 72)
-	mascot.size = Vector2(428, 550)
-	mascot.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	Ui.soften_tex(mascot)
-	add_child(mascot)
-
-	var panel := Ui.panel(Color("#102B68", 0.98), Ui.GOLD)
-	panel.position = Vector2(20, 675)
-	panel.size = Vector2(500, 420)
-	var root := VBoxContainer.new()
-	root.add_theme_constant_override("separation", 13)
-
-	var title := Ui.label("CYBER SEEKER", 44, Ui.GOLD)
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-	root.add_child(title)
-	var chapter := Ui.label("SPIN  •  BUILD  •  COLLECT", 12, Ui.NEON_CYAN)
-	chapter.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-	root.add_child(chapter)
-
-	var sub := Ui.label("Spin the slot. Rebuild the city.\nCrack caches with BYTE.", 17, Ui.TEXT)
-	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	add_child(Ui.illustrated_stage("res://assets/generated/punk_city/city.webp"))
+	var body := Ui.screen_body()
+	body.offset_bottom = -20
+	body.add_theme_constant_override("separation", 18)
+	var spacer := Control.new()
+	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	body.add_child(spacer)
+	var logo := TextureRect.new()
+	logo.texture = Neon.LOGO
+	logo.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	logo.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	logo.custom_minimum_size.y = 250
+	Ui.soften_tex(logo)
+	body.add_child(logo)
+	var emblem := TextureRect.new()
+	emblem.texture = Neon.icon(3)
+	emblem.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	emblem.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	emblem.custom_minimum_size.y = 190
+	Ui.soften_tex(emblem)
+	body.add_child(emblem)
+	var panel := Ui.panel(Ui.PANEL, Ui.NEON_CYAN)
+	var copy := VBoxContainer.new()
+	copy.add_theme_constant_override("separation", 18)
+	copy.add_child(Ui.label("THE CITY IS YOURS", 28, Ui.TEXT))
+	var sub := Ui.label("Spin for loot. Build your district.\nBreach rival vaults and rise through the ranks.", 16, Ui.TEXT_DIM)
 	sub.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	root.add_child(sub)
-
-	var divider := Ui.separator()
-	root.add_child(divider)
+	copy.add_child(sub)
 	_status = Ui.label("CONNECT YOUR WALLET TO START", 13, Ui.NEON_CYAN)
 	_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	root.add_child(_status)
-
-	_btn = _big_button("LET'S GO  •  CONNECT WALLET", Ui.GOLD)
-	root.add_child(_btn)
-
-	var mode_text := "TEST MODE  •  NO REAL PURCHASES" if Wallet.is_dev() else "SECURE SOLANA CONNECTION"
-	var dev_note := Ui.label(mode_text, 11, Ui.TEXT_DIM)
-	root.add_child(dev_note)
-	panel.add_child(root)
-	add_child(panel)
+	copy.add_child(_status)
+	_btn = _big_button("LET'S GO • CONNECT WALLET", Ui.GOLD)
+	copy.add_child(_btn)
+	var mode_text := "TEST MODE • NO REAL PURCHASES" if Wallet.is_dev() else "SECURE SOLANA CONNECTION"
+	copy.add_child(Ui.label(mode_text, 11, Ui.TEXT_DIM))
+	panel.add_child(copy)
+	body.add_child(panel)
+	var bottom := Control.new()
+	bottom.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	body.add_child(bottom)
+	add_child(body)
 
 func _big_button(text: String, accent: Color) -> Button:
 	var b := Button.new()

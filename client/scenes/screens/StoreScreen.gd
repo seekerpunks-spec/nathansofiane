@@ -1,6 +1,8 @@
 extends Control
 ## Store — aucune publicité forcée, preuves simulées uniquement en build debug.
 
+const Neon := preload("res://scripts/components/NeonSkin.gd")
+
 signal navigate_requested(tab: String)
 
 var _content: VBoxContainer
@@ -10,9 +12,9 @@ var _tracked_offer_views: Dictionary = {}
 var _eligible_offers: Array = []
 
 func _ready() -> void:
-	add_child(Ui.illustrated_stage("res://assets/generated/api_gpt/heroes/store_hero.webp"))
+	add_child(Ui.illustrated_stage("res://assets/generated/punk_city/city.webp"))
 	var body := Ui.screen_body()
-	body.add_child(Ui.kicker_block("FREEBIES  •  BOOSTS  •  LOOT", "Shop", Ui.NEON_MAGENTA))
+	body.add_child(Neon.header("FREEBIES • BOOSTS • LOOT", "Shop", 6, Ui.NEON_MAGENTA))
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED

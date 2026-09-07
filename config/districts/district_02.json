@@ -24,12 +24,12 @@
         {
           "level": 2,
           "cost": 700000,
-          "asset": "districts/buildings/d2_habitats_t0"
+          "asset": "districts/buildings/d2_habitats_t1"
         },
         {
           "level": 3,
           "cost": 2200000,
-          "asset": "districts/buildings/d2_habitats_t0"
+          "asset": "districts/buildings/d2_habitats_t1"
         },
         {
           "level": 4,
@@ -60,12 +60,12 @@
         {
           "level": 2,
           "cost": 650000,
-          "asset": "districts/buildings/d2_foundry_t0"
+          "asset": "districts/buildings/d2_foundry_t1"
         },
         {
           "level": 3,
           "cost": 2000000,
-          "asset": "districts/buildings/d2_foundry_t0"
+          "asset": "districts/buildings/d2_foundry_t1"
         },
         {
           "level": 4,
@@ -96,12 +96,12 @@
         {
           "level": 2,
           "cost": 800000,
-          "asset": "districts/buildings/d2_bazaar_t0"
+          "asset": "districts/buildings/d2_bazaar_t1"
         },
         {
           "level": 3,
           "cost": 2400000,
-          "asset": "districts/buildings/d2_bazaar_t0"
+          "asset": "districts/buildings/d2_bazaar_t1"
         },
         {
           "level": 4,
@@ -132,12 +132,12 @@
         {
           "level": 2,
           "cost": 720000,
-          "asset": "districts/buildings/d2_clinic_t0"
+          "asset": "districts/buildings/d2_clinic_t1"
         },
         {
           "level": 3,
           "cost": 2100000,
-          "asset": "districts/buildings/d2_clinic_t0"
+          "asset": "districts/buildings/d2_clinic_t1"
         },
         {
           "level": 4,
@@ -168,12 +168,12 @@
         {
           "level": 2,
           "cost": 900000,
-          "asset": "districts/buildings/d2_beacon_t0"
+          "asset": "districts/buildings/d2_beacon_t1"
         },
         {
           "level": 3,
           "cost": 2800000,
-          "asset": "districts/buildings/d2_beacon_t0"
+          "asset": "districts/buildings/d2_beacon_t1"
         },
         {
           "level": 4,

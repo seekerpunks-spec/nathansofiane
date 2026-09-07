@@ -20,6 +20,15 @@ func _pick() -> AudioStreamPlayer:
 	_idx = (_idx + 1) % _pool.size()
 	return _pool[_idx]
 
+func stop_all() -> void:
+	for player in _pool:
+		if is_instance_valid(player):
+			player.stop()
+			player.stream = null
+
+func _exit_tree() -> void:
+	stop_all()
+
 ## Génère un stream à partir de segments [freq, dur_s, shape(0/1/2), vol].
 func _make_stream(segments: Array) -> AudioStreamWAV:
 	var bytes := PackedByteArray()

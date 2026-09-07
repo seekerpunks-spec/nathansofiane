@@ -24,12 +24,12 @@
         {
           "level": 2,
           "cost": 1500000,
-          "asset": "districts/buildings/d3_cradle_t0"
+          "asset": "districts/buildings/d3_cradle_t1"
         },
         {
           "level": 3,
           "cost": 4700000,
-          "asset": "districts/buildings/d3_cradle_t0"
+          "asset": "districts/buildings/d3_cradle_t1"
         },
         {
           "level": 4,
@@ -60,12 +60,12 @@
         {
           "level": 2,
           "cost": 1400000,
-          "asset": "districts/buildings/d3_rig_t0"
+          "asset": "districts/buildings/d3_rig_t1"
         },
         {
           "level": 3,
           "cost": 4300000,
-          "asset": "districts/buildings/d3_rig_t0"
+          "asset": "districts/buildings/d3_rig_t1"
         },
         {
           "level": 4,
@@ -96,12 +96,12 @@
         {
           "level": 2,
           "cost": 1700000,
-          "asset": "districts/buildings/d3_salvage_t0"
+          "asset": "districts/buildings/d3_salvage_t1"
         },
         {
           "level": 3,
           "cost": 5200000,
-          "asset": "districts/buildings/d3_salvage_t0"
+          "asset": "districts/buildings/d3_salvage_t1"
         },
         {
           "level": 4,
@@ -132,12 +132,12 @@
         {
           "level": 2,
           "cost": 1550000,
-          "asset": "districts/buildings/d3_spine_t0"
+          "asset": "districts/buildings/d3_spine_t1"
         },
         {
           "level": 3,
           "cost": 4500000,
-          "asset": "districts/buildings/d3_spine_t0"
+          "asset": "districts/buildings/d3_spine_t1"
         },
         {
           "level": 4,
@@ -168,12 +168,12 @@
         {
           "level": 2,
           "cost": 1950000,
-          "asset": "districts/buildings/d3_lantern_t0"
+          "asset": "districts/buildings/d3_lantern_t1"
         },
         {
           "level": 3,
           "cost": 6000000,
-          "asset": "districts/buildings/d3_lantern_t0"
+          "asset": "districts/buildings/d3_lantern_t1"
         },
         {
           "level": 4,

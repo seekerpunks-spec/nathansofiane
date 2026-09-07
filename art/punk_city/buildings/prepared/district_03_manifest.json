@@ -1,0 +1,156 @@
+{
+  "district": 3,
+  "source": "district_03.png",
+  "sprites": [
+    {
+      "name": "d3_cradle_t0.webp",
+      "bounds": [
+        68,
+        73,
+        289,
+        287
+      ],
+      "transparent_fraction": 0.7699
+    },
+    {
+      "name": "d3_rig_t0.webp",
+      "bounds": [
+        366,
+        77,
+        598,
+        291
+      ],
+      "transparent_fraction": 0.7288
+    },
+    {
+      "name": "d3_salvage_t0.webp",
+      "bounds": [
+        681,
+        59,
+        887,
+        294
+      ],
+      "transparent_fraction": 0.7684
+    },
+    {
+      "name": "d3_spine_t0.webp",
+      "bounds": [
+        981,
+        40,
+        1149,
+        290
+      ],
+      "transparent_fraction": 0.7772
+    },
+    {
+      "name": "d3_lantern_t0.webp",
+      "bounds": [
+        1257,
+        33,
+        1443,
+        288
+      ],
+      "transparent_fraction": 0.7902
+    },
+    {
+      "name": "d3_cradle_t1.webp",
+      "bounds": [
+        56,
+        347,
+        303,
+        593
+      ],
+      "transparent_fraction": 0.6809
+    },
+    {
+      "name": "d3_rig_t1.webp",
+      "bounds": [
+        355,
+        361,
+        602,
+        586
+      ],
+      "transparent_fraction": 0.6943
+    },
+    {
+      "name": "d3_salvage_t1.webp",
+      "bounds": [
+        648,
+        327,
+        908,
+        599
+      ],
+      "transparent_fraction": 0.6274
+    },
+    {
+      "name": "d3_spine_t1.webp",
+      "bounds": [
+        971,
+        315,
+        1158,
+        594
+      ],
+      "transparent_fraction": 0.7041
+    },
+    {
+      "name": "d3_lantern_t1.webp",
+      "bounds": [
+        1252,
+        308,
+        1442,
+        591
+      ],
+      "transparent_fraction": 0.7552
+    },
+    {
+      "name": "d3_cradle_t2.webp",
+      "bounds": [
+        36,
+        648,
+        324,
+        931
+      ],
+      "transparent_fraction": 0.5594
+    },
+    {
+      "name": "d3_rig_t2.webp",
+      "bounds": [
+        341,
+        653,
+        627,
+        926
+      ],
+      "transparent_fraction": 0.5638
+    },
+    {
+      "name": "d3_salvage_t2.webp",
+      "bounds": [
+        636,
+        629,
+        933,
+        937
+      ],
+      "transparent_fraction": 0.5016
+    },
+    {
+      "name": "d3_spine_t2.webp",
+      "bounds": [
+        953,
+        615,
+        1182,
+        934
+      ],
+      "transparent_fraction": 0.5863
+    },
+    {
+      "name": "d3_lantern_t2.webp",
+      "bounds": [
+        1213,
+        602,
+        1481,
+        940
+      ],
+      "transparent_fraction": 0.6014
+    }
+  ]
+}

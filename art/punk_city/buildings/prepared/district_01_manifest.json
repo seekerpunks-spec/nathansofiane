@@ -1,0 +1,156 @@
+{
+  "district": 1,
+  "source": "district_01.png",
+  "sprites": [
+    {
+      "name": "apartment_t0.webp",
+      "bounds": [
+        96,
+        60,
+        288,
+        284
+      ],
+      "transparent_fraction": 0.7583
+    },
+    {
+      "name": "terminal_t0.webp",
+      "bounds": [
+        383,
+        81,
+        569,
+        287
+      ],
+      "transparent_fraction": 0.7794
+    },
+    {
+      "name": "energy_t0.webp",
+      "bounds": [
+        679,
+        63,
+        865,
+        288
+      ],
+      "transparent_fraction": 0.7983
+    },
+    {
+      "name": "bodega_t0.webp",
+      "bounds": [
+        946,
+        97,
+        1152,
+        290
+      ],
+      "transparent_fraction": 0.7611
+    },
+    {
+      "name": "antenna_t0.webp",
+      "bounds": [
+        1240,
+        55,
+        1412,
+        287
+      ],
+      "transparent_fraction": 0.8188
+    },
+    {
+      "name": "apartment_t1.webp",
+      "bounds": [
+        65,
+        332,
+        305,
+        607
+      ],
+      "transparent_fraction": 0.6564
+    },
+    {
+      "name": "terminal_t1.webp",
+      "bounds": [
+        362,
+        362,
+        590,
+        610
+      ],
+      "transparent_fraction": 0.6551
+    },
+    {
+      "name": "energy_t1.webp",
+      "bounds": [
+        645,
+        323,
+        880,
+        610
+      ],
+      "transparent_fraction": 0.6659
+    },
+    {
+      "name": "bodega_t1.webp",
+      "bounds": [
+        916,
+        366,
+        1183,
+        613
+      ],
+      "transparent_fraction": 0.612
+    },
+    {
+      "name": "antenna_t1.webp",
+      "bounds": [
+        1223,
+        329,
+        1457,
+        612
+      ],
+      "transparent_fraction": 0.6941
+    },
+    {
+      "name": "apartment_t2.webp",
+      "bounds": [
+        43,
+        645,
+        305,
+        955
+      ],
+      "transparent_fraction": 0.5741
+    },
+    {
+      "name": "terminal_t2.webp",
+      "bounds": [
+        336,
+        643,
+        608,
+        967
+      ],
+      "transparent_fraction": 0.5412
+    },
+    {
+      "name": "energy_t2.webp",
+      "bounds": [
+        627,
+        635,
+        897,
+        960
+      ],
+      "transparent_fraction": 0.5062
+    },
+    {
+      "name": "bodega_t2.webp",
+      "bounds": [
+        910,
+        666,
+        1182,
+        963
+      ],
+      "transparent_fraction": 0.5055
+    },
+    {
+      "name": "antenna_t2.webp",
+      "bounds": [
+        1199,
+        634,
+        1483,
+        964
+      ],
+      "transparent_fraction": 0.5376
+    }
+  ]
+}

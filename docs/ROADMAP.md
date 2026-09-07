@@ -1,5 +1,17 @@
 # CYBERSEEKER — ROADMAP D'EXÉCUTION
 
+> R44 (07/09/2026) : les bâtiments ont été entièrement redessinés, 75 sprites
+> sur cinq districts. [Livraison et validation](R44_BUILDING_ART.md).
+> Le blocage de génération des bâtiments cité dans l'historique R42 est levé.
+
+> R43 (07/09/2026) : MAP refait dans le thème R42, interactions de construction
+> clarifiées et testées. Voir [livraison MAP](R43_MAP_DESIGN.md).
+
+> R42 (07/09/2026) : le nouveau brief utilisateur Punk City remplace les briefs
+> visuels précédents. Accueil et thème des six scènes intégrés, mais illustration
+> des bâtiments/coffres encore à refaire après levée du quota d'images. Voir
+> [livraison, validation et restant R42](R42_REFERENCE_DESIGN.md). Aucun APK/AAB.
+
 ## P0 — Fondations
 
 - [x] Audit statique client/serveur/config.

@@ -72,6 +72,7 @@ func _run() -> void:
 		"seasons": _json("seasons.json").get("items", []),
 	}
 	Config._index_outcomes()
+	_check_building_art()
 	var credits_only := Ui.reward_text({"credits": 300000})
 	_check(credits_only == "+300K CR", "récompense crédits-only mal formatée: " + credits_only)
 	_check(not credits_only.contains("SPINS"), "récompense crédits-only invente des spins")
@@ -85,7 +86,7 @@ func _run() -> void:
 		"mapping visuel Attack invalide"
 	)
 	_check(
-		SpinVisuals.symbols_for_result({"type": "credits", "tier": "legendary"}) == ["vault", "vault", "vault"],
+		SpinVisuals.symbols_for_result({"type": "credits", "tier": "legendary"}) == ["credits", "credits", "credits"],
 		"mapping visuel jackpot invalide"
 	)
 	var juice_btn := Ui.button("SPIN", Ui.NEON_CYAN)
@@ -98,7 +99,7 @@ func _run() -> void:
 	_check(ResourceLoader.exists("res://assets/fonts/Nunito-ExtraBold.ttf"), "police Nunito absente")
 	var polish_box := Ui.style_box()
 	_check(polish_box.anti_aliasing, "StyleBoxFlat anti_aliasing off")
-	_check(polish_box.corner_detail >= 10, "coins StyleBox trop anguleux")
+	_check(polish_box.corner_detail == 1, "R42: cadres biseautes attendus")
 	var probe := Control.new()
 	Preferences.reduced_motion = true
 	Juice.pop(probe, 1.2, 0.2)
@@ -131,6 +132,8 @@ func _run() -> void:
 		if not _check(instance.get_script() != null, "Script non chargé: " + path):
 			instance.queue_free()
 			continue
+		instance.set_meta("qa_skip_sync", true)
+		instance.set_meta("qa_offers", [])
 		add_child(instance)
 		await get_tree().process_frame
 		if path.ends_with("DistrictScreen.tscn"):
@@ -139,6 +142,7 @@ func _run() -> void:
 			_check_collection_screen(instance)
 			_check_horizontal_bounds(instance)
 		if path.ends_with("SpinScreen.tscn"):
+			_check_reference_home(instance)
 			instance._network_snapshot = {
 				"giftRules":{"rewardSpins":1,"maxSentPerDay":20,"sentToday":0},
 				"friends":[{"playerId":"CYB-000000000002","displayName":"Long Friend Name","score":123456,"giftedToday":false}],
@@ -170,6 +174,10 @@ func _run() -> void:
 			instance._clear_social_overlay()
 		instance.queue_free()
 		await get_tree().process_frame
+	await _check_reference_shell()
+	# Let the audio mixer release the last navigation click before engine exit.
+	Sfx.stop_all()
+	await get_tree().create_timer(0.06).timeout
 	if _failures > 0:
 		print("SMOKE_SCENES_FAILED: ", _failures)
 		get_tree().quit(1)
@@ -180,6 +188,61 @@ func _run() -> void:
 ## Les scènes pouvaient être instanciées avec succès tout en poussant leurs
 ## actions hors du viewport. Les contrôles critiques s'inscrivent explicitement
 ## dans ce groupe afin que chaque résolution de la gate vérifie leurs bounds.
+func _check_reference_shell() -> void:
+	var shell := preload("res://scenes/Main.tscn").instantiate()
+	shell.qa_bypass_boot = true
+	add_child(shell)
+	shell._enter_game("spin")
+	await get_tree().process_frame
+	_check(shell._nav_buttons.size() == 6, "R42: six navigation tabs expected")
+	shell._on_nav_pressed("events")
+	await get_tree().process_frame
+	_check(shell._current_tab == "missions", "R42: events route does not reach rewards")
+	for tab in ["missions", "collection", "store"]:
+		shell._open_tab(tab)
+		await get_tree().process_frame
+		for node in shell._screen.get_children():
+			if node is VBoxContainer:
+				_check(node.get_combined_minimum_size().x <= shell.size.x - Ui.SAFE_MARGIN * 2, "R42: " + tab + " content forces horizontal overflow")
+	shell.queue_free()
+	await get_tree().process_frame
+
+func _check_reference_home(instance: Node) -> void:
+	var home: RefCounted = instance._home_view
+	home.layout()
+	_check(instance._reels.size() == 3, "R42: exactly three animated drums")
+	_check(home.village_art.size() == 5, "R42: five village structures")
+	_check(instance._event_label.text != "", "R42: event label missing")
+	for kind in ["raid", "shield", "chest", "card"]:
+		var expected: String = {"raid": "vault", "shield": "shield", "chest": "chest", "card": "card"}[kind]
+		_check(SpinVisuals.symbols_for_result({"type": kind}) == [expected, expected, expected], "R42: incorrect symbol for " + kind)
+	for control in [instance._spin_btn, instance._multiplier_btn, home.village, instance._credits_value, instance._spins_value]:
+		var rect: Rect2 = control.get_global_rect()
+		var area: Vector2 = instance.get_viewport_rect().size
+		_check(rect.position.x >= -1 and rect.end.x <= area.x + 1, "R42: control outside horizontal viewport")
+		_check(rect.position.y >= 0 and rect.end.y <= area.y - Ui.NAV_HEIGHT + 1, "R42: control overlaps navigation")
+	var selected: int = instance._selected_multiplier
+	instance._selected_multiplier = 100000
+	instance._normalize_multiplier()
+	_check(instance._selected_multiplier == 1, "R42: unaffordable bet must fall back to one")
+	var affordable: Array = instance._affordable_multipliers()
+	for step in affordable.size():
+		instance._cycle_multiplier()
+		_check(affordable.has(instance._selected_multiplier), "R42: unaffordable value in bet cycle")
+	_check(instance._selected_multiplier == 1, "R42: bet cycle must wrap")
+	instance._selected_multiplier = selected
+	instance._normalize_multiplier()
+	for reel in instance._reels:
+		reel.start_spin()
+		reel.land("credits")
+		_check(not reel.spinning and reel.final_symbol == "credits", "R42: reel landing mismatch")
+	var original_events: Variant = Store.state.get("events", [])
+	Store.state["events"] = [{"name": "Expired", "endsAtMs": Store.now_ms() - 1}]
+	home.update_event()
+	_check(instance._event_label.text == "EVENTS", "R42: expired event advertised as active")
+	Store.state["events"] = original_events
+	home.update_event()
+
 func _check_horizontal_bounds(instance: Node) -> void:
 	var viewport_width: float = instance.get_viewport_rect().size.x
 	for child in instance.find_children("*", "Control", true, false):
@@ -306,3 +369,80 @@ func _check_district_screen(instance: Node) -> void:
 	)
 	Config.raw["districts"] = restore_districts
 	Store.state["districtIndex"] = restore_index
+	instance._refresh()
+	await get_tree().process_frame
+	await _check_map_interactions(instance)
+
+func _check_map_interactions(instance: Node) -> void:
+	var view: RefCounted = instance._map_view
+	var original: Dictionary = Store.state.duplicate(true)
+	var elements: Array = instance._district.get("elements", [])
+	_check(view.cards.size() == elements.size(), "R43: MAP structure count")
+	var before_credits := Store.credits()
+	var before_progress: Array = Store.state.get("districtProgress", []).duplicate(true)
+	var target: Control = view.cards[1].get_child(0)
+	target.pressed.emit()
+	await get_tree().process_frame
+	_check(instance._armed_element == int(elements[1].id), "R43: selected building not updated")
+	_check(Store.credits() == before_credits and Store.state.get("districtProgress", []) == before_progress, "R43: selecting a building must not buy it")
+	var q: Dictionary = view.quote(view.selected)
+	_check(int(q.cost) == int(elements[1].levels[1].cost), "R43: next level quote differs from config")
+	Store.state["credits"] = 0
+	instance._refresh()
+	_check(view.action.disabled, "R43: unaffordable upgrade enabled")
+	_check(view.feedback.text.begins_with("NEED "), "R43: insufficient credit hint missing")
+	var district_id := int(instance._district.id)
+	var element_id := int(elements[1].id)
+	Store.state["credits"] = before_credits
+	Store.state["districtProgress"] = [{"districtId": district_id, "elementId": element_id, "level": 5}]
+	instance._refresh()
+	_check(view.action.disabled and view.action.text == "MAX LEVEL", "R43: maximum level still purchasable")
+	Store.state["districtDamage"] = [{"districtId": district_id, "elementId": element_id}]
+	instance._refresh()
+	q = view.quote(view.selected)
+	var expected_repair: int = int(elements[1].levels[5].cost) * int(Config.social().get("attack", {}).get("repairCostBps", 2500)) / 10000
+	_check(q.damaged and not q.maxed and int(q.cost) == expected_repair, "R43: damaged maximum level repair quote")
+	_check(view.action.text.begins_with("REPAIR"), "R43: repair action missing")
+	instance._busy = true
+	instance._refresh()
+	_check(view.action.disabled and view.bay.disabled, "R43: duplicate action allowed while request pending")
+	instance._busy = false
+	Store.state = original
+	instance._refresh()
+	for control in [view.action, view.bay, view.route, view.detail, view.stage]:
+		var rect: Rect2 = control.get_global_rect()
+		_check(rect.position.x >= 0 and rect.end.x <= instance.size.x + 1, "R43: MAP horizontal overflow")
+		_check(rect.position.y >= 0 and rect.end.y <= instance.size.y - Ui.NAV_HEIGHT + 1, "R43: MAP overlaps bottom navigation")
+	view.open_bay()
+	await get_tree().process_frame
+	_check(is_instance_valid(view._modal) and view._modal.is_in_group("dismiss_on_back"), "R43: Build Bay Android back support")
+	for node in view._modal.find_children("*", "Button", true, false):
+		_check(node.size.x <= instance.size.x - 28, "R43: Build Bay action overflow")
+	view.open_route()
+	await get_tree().process_frame
+	_check(view._modal.find_children("*", "ScrollContainer", true, false).size() == 1, "R43: district route must scroll")
+	view._modal.queue_free()
+	await get_tree().process_frame
+
+func _check_building_art() -> void:
+	var paths: Dictionary = {}
+	for district in Config.districts():
+		for element in district.get("elements", []):
+			var unique: Dictionary = {}
+			for level in element.get("levels", []):
+				var asset := str(level.get("asset", ""))
+				unique[asset] = true
+				paths[asset] = true
+			_check(unique.size() == 3, "R44: each building needs three illustrated evolutions")
+	_check(paths.size() == 75, "R44: 75 distinct building sprites expected")
+	for asset in paths:
+		var texture := load("res://assets/generated/" + str(asset) + ".webp") as Texture2D
+		if not _check(texture != null, "R44: building texture missing"):
+			continue
+		_check(texture.get_size() == Vector2(320, 360), "R44: inconsistent building canvas")
+		var bitmap := texture.get_image()
+		if bitmap.is_compressed():
+			bitmap.decompress()
+		_check(bitmap.detect_alpha() != Image.ALPHA_NONE, "R44: opaque building background")
+		for corner in [Vector2i(0, 0), Vector2i(319, 0), Vector2i(0, 359), Vector2i(319, 359)]:
+			_check(bitmap.get_pixelv(corner).a == 0, "R44: nontransparent sprite corner")

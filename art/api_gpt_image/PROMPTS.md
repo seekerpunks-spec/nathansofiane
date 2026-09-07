@@ -27,6 +27,9 @@ secret ni clé API utilisateur n'est requis par ce workflow.
 > casual-game mood, toy-like materials, clean depth and atmospheric perspective.
 > No characters, no slot machine, no buttons, no UI, no words, no logos.
 
+Pass DA 03/09/2026 — brief user **skyline jour jouet** : même prompt Fond,
+frame `skyline_jour_jouet_v1.png` (staging). Pas de HUD, pas de slot.
+
 ## Cabinet
 
 > Isolated front-facing premium stylized 3D cyberpunk slot-machine cabinet for

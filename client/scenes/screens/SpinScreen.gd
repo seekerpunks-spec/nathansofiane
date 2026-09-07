@@ -1,24 +1,21 @@
 extends Control
-## SpinScreen R23 — scène premium GPT Image, logique Godot interactive.
+## SpinScreen R42 — vue Punk City indépendante, logique serveur préservée.
 ##
 ## Le serveur choisit toujours le résultat économique. Les symboles constituent
 ## uniquement une représentation animée de la réponse autoritaire.
 
 signal navigate_requested(tab: String)
 
-const SYMBOL_ATLAS := preload("res://assets/generated/api_gpt/slot_symbols_atlas.webp")
-const SPIN_BG := preload("res://assets/generated/api_gpt/spin_background.webp")
-const SLOT_FRAME := preload("res://assets/generated/api_gpt/slot_machine.webp")
-const BYTE_MASCOT := preload("res://assets/generated/api_gpt/byte.webp")
-const SPIN_BUTTON_ART := preload("res://assets/generated/api_gpt/spin_button.webp")
+const SpinHomeView := preload("res://scripts/components/SpinHomeView.gd")
 const SpinVisuals := preload("res://scripts/components/SpinVisuals.gd")
 const SpinJuice := preload("res://scripts/components/SpinJuice.gd")
 const SpinNetworkView := preload("res://scripts/components/SpinNetworkView.gd")
 const SpinEncounterView := preload("res://scripts/components/SpinEncounterView.gd")
 const SpinNetworkActions := preload("res://scripts/components/SpinNetworkActions.gd")
 const SpinTelemetry := preload("res://scripts/components/SpinTelemetry.gd")
-const SYMBOLS := ["credits", "shield", "hack", "vault", "energy", "glitch"]
+const SYMBOLS := ["credits", "shield", "hack", "vault", "energy", "glitch", "chest", "card"]
 
+var _home_view: RefCounted
 var _spins_value: Label
 var _credits_value: Label
 var _district_label: Label
@@ -94,24 +91,8 @@ func handle_back() -> bool:
 
 
 func _build() -> void:
-	var bg := TextureRect.new()
-	bg.texture = SPIN_BG
-	bg.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	bg.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
-	Ui.soften_tex(bg)
-	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
-	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(bg)
-
-	var atmosphere := SpinVisuals.AnimatedBackdrop.new()
-	atmosphere.set_anchors_preset(Control.PRESET_FULL_RECT)
-	atmosphere.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(atmosphere)
-
-	_build_header()
-	_build_event_banner()
-	_build_cabinet()
-	_build_lower_controls()
+	_home_view = SpinHomeView.new(self)
+	_home_view.build()
 
 	_no_spins = _build_no_spins()
 	add_child(_no_spins)
@@ -131,227 +112,6 @@ func _build() -> void:
 	_tick_timer.wait_time = 0.055
 	_tick_timer.timeout.connect(_on_tick)
 	add_child(_tick_timer)
-
-
-func _build_header() -> void:
-	var credits_chip := _stat_chip(Vector2(14, 12), Vector2(238, 56), Ui.GOLD)
-	var credits_row := HBoxContainer.new()
-	credits_row.alignment = BoxContainer.ALIGNMENT_CENTER
-	credits_row.add_theme_constant_override("separation", 9)
-	credits_row.add_child(Ui.label("●", 24, Ui.GOLD))
-	_credits_value = Ui.label("0", 21, Color("#2A2551"))
-	credits_row.add_child(_credits_value)
-	credits_chip.add_child(credits_row)
-	add_child(credits_chip)
-
-	var spins_chip := _stat_chip(Vector2(284, 12), Vector2(158, 56), Ui.NEON_CYAN)
-	_spins_value = Ui.label("⚡ 0", 21, Color("#11225A"))
-	_spins_value.position = Vector2(0, 0)
-	_spins_value.size = Vector2(146, 50)
-	spins_chip.add_child(_spins_value)
-	add_child(spins_chip)
-
-	var menu := _promo_button("NET", Ui.NEON_MAGENTA)
-	menu.position = Vector2(458, 12)
-	menu.size = Vector2(68, 56)
-	menu.add_theme_font_size_override("font_size", 25)
-	menu.pressed.connect(_open_network)
-	add_child(menu)
-
-
-func _stat_chip(pos: Vector2, chip_size: Vector2, accent: Color) -> PanelContainer:
-	var panel := PanelContainer.new()
-	panel.position = pos
-	panel.size = chip_size
-	panel.add_theme_stylebox_override(
-		"panel", _game_box(Color("#FFF0C0"), Color(accent, 0.98), 22, 4, 7)
-	)
-	return panel
-
-
-func _game_box(bg: Color, border: Color, radius: int, width: int, shadow: int = 6) -> StyleBoxFlat:
-	var box := Ui.style_box(bg, border, radius, width)
-	box.set_content_margin_all(8)
-	box.shadow_color = Color("#182356", 0.48)
-	box.shadow_size = shadow
-	box.shadow_offset = Vector2(0, 5)
-	return box
-
-
-func _promo_button(text: String, accent: Color) -> Button:
-	var button := Button.new()
-	button.text = text
-	button.focus_mode = Control.FOCUS_NONE
-	button.add_theme_font_size_override("font_size", 14)
-	button.add_theme_color_override("font_color", Color.WHITE)
-	button.add_theme_color_override("font_outline_color", Color("#121A4A"))
-	button.add_theme_font_override("font", Ui.FACE)
-	button.add_theme_constant_override("outline_size", 2)
-	button.add_theme_stylebox_override("normal", _game_box(accent, Color.WHITE, 18, 3, 7))
-	button.add_theme_stylebox_override("hover", _game_box(accent.lightened(0.08), Color.WHITE, 18, 4, 9))
-	button.add_theme_stylebox_override("pressed", _game_box(accent.darkened(0.16), Ui.GOLD, 18, 4, 4))
-	return button
-
-
-func _build_event_banner() -> void:
-	var rush := _promo_button("RUSH\n+10", Ui.NEON_MAGENTA)
-	rush.position = Vector2(18, 82)
-	rush.size = Vector2(82, 66)
-	rush.pressed.connect(func() -> void: navigate_requested.emit("missions"))
-	add_child(rush)
-
-	_event_label = Ui.label("CYBER SEEKER", 29, Ui.GOLD)
-	_event_label.position = Vector2(105, 76)
-	_event_label.size = Vector2(330, 42)
-	add_child(_event_label)
-
-	_district_label = Ui.label("NEON SLUMS  •  NODE 01", 13, Color.WHITE)
-	_district_label.position = Vector2(110, 114)
-	_district_label.size = Vector2(320, 26)
-	add_child(_district_label)
-
-	_event_timer = Ui.label("LIVE", 11, Color("#202151"))
-	_event_timer.position = Vector2(18, 121)
-	_event_timer.size = Vector2(82, 20)
-	_event_timer.visible = false
-	add_child(_event_timer)
-
-	var loot := _promo_button("LOOT", Ui.NEON_BLUE)
-	loot.position = Vector2(444, 82)
-	loot.size = Vector2(78, 44)
-	loot.pressed.connect(func() -> void: navigate_requested.emit("collection"))
-	add_child(loot)
-
-
-func _build_cabinet() -> void:
-	_cabinet_root = Control.new()
-	_cabinet_root.position = Vector2(10, 142)
-	_cabinet_root.size = Vector2(520, 540)
-	add_child(_cabinet_root)
-
-	# Le contrôleur conserve l'état d'accentuation des gains, mais le contour
-	# technique R18 reste masqué au profit du véritable décor illustré.
-	_cabinet = SpinVisuals.SlotCabinet.new()
-	_cabinet.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_cabinet.visible = false
-	_cabinet_root.add_child(_cabinet)
-
-	var cabinet_art := TextureRect.new()
-	cabinet_art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	cabinet_art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	cabinet_art.custom_minimum_size = Vector2.ZERO
-	cabinet_art.texture = SLOT_FRAME
-	cabinet_art.set_position(Vector2.ZERO)
-	cabinet_art.set_size(Vector2(520, 540))
-	cabinet_art.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	Ui.soften_tex(cabinet_art)
-	_cabinet_root.add_child(cabinet_art)
-
-	_status_label = Ui.label("NEON RUSH", 22, Ui.NEON_MAGENTA)
-	_status_label.position = Vector2(132, 45)
-	_status_label.size = Vector2(256, 40)
-	_status_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	_cabinet_root.add_child(_status_label)
-
-	_result_banner = Ui.label("MATCH 3  •  CRACK THE VAULT", 11, Color.WHITE)
-	_result_banner.position = Vector2(132, 84)
-	_result_banner.size = Vector2(256, 26)
-	_result_banner.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	_cabinet_root.add_child(_result_banner)
-
-	var reel_x := [116.0, 225.0, 337.0]
-	for i in 3:
-		var reel := SpinVisuals.SlotReel.new()
-		reel.atlas = SYMBOL_ATLAS
-		reel.symbols = SYMBOLS
-		reel.position = Vector2(reel_x[i], 215)
-		reel.size = Vector2(90 if i == 1 else 88, 186)
-		reel.reel_index = i
-		reel.final_symbol = SYMBOLS[(i * 2) % SYMBOLS.size()]
-		reel.clip_contents = true
-		_cabinet_root.add_child(reel)
-		_reels.append(reel)
-
-	_regen_bar = _make_progress()
-	_regen_bar.position = Vector2(138, 438)
-	_regen_bar.size = Vector2(244, 31)
-	_cabinet_root.add_child(_regen_bar)
-
-	_regen_label = Ui.label("", 11, Color.WHITE)
-	_regen_label.position = Vector2(139, 438)
-	_regen_label.size = Vector2(242, 30)
-	_cabinet_root.add_child(_regen_label)
-
-
-func _build_lower_controls() -> void:
-	_mascot = TextureRect.new()
-	_mascot.texture = BYTE_MASCOT
-	_mascot.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	_mascot.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	_mascot.position = Vector2(4, 714)
-	_mascot.size = Vector2(168, 198)
-	_mascot.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	Ui.soften_tex(_mascot)
-	add_child(_mascot)
-
-	_spin_btn = _big_button("SPIN")
-	_spin_btn.position = Vector2(148, 732)
-	_spin_btn.size = Vector2(246, 106)
-	_spin_btn.pivot_offset = _spin_btn.size / 2.0
-	_spin_btn.pressed.connect(_on_spin_pressed)
-	Juice.arm(_spin_btn, true)
-	var spin_art := TextureRect.new()
-	spin_art.texture = SPIN_BUTTON_ART
-	spin_art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	spin_art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	spin_art.position = Vector2(-20, -30)
-	spin_art.size = Vector2(286, 201)
-	spin_art.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	spin_art.show_behind_parent = true
-	Ui.soften_tex(spin_art)
-	_spin_btn.add_child(spin_art)
-	add_child(_spin_btn)
-
-	_multiplier_btn = _promo_button("BET  ×1", Ui.NEON_MAGENTA)
-	_multiplier_btn.position = Vector2(184, 850)
-	_multiplier_btn.size = Vector2(174, 58)
-	_multiplier_btn.add_theme_font_size_override("font_size", 17)
-	_multiplier_btn.pressed.connect(_cycle_multiplier)
-	Juice.arm(_multiplier_btn, true)
-	add_child(_multiplier_btn)
-
-	var district_btn := _promo_button("CITY", Color("#1867C9"))
-	district_btn.position = Vector2(430, 758)
-	district_btn.size = Vector2(84, 68)
-	district_btn.add_theme_font_size_override("font_size", 15)
-	district_btn.pressed.connect(func() -> void: navigate_requested.emit("district"))
-	Juice.arm(district_btn, true)
-	add_child(district_btn)
-
-
-func _big_button(text: String) -> Button:
-	var button := Button.new()
-	button.text = text
-	button.focus_mode = Control.FOCUS_NONE
-	button.add_theme_font_override("font", Ui.FACE)
-	button.add_theme_font_size_override("font_size", 36)
-	button.add_theme_stylebox_override("normal", StyleBoxEmpty.new())
-	button.add_theme_stylebox_override("hover", StyleBoxEmpty.new())
-	button.add_theme_stylebox_override("pressed", StyleBoxEmpty.new())
-	button.add_theme_stylebox_override("disabled", StyleBoxEmpty.new())
-	button.add_theme_color_override("font_color", Color.WHITE)
-	button.add_theme_color_override("font_outline_color", Color("#342047"))
-	button.add_theme_constant_override("outline_size", 3)
-	button.add_theme_color_override("font_disabled_color", Color.WHITE)
-	return button
-
-
-func _make_progress() -> ProgressBar:
-	var bar := Ui.progress_bar(Ui.NEON_CYAN, 32)
-	bar.add_theme_stylebox_override("background", _game_box(Color("#17244E"), Color("#D8E7FF"), 15, 4, 4))
-	bar.add_theme_stylebox_override("fill", _game_box(Ui.NEON_CYAN, Color("#B9FFFF"), 15, 2, 3))
-	bar.value = 0
-	return bar
 
 
 func _build_no_spins() -> Control:
@@ -414,32 +174,18 @@ func _update_regen() -> void:
 
 
 func _update_event() -> void:
-	var events := Config.events()
-	if events.is_empty() or typeof(events[0]) != TYPE_DICTIONARY:
-		_event_timer.text = "LIVE"
-		return
-	var event: Dictionary = events[0]
-	var ends_at := int(event.get("endsAtMs", 0))
-	var points := 0
-	var sources: Variant = event.get("pointSources", [])
-	if typeof(sources) == TYPE_ARRAY:
-		for source in sources:
-			if typeof(source) == TYPE_DICTIONARY and str(source.get("action", "")) == "spin":
-				points = int(source.get("points", 0))
-				break
-	var remaining := maxi(0, ends_at - Store.now_ms())
-	_event_timer.text = "+%d" % points if points > 0 else Ui.mmss_long(remaining)
+	_home_view.update_event()
 
 
 func _refresh_hud() -> void:
 	var spins := Store.spins()
 	var credits := Store.credits()
 	if _hud_spins < 0:
-		_spins_value.text = "⚡ " + str(spins)
+		_spins_value.text = str(spins)
 		_credits_value.text = Ui.compact(credits)
 	else:
 		if spins != _hud_spins:
-			Juice.count(_spins_value, _hud_spins, spins, 0.28, func(n: int) -> String: return "⚡ " + str(n))
+			Juice.count(_spins_value, _hud_spins, spins, 0.28, func(n: int) -> String: return str(n))
 		if credits != _hud_credits:
 			Juice.count(_credits_value, _hud_credits, credits, 0.42, func(n: int) -> String: return Ui.compact(n))
 			if credits > _hud_credits and not Juice.reduced():
@@ -447,23 +193,7 @@ func _refresh_hud() -> void:
 	_hud_spins = spins
 	_hud_credits = credits
 	_normalize_multiplier()
-	var districts := Config.districts()
-	var active_district: Dictionary = {}
-	var completed := int(Store.state.get("districtIndex", 0))
-	for candidate in districts:
-		if typeof(candidate) != TYPE_DICTIONARY:
-			continue
-		active_district = candidate
-		if int(candidate.get("id", 0)) > completed:
-			break
-	if not active_district.is_empty():
-		var network_power := int(Store.state.get("progression", {}).get("score", 0))
-		_district_label.text = (
-			str(active_district.get("name", "NEON SLUMS")).to_upper()
-			+ " · NODE %02d" % int(active_district.get("id", 1))
-			+ " · FW %d/%d" % [int(Store.state.get("firewallCharges", 0)), int(Store.state.get("firewallMax", 3))]
-			+ " · PWR %s" % Ui.compact(network_power)
-		)
+	_home_view.refresh()
 
 
 func _affordable_multipliers() -> Array[int]:
@@ -712,7 +442,7 @@ func _reset_idle_state(reset_message: bool = true) -> void:
 		_status_label.text = "NEON RUSH"
 		_status_label.add_theme_color_override("font_color", Ui.NEON_MAGENTA)
 		_result_banner.text = "MATCH 3  •  CRACK THE VAULT"
-		_result_banner.add_theme_color_override("font_color", Color("#272554"))
+		_result_banner.add_theme_color_override("font_color", Ui.NEON_CYAN)
 		_cabinet.set_mode(Ui.NEON_CYAN, false)
 	_start_idle_animation()
 

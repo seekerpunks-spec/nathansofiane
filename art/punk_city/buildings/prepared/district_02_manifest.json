@@ -1,0 +1,156 @@
+{
+  "district": 2,
+  "source": "district_02.png",
+  "sprites": [
+    {
+      "name": "d2_habitats_t0.webp",
+      "bounds": [
+        64,
+        37,
+        305,
+        300
+      ],
+      "transparent_fraction": 0.6922
+    },
+    {
+      "name": "d2_foundry_t0.webp",
+      "bounds": [
+        357,
+        57,
+        601,
+        302
+      ],
+      "transparent_fraction": 0.7097
+    },
+    {
+      "name": "d2_bazaar_t0.webp",
+      "bounds": [
+        649,
+        82,
+        892,
+        301
+      ],
+      "transparent_fraction": 0.7032
+    },
+    {
+      "name": "d2_clinic_t0.webp",
+      "bounds": [
+        935,
+        78,
+        1167,
+        299
+      ],
+      "transparent_fraction": 0.6799
+    },
+    {
+      "name": "d2_beacon_t0.webp",
+      "bounds": [
+        1250,
+        26,
+        1464,
+        304
+      ],
+      "transparent_fraction": 0.7629
+    },
+    {
+      "name": "d2_habitats_t1.webp",
+      "bounds": [
+        45,
+        331,
+        323,
+        615
+      ],
+      "transparent_fraction": 0.6232
+    },
+    {
+      "name": "d2_foundry_t1.webp",
+      "bounds": [
+        348,
+        356,
+        615,
+        611
+      ],
+      "transparent_fraction": 0.6031
+    },
+    {
+      "name": "d2_bazaar_t1.webp",
+      "bounds": [
+        635,
+        371,
+        900,
+        608
+      ],
+      "transparent_fraction": 0.6255
+    },
+    {
+      "name": "d2_clinic_t1.webp",
+      "bounds": [
+        918,
+        364,
+        1181,
+        618
+      ],
+      "transparent_fraction": 0.609
+    },
+    {
+      "name": "d2_beacon_t1.webp",
+      "bounds": [
+        1233,
+        322,
+        1487,
+        628
+      ],
+      "transparent_fraction": 0.6605
+    },
+    {
+      "name": "d2_habitats_t2.webp",
+      "bounds": [
+        33,
+        638,
+        323,
+        953
+      ],
+      "transparent_fraction": 0.4971
+    },
+    {
+      "name": "d2_foundry_t2.webp",
+      "bounds": [
+        331,
+        655,
+        626,
+        955
+      ],
+      "transparent_fraction": 0.4853
+    },
+    {
+      "name": "d2_bazaar_t2.webp",
+      "bounds": [
+        632,
+        686,
+        907,
+        951
+      ],
+      "transparent_fraction": 0.5513
+    },
+    {
+      "name": "d2_clinic_t2.webp",
+      "bounds": [
+        914,
+        672,
+        1202,
+        958
+      ],
+      "transparent_fraction": 0.5125
+    },
+    {
+      "name": "d2_beacon_t2.webp",
+      "bounds": [
+        1224,
+        643,
+        1502,
+        970
+      ],
+      "transparent_fraction": 0.5586
+    }
+  ]
+}

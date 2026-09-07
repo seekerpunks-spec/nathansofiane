@@ -116,8 +116,8 @@ if (Test-Path -LiteralPath $buildingDir) {
 if (Test-Path -LiteralPath $stageDir) {
     $stageCount = @(Get-ChildItem -LiteralPath $stageDir -Filter "*.webp").Count
 }
-if ($buildingCount -lt 50) {
-    throw "Art diorama incomplet: $buildingCount/50+ WebP batiments"
+if ($buildingCount -lt 75) {
+    throw "Art R44 incomplet: $buildingCount/75+ WebP batiments (25 x 3 evolutions)"
 }
 if ($stageCount -lt 5) {
     throw "Stages district incomplets: $stageCount/5"
@@ -202,8 +202,8 @@ foreach ($iconKey in @("main_192x192", "adaptive_foreground_432x432", "adaptive_
 if ($preset -notmatch 'exclude_filter="[^"]*export/\*') { throw "Preset Android: export/* doit rester hors du pck" }
 
 # --- Netteté R39 ---
-if ($project -notmatch 'theme/custom_font="res://assets/fonts/Nunito-ExtraBold\.ttf"') {
-    throw "Police Nunito ExtraBold absente du theme"
+if ($project -notmatch 'theme/custom_font="res://assets/fonts/Rajdhani-Bold\.ttf"') {
+    throw "Police Rajdhani Bold absente du theme"
 }
 if ($project -notmatch 'default_font_multichannel_signed_distance_field=true') {
     throw "MSDF defaut police desactive"
@@ -222,11 +222,11 @@ $mipOff = Get-ChildItem -LiteralPath $generatedRoot -Recurse -Filter "*.import" 
 if ($mipOff) {
     throw "Textures sans mipmaps: $(($mipOff | ForEach-Object Name) -join ', ')"
 }
-if (-not (Test-Path -LiteralPath (Join-Path $client "assets\fonts\Nunito-ExtraBold.ttf"))) {
-    throw "Nunito-ExtraBold.ttf manquant"
+if (-not (Test-Path -LiteralPath (Join-Path $client "assets\fonts\Rajdhani-Bold.ttf"))) {
+    throw "Rajdhani-Bold.ttf manquant"
 }
-if (-not (Test-Path -LiteralPath (Join-Path $client "assets\fonts\OFL.txt"))) {
-    throw "Licence OFL Nunito manquante"
+if (-not (Test-Path -LiteralPath (Join-Path $client "assets\fonts\Rajdhani-OFL.txt"))) {
+    throw "Licence OFL Rajdhani manquante"
 }
 
 [pscustomobject]@{

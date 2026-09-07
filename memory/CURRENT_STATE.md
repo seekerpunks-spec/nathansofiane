@@ -1,15 +1,33 @@
-# MÉMOIRE — ÉTAT ACTUEL R41 + reset DA
+# MÉMOIRE — ÉTAT ACTUEL R44 : nouveaux bâtiments Punk City
 
-> MAJ 07/09/2026. R41 = hardening/fermeture MASTER TODO local. Le runtime visuel
-> reste R39 ; le home/mockup R40 est **abandonné**.
+> R44 : les 55 anciennes illustrations de bâtiments sont retirées du runtime
+> et archivées. 25 bâtiments redessinés × trois évolutions = 75 nouveaux sprites.
+> Imagegen intégré + détourage automatique autorisé par l'utilisateur.
+> Gate complète verte. Voir `docs/R44_BUILDING_ART.md`.
+
+> R43 : refonte MAP livrée dans le thème R42. Fiche d'amélioration explicite,
+> Build Bay illustré, districts défilants et complétion dorée. Économie préservée.
+> Gate complète verte ; détails et limites : `docs/R43_MAP_DESIGN.md`.
+
+> MAJ 07/09/2026. Gameplay R41 conservé. Nouvelle demande explicite utilisateur :
+> refaire l'aspect à partir de l'image Punk City du 3 septembre. Le brief de jour
+> ci-dessous est remplacé, sans effacer les anciens essais.
 
 ## Design
 
-Reset user : rien ne va. Plus de Punk City, plus de rails, plus de
-`SpinHomeChrome`. Client visuel = commit `4bb98d3` (R34–R39).
-Brief DA : **skyline jour jouet**. Frame 1 (monde vide, pas de HUD/slot)
-en staging `art/api_gpt_image/skyline_jour_jouet_v1.png` — **pas encore
-câblée**. Attente oui/non user.
+R42 : machine trois rouleaux argentés, bleu nuit/cyan/magenta, logo graffiti
+CYBER SEEKER, bouton doré, rails illustrés, village et navigation six onglets.
+Composition native séparée de SpinScreen dans `SpinHomeView.gd` / `NeonSkin.gd`.
+Police Rajdhani Bold et thème des six scènes harmonisés. Résultats, mises et
+soldes serveur préservés. Sources sous `art/punk_city`, ancien art archivé sous
+`art/archive/r23-replaced`. Les essais skyline/R40 restent historiques.
+
+**Pas de déclaration "design fini à 100 %"** : fonds de districts et illustrations
+de coffres secondaires encore anciens. Le blocage imagegen R42 est levé et les
+bâtiments sont tous remplacés en R44. Gemmes, piggy bank, Coin Fever,
+Mega Chest et autospin ne sont pas simulés par de faux boutons/compteurs.
+Lire `docs/R42_REFERENCE_DESIGN.md` pour le livré, les adaptations et le restant.
+Ne pas remplacer ce brief par la précédente direction skyline jour.
 
 ## Gameplay et plateforme R41
 

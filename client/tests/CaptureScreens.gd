@@ -67,6 +67,7 @@ func _capture_all() -> void:
 	stage.add_child(ambiance)
 	for key in SCREENS:
 		var screen: Control = load(SCREENS[key]).instantiate()
+		screen.set_meta("qa_skip_sync", true)
 		if key == "store" and not Config.offers().is_empty():
 			screen.set_meta("qa_offers", [Config.offers()[0]])
 		stage.add_child(screen)

@@ -24,12 +24,12 @@
         {
           "level": 2,
           "cost": 6900000,
-          "asset": "districts/buildings/d5_lattice_t0"
+          "asset": "districts/buildings/d5_lattice_t1"
         },
         {
           "level": 3,
           "cost": 21500000,
-          "asset": "districts/buildings/d5_lattice_t0"
+          "asset": "districts/buildings/d5_lattice_t1"
         },
         {
           "level": 4,
@@ -60,12 +60,12 @@
         {
           "level": 2,
           "cost": 6450000,
-          "asset": "districts/buildings/d5_reactor_t0"
+          "asset": "districts/buildings/d5_reactor_t1"
         },
         {
           "level": 3,
           "cost": 20000000,
-          "asset": "districts/buildings/d5_reactor_t0"
+          "asset": "districts/buildings/d5_reactor_t1"
         },
         {
           "level": 4,
@@ -96,12 +96,12 @@
         {
           "level": 2,
           "cost": 7950000,
-          "asset": "districts/buildings/d5_cipher_t0"
+          "asset": "districts/buildings/d5_cipher_t1"
         },
         {
           "level": 3,
           "cost": 24000000,
-          "asset": "districts/buildings/d5_cipher_t0"
+          "asset": "districts/buildings/d5_cipher_t1"
         },
         {
           "level": 4,
@@ -132,12 +132,12 @@
         {
           "level": 2,
           "cost": 7200000,
-          "asset": "districts/buildings/d5_spine_t0"
+          "asset": "districts/buildings/d5_spine_t1"
         },
         {
           "level": 3,
           "cost": 20900000,
-          "asset": "districts/buildings/d5_spine_t0"
+          "asset": "districts/buildings/d5_spine_t1"
         },
         {
           "level": 4,
@@ -168,12 +168,12 @@
         {
           "level": 2,
           "cost": 9000000,
-          "asset": "districts/buildings/d5_beacon_t0"
+          "asset": "districts/buildings/d5_beacon_t1"
         },
         {
           "level": 3,
           "cost": 27700000,
-          "asset": "districts/buildings/d5_beacon_t0"
+          "asset": "districts/buildings/d5_beacon_t1"
         },
         {
           "level": 4,

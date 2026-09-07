@@ -24,12 +24,12 @@
         {
           "level": 2,
           "cost": 3200000,
-          "asset": "districts/buildings/d4_vault_t0"
+          "asset": "districts/buildings/d4_vault_t1"
         },
         {
           "level": 3,
           "cost": 10000000,
-          "asset": "districts/buildings/d4_vault_t0"
+          "asset": "districts/buildings/d4_vault_t1"
         },
         {
           "level": 4,
@@ -60,12 +60,12 @@
         {
           "level": 2,
           "cost": 3000000,
-          "asset": "districts/buildings/d4_atrium_t0"
+          "asset": "districts/buildings/d4_atrium_t1"
         },
         {
           "level": 3,
           "cost": 9300000,
-          "asset": "districts/buildings/d4_atrium_t0"
+          "asset": "districts/buildings/d4_atrium_t1"
         },
         {
           "level": 4,
@@ -96,12 +96,12 @@
         {
           "level": 2,
           "cost": 3700000,
-          "asset": "districts/buildings/d4_bridge_t0"
+          "asset": "districts/buildings/d4_bridge_t1"
         },
         {
           "level": 3,
           "cost": 11200000,
-          "asset": "districts/buildings/d4_bridge_t0"
+          "asset": "districts/buildings/d4_bridge_t1"
         },
         {
           "level": 4,
@@ -132,12 +132,12 @@
         {
           "level": 2,
           "cost": 3350000,
-          "asset": "districts/buildings/d4_suite_t0"
+          "asset": "districts/buildings/d4_suite_t1"
         },
         {
           "level": 3,
           "cost": 9700000,
-          "asset": "districts/buildings/d4_suite_t0"
+          "asset": "districts/buildings/d4_suite_t1"
         },
         {
           "level": 4,
@@ -168,12 +168,12 @@
         {
           "level": 2,
           "cost": 4200000,
-          "asset": "districts/buildings/d4_crown_t0"
+          "asset": "districts/buildings/d4_crown_t1"
         },
         {
           "level": 3,
           "cost": 12900000,
-          "asset": "districts/buildings/d4_crown_t0"
+          "asset": "districts/buildings/d4_crown_t1"
         },
         {
           "level": 4,

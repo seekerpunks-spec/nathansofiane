@@ -6,10 +6,10 @@ class_name Ui
 # Palette plus saturée et chaleureuse : cobalt, cyan, magenta et or récompense.
 # Le contraste reste WCAG-friendly, mais les surfaces ne ressemblent plus à
 # une console technique noire.
-const BG := Color("#071A4A")
-const PANEL := Color("#10285E")
-const PANEL_HI := Color("#1A3D7A")
-const BORDER := Color("#4278D7")
+const BG := Color("#020614")
+const PANEL := Color("#061224")
+const PANEL_HI := Color("#0B2445")
+const BORDER := Color("#2271A0")
 const NEON_CYAN := Color("#2BE7FF")
 const NEON_MAGENTA := Color("#FF45B5")
 const NEON_PINK := Color("#FF628F")
@@ -17,13 +17,13 @@ const NEON_BLUE := Color("#5A84FF")
 const GOLD := Color("#FFD34E")
 const GREEN := Color("#61ED91")
 const GREY := Color("#90A5D4")
-const TEXT := Color("#FFF8E8")
+const TEXT := Color("#F1FCFF")
 const TEXT_DIM := Color("#B6C7EB")
 const DANGER := Color("#FF526E")
-const NAV_HEIGHT := 118
+const NAV_HEIGHT := 84
 const SAFE_MARGIN := 20
 const HERO_HEIGHT := 172
-const FACE := preload("res://assets/fonts/Nunito-ExtraBold.ttf")
+const FACE := preload("res://assets/fonts/Rajdhani-Bold.ttf")
 
 static func safe_insets() -> Vector4:
 	var window_size := Vector2(DisplayServer.window_get_size())
@@ -124,15 +124,15 @@ static func style_box(bg: Color = PANEL, border: Color = BORDER, radius: int = 1
 	sb.bg_color = bg
 	sb.border_color = border
 	sb.set_border_width_all(width)
-	sb.set_corner_radius_all(radius)
-	sb.corner_detail = 12
+	sb.set_corner_radius_all(mini(radius, 12))
+	sb.corner_detail = 1
 	sb.anti_aliasing = true
 	sb.anti_aliasing_size = 1.0
 	sb.set_content_margin_all(15)
 	if shadow:
-		sb.shadow_color = Color("#020929", 0.58)
+		sb.shadow_color = Color(border, 0.15)
 		sb.shadow_size = 9
-		sb.shadow_offset = Vector2(0, 6)
+		sb.shadow_offset = Vector2(0, 2)
 	return sb
 
 static func soften_tex(node: CanvasItem) -> void:
@@ -179,7 +179,7 @@ static func kicker_block(kicker: String, title: String, accent: Color = NEON_CYA
 
 static func hud_chip(accent: Color) -> PanelContainer:
 	var chip := PanelContainer.new()
-	var box := style_box(Color("#FFF0C0"), Color(accent, 0.98), 22, 4)
+	var box := style_box(PANEL, Color(accent, 0.98), 22, 4)
 	box.set_content_margin_all(8)
 	box.shadow_color = Color("#182356", 0.48)
 	box.shadow_size = 7
@@ -201,22 +201,24 @@ static func label(text: String, size: int, color: Color = TEXT) -> Label:
 	l.add_theme_font_size_override("font_size", size)
 	l.add_theme_color_override("font_color", color)
 	l.add_theme_color_override("font_outline_color", Color("#03102E", 0.72))
-	l.add_theme_constant_override("outline_size", 2)
+	l.add_theme_constant_override("outline_size", 0)
 	l.add_theme_color_override("font_shadow_color", Color("#03102E", 0.42))
 	l.add_theme_constant_override("shadow_offset_x", 0)
 	l.add_theme_constant_override("shadow_offset_y", 1)
-	l.add_theme_constant_override("shadow_outline_size", 2)
+	l.add_theme_constant_override("shadow_outline_size", 0)
 	return l
 
 static func button(text: String, accent: Color = NEON_CYAN, secondary: bool = false) -> Button:
 	var b := Button.new()
 	b.text = text
+	b.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	b.clip_text = true
 	b.custom_minimum_size = Vector2(0, 64)
 	b.focus_mode = Control.FOCUS_NONE
 	b.add_theme_font_override("font", FACE)
 	b.add_theme_font_size_override("font_size", 18)
-	var base := PANEL_HI if secondary else accent
-	var font := TEXT if secondary else BG
+	var base := PANEL_HI if secondary else accent.darkened(0.30)
+	var font := TEXT
 	b.add_theme_stylebox_override("normal", style_box(base, Color(accent, 0.92), 24, 3))
 	b.add_theme_stylebox_override("hover", style_box(base.lightened(0.09), accent, 24, 3))
 	b.add_theme_stylebox_override("pressed", style_box(base.darkened(0.16), Color.WHITE, 24, 3))
@@ -245,7 +247,7 @@ static func page_title(kicker: String, title: String, subtitle: String = "") -> 
 ## En-tête illustré : le texte reste natif et accessible, tandis que le rendu
 ## L'illustration transparente flotte à droite comme un véritable objet 2.5D.
 static func hero_card(image_path: String, kicker: String, title: String, subtitle: String, accent: Color = NEON_CYAN) -> PanelContainer:
-	var frame := panel(Color("#102C69", 0.98), Color(accent, 0.94))
+	var frame := panel(Color(PANEL, 0.98), Color(accent, 0.94))
 	frame.custom_minimum_size.y = HERO_HEIGHT
 	frame.clip_contents = true
 
@@ -321,8 +323,12 @@ static func progress_bar(accent: Color = NEON_CYAN, height: int = 10) -> Progres
 	pb.min_value = 0
 	pb.max_value = 100
 	pb.custom_minimum_size = Vector2(0, height)
-	pb.add_theme_stylebox_override("background", style_box(Color(1, 1, 1, 0.07), Color.TRANSPARENT, height / 2, 0))
-	pb.add_theme_stylebox_override("fill", style_box(accent, accent, height / 2, 0))
+	var track := style_box(Color(1, 1, 1, 0.07), Color.TRANSPARENT, height / 2, 0)
+	var fill := style_box(accent, accent, height / 2, 0)
+	track.set_content_margin_all(0)
+	fill.set_content_margin_all(0)
+	pb.add_theme_stylebox_override("background", track)
+	pb.add_theme_stylebox_override("fill", fill)
 	return pb
 
 static func separator() -> HSeparator:
