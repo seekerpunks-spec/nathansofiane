@@ -57,6 +57,16 @@ func _ready() -> void:
 		if arg.begins_with("--tab=") and shell.SCREENS.has(arg.substr(6)):
 			tab = arg.substr(6)
 	shell._enter_game(tab)
+	if tab == "collection":
+		for arg in OS.get_cmdline_user_args():
+			if arg.begins_with("--collection-set="):
+				shell._screen._select_set(clampi(int(arg.substr(17)), 0, Config.sets().size() - 1))
+			elif arg == "--collection-modal=card":
+				shell._screen._show_card(Config.cards()[0])
+			elif arg == "--collection-modal=drops":
+				shell._screen._show_drops([{"cardId": "ghost_terminal", "duplicate": true}, {"cardId": "data_spike", "duplicate": false}])
+			elif arg == "--collection-chests":
+				shell._screen._switch_mode(true)
 	if tab == "district":
 		for arg in OS.get_cmdline_user_args():
 			if arg == "--map-modal=bay":

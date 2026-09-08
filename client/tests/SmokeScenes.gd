@@ -195,6 +195,11 @@ func _check_reference_shell() -> void:
 	shell._enter_game("spin")
 	await get_tree().process_frame
 	_check(shell._nav_buttons.size() == 6, "R42: six navigation tabs expected")
+	_check(shell._nav_buttons.has("collection") and not shell._nav_buttons.has("raid"), "R45: Collection replaces duplicate Raid navigation")
+	shell._on_nav_pressed("collection")
+	await get_tree().process_frame
+	_check(shell._current_tab == "collection", "R45: Collection button routes to album")
+	_check(shell._nav_buttons["collection"].button_pressed, "R45: Collection tab selected")
 	shell._on_nav_pressed("events")
 	await get_tree().process_frame
 	_check(shell._current_tab == "missions", "R42: events route does not reach rewards")
@@ -258,6 +263,39 @@ func _check_horizontal_bounds(instance: Node) -> void:
 ## Sans cette couverture, un set en completionReward afficherait « +0 SPINS »
 ## sans que rien ne le signale.
 func _check_collection_screen(instance: Node) -> void:
+	var original_state: Dictionary = Store.state.duplicate(true)
+	Store.state["cards"] = [{"cardId": "ghost_terminal", "qty": 2}, {"cardId": "data_spike", "qty": 1}]
+	var opened := {"chestId": "basic", "remaining": 0, "cards": [{"cardId": "ghost_terminal", "qty": 3}, {"cardId": "ghost_terminal", "qty": 4}]}
+	Store.apply_collection_mutation("/chest/open", opened)
+	Store.apply_collection_mutation("/chest/open", opened)
+	var quantities: Dictionary = instance._owned_map()
+	_check(quantities.get("ghost_terminal") == 4 and quantities.get("data_spike") == 1, "R45: opening/replay must preserve unrelated cards and exact totals without GET /state")
+	_check(Store.chest_qty("basic") == 0, "R45: chest consumption missing from local state")
+	Store.apply_collection_mutation("/chest/buy", {"chestId": "basic", "quantity": 2})
+	Store.apply_collection_mutation("/chest/buy", {"chestId": "basic", "quantity": 2})
+	_check(Store.chest_qty("basic") == 2, "R45: chest buy replay changed quantity")
+	Store.apply_collection_mutation("/set/claim", {"setId": "hacker_tools"})
+	Store.apply_collection_mutation("/set/claim", {"setId": "hacker_tools"})
+	_check(Store.state.get("completedSets", []).count("hacker_tools") == 1, "R45: completion claim must stay marked once")
+	Store.state = original_state
+	var card_view := preload("res://scripts/components/CryptoCardView.gd")
+	_check(Config.cards().size() == 45, "R45: 45 crypto cards expected")
+	_check(card_view.artwork({"image": "https://example.com/evil.png", "imageIndex": 0}) == null, "R45: remote artwork rejected")
+	for card in Config.cards():
+		_check(not str(card.get("symbol", "")).is_empty(), "R45: crypto symbol missing")
+		var art: Texture2D = card_view.artwork(card)
+		_check(art != null, "R45: illustration missing for " + str(card.get("name", "")))
+		_check(card_view.local_texture(str(card.get("logo", "")), "res://assets/crypto_logos/") != null, "R45: logo missing")
+		var invalid: Dictionary = card.duplicate()
+		invalid["imageIndex"] = 9
+		_check(card_view.artwork(invalid) == null, "R45: invalid atlas index accepted")
+	for index in Config.sets().size():
+		instance._select_set(index)
+		_check(Config.sets()[index].get("cards", []).size() == 9, "R45: nine cards per album")
+	instance._switch_mode(true)
+	_check(instance._show_caches and not instance._selector.visible, "R45: chest view did not open")
+	instance._switch_mode(false)
+	instance._select_set(0)
 	var sets := Config.sets()
 	if not _check(not sets.is_empty(), "aucun set dans la config"):
 		return

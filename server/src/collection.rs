@@ -168,7 +168,7 @@ pub async fn buy_chest(
     let before = json!({"credits": player.credits});
     let after = json!({"credits": credits, "chestId": chest.chest_id, "qtyDelta": 1});
     Db::audit_tx(&mut tx, &addr.0, "chest_buy", &before, &after, Some(&rid)).await?;
-    let response = json!({"chestId": chest.chest_id, "credits": credits, "serverTimeMs": chrono::Utc::now().timestamp_millis()});
+    let response = json!({"chestId": chest.chest_id, "quantity": quantity, "credits": credits, "serverTimeMs": chrono::Utc::now().timestamp_millis()});
     state.db.store_idempotent(&mut tx, &key, &response).await?;
     tx.commit().await?;
     Ok(Json(response))

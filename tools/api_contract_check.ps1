@@ -11,6 +11,19 @@ $BaseUrl = $BaseUrl.TrimEnd('/')
 # un autre outil a deja charge l'assembly dans la session.
 Add-Type -AssemblyName System.Net.Http
 
+# Presentation fields must survive the typed /config boundary, not just local QA.
+$cryptoConfig = (Invoke-RestMethod -Uri ($BaseUrl + "/config") -UseBasicParsing).payload
+if ($cryptoConfig.cards.Count -ne 45 -or $cryptoConfig.sets.Count -ne 5) {
+    throw "Catalogue crypto incomplet dans GET /config"
+}
+foreach ($card in $cryptoConfig.cards) {
+    if (-not $card.symbol -or -not $card.image -or -not $card.logo -or
+        $null -eq $card.imageIndex -or $card.imageIndex -lt 0 -or $card.imageIndex -gt 8) {
+        throw "Metadonnees crypto perdues dans GET /config: $($card.cardId)"
+    }
+}
+Write-Host "CRYPTO_CONFIG_CONTRACT_OK: 45 cartes, 5 collections"
+
 $health = Invoke-RestMethod -Uri ($BaseUrl + "/health") -UseBasicParsing
 $ready = Invoke-RestMethod -Uri ($BaseUrl + "/ready") -UseBasicParsing
 if ($health.status -ne "ok" -or $ready.status -ne "ready" -or $ready.database -ne $true) {

@@ -138,8 +138,8 @@ func _build_nav() -> void:
 	_nav.offset_bottom = -(6 + safe.w)
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 6)
-	var labels := {"district": "MAP", "missions": "MISSIONS", "raid": "RAID", "spin": "SPIN", "events": "EVENTS", "clan": "CLAN"}
-	var icons := {"district": 9, "missions": 8, "raid": 11, "spin": 4, "events": 10, "clan": 1}
+	var labels := {"district": "MAP", "missions": "MISSIONS", "collection": "COLLECTION", "spin": "SPIN", "events": "EVENTS", "clan": "CLAN"}
+	var icons := {"district": 9, "missions": 8, "collection": 7, "spin": 4, "events": 10, "clan": 1}
 	for key in labels:
 		var button := Neon.button(row, "", Rect2(0, 0, 74, 76), Ui.NEON_MAGENTA if key == "spin" else Ui.NEON_CYAN)
 		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -152,7 +152,7 @@ func _build_nav() -> void:
 		picture.offset_right = -10
 		picture.offset_top = 3
 		picture.offset_bottom = 53
-		var label := Neon.text(button, labels[key], Rect2(0, 53, 74, 19), 12)
+		var label := Neon.text(button, labels[key], Rect2(0, 53, 74, 19), 10 if key == "collection" else 12)
 		label.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
 		label.offset_left = 0
 		label.offset_right = 0
@@ -171,13 +171,6 @@ func _on_nav_pressed(tab: String) -> void:
 		"clan":
 			_open_tab("spin")
 			_screen.call("_open_network")
-		"raid":
-			_open_tab("spin")
-			if typeof(Store.state.get("pendingEncounter")) == TYPE_DICTIONARY:
-				_screen.call("_resume_pending_encounter")
-			else:
-				_screen._status_label.text = "RAID"
-				_screen._result_banner.text = "LAND 3 RAID SYMBOLS TO BREACH"
 		"events":
 			_open_tab("missions")
 		_:

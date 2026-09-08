@@ -395,6 +395,15 @@ pub struct CardConfig {
     pub name: String,
     pub rarity: Tier,
     pub drop_weight: u32,
+    /// Optional presentation metadata; never changes inventory identity or odds.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub symbol: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub image: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub image_index: Option<u8>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub logo: Option<String>,
 }
 
 /// Prérequis de déblocage d'un set. Vide = disponible dès le départ.
@@ -1625,6 +1634,24 @@ impl RemoteConfig {
             if !set_ids.contains(card.set_id.as_str()) || card.drop_weight == 0 {
                 problems.push(format!("carte {} : set inconnu ou poids nul", card.card_id));
             }
+            let has_art = card.image.is_some() || card.image_index.is_some() || card.logo.is_some();
+            if has_art {
+                let safe_path = |path: &Option<String>, prefix: &str, suffix: &str| {
+                    path.as_ref().is_some_and(|p| {
+                        p.starts_with(prefix) && p.ends_with(suffix) && !p.contains("..")
+                    })
+                };
+                if !safe_path(&card.image, "res://assets/generated/crypto_cards/", ".webp")
+                    || !safe_path(&card.logo, "res://assets/crypto_logos/", ".svg")
+                    || !card.image_index.is_some_and(|index| index < 9)
+                    || !card.symbol.as_ref().is_some_and(|s| !s.is_empty())
+                {
+                    problems.push(format!(
+                        "carte {} : illustration crypto invalide",
+                        card.card_id
+                    ));
+                }
+            }
         }
         for set in &self.sets {
             if set.completion_spins.is_none() && set.completion_reward.is_none() {
@@ -2272,6 +2299,47 @@ impl RemoteConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn crypto_card_presentation_survives_remote_config_roundtrip() {
+        let cfg = bundled();
+        assert_eq!(cfg.cards.len(), 45);
+        for card in &cfg.cards {
+            let json = serde_json::to_value(card).unwrap();
+            let restored: CardConfig = serde_json::from_value(json.clone()).unwrap();
+            assert_eq!(restored.card_id, card.card_id);
+            assert_eq!(restored.image_index, card.image_index);
+            assert!(card.image_index.is_some_and(|index| index < 9));
+            assert!(json["symbol"].as_str().is_some_and(|s| !s.is_empty()));
+            for key in ["image", "logo"] {
+                let relative = json[key].as_str().unwrap().strip_prefix("res://").unwrap();
+                assert!(!relative.contains(".."));
+                assert!(Path::new(env!("CARGO_MANIFEST_DIR"))
+                    .join("../client")
+                    .join(relative)
+                    .exists());
+            }
+        }
+        let legacy: CardConfig = serde_json::from_str(
+            r#"{"cardId":"legacy","setId":"old","name":"Old","rarity":"common","dropWeight":1}"#,
+        )
+        .unwrap();
+        assert!(legacy.image.is_none());
+        assert!(legacy.symbol.is_none());
+    }
+
+    #[test]
+    fn crypto_card_art_rejects_bad_paths_and_indices() {
+        let mut cfg = bundled();
+        cfg.cards[0].image_index = Some(9);
+        assert!(cfg.validate().is_err());
+        let mut cfg = bundled();
+        cfg.cards[0].logo = Some("https://example.com/logo.svg".into());
+        assert!(cfg.validate().is_err());
+        let mut cfg = bundled();
+        cfg.cards[0].image = Some("res://assets/generated/crypto_cards/../secret.webp".into());
+        assert!(cfg.validate().is_err());
+    }
 
     #[test]
     fn bundled_config_is_valid() {

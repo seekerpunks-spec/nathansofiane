@@ -133,6 +133,27 @@ func _apply_achievement_progress(progress_achievements: Array) -> void:
 				achievement["progress"] = int(update.get("progress", achievement.get("progress", 0)))
 
 ## Applique les champs communs d'une mutation puis fusionne les collections.
+## Chest-open cards are a delta list with absolute quantities, NOT an inventory
+## snapshot. Preserve unrelated cards even if the following GET /state fails.
+func apply_collection_mutation(path: String, data: Dictionary) -> void:
+	var common := data.duplicate()
+	if path == "/chest/open":
+		common.erase("cards")
+		for card in data.get("cards", []):
+			if typeof(card) == TYPE_DICTIONARY:
+				_upsert_quantity("cards", "cardId", str(card.get("cardId", "")), int(card.get("qty", 0)))
+		if data.has("remaining"):
+			_upsert_quantity("chests", "chestId", str(data.get("chestId", "")), int(data.remaining))
+	elif path == "/chest/buy" and data.has("quantity"):
+		_upsert_quantity("chests", "chestId", str(data.get("chestId", "")), int(data.quantity))
+	elif path == "/set/claim":
+		var claimed: Array = state.get("completedSets", []).duplicate()
+		var set_id := str(data.get("setId", ""))
+		if set_id != "" and not claimed.has(set_id):
+			claimed.append(set_id)
+		state["completedSets"] = claimed
+	apply_mutation(common)
+
 func apply_mutation(d: Dictionary) -> void:
 	if typeof(d) != TYPE_DICTIONARY:
 		return

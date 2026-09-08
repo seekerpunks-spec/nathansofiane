@@ -1,43 +1,114 @@
 {
-  "note": "PROVISIONAL — 5 sets de 9 cartes. hacker_tools garde la forme historique completionSpins pour que la compatibilite ascendante reste exercee par la config livree ; les autres utilisent completionReward. unlockRequirement est arbitre par le serveur dans claim_set, pas seulement affiche.",
+  "note": "Collections crypto de neuf cartes. IDs, recompenses, prerequis et claims historiques conserves; aucun reset d'inventaire.",
   "items": [
     {
       "setId": "hacker_tools",
-      "name": "Hacker Tools",
+      "name": "Layer 1",
       "visualTheme": "cyan",
-      "cards": ["ghost_terminal", "data_spike", "packet_wraith", "logic_bomb", "root_sigil", "neural_key", "cipher_lens", "quantum_rig", "zero_day_core"],
+      "cards": [
+        "ghost_terminal",
+        "data_spike",
+        "packet_wraith",
+        "logic_bomb",
+        "root_sigil",
+        "neural_key",
+        "cipher_lens",
+        "quantum_rig",
+        "zero_day_core"
+      ],
       "completionSpins": 1000
     },
     {
       "setId": "seeker_tech",
-      "name": "Seeker Tech",
+      "name": "Genesis Crew",
       "visualTheme": "magenta",
-      "cards": ["secure_chip", "signal_shard", "relay_beacon", "neon_antenna", "handshake_coil", "mobile_node", "mesh_router", "vault_lattice", "seed_vault"],
-      "completionReward": { "spins": 2500, "credits": 3000000 }
+      "cards": [
+        "secure_chip",
+        "signal_shard",
+        "relay_beacon",
+        "neon_antenna",
+        "handshake_coil",
+        "mobile_node",
+        "mesh_router",
+        "vault_lattice",
+        "seed_vault"
+      ],
+      "completionReward": {
+        "spins": 2500,
+        "credits": 3000000
+      }
     },
     {
       "setId": "harbor_salvage",
-      "name": "Harbor Salvage",
+      "name": "DeFi District",
       "visualTheme": "rust",
-      "unlockRequirement": { "completedDistrictId": 2 },
-      "cards": ["rust_anchor", "tide_valve", "scrap_servo", "cargo_manifest", "dock_crane_arm", "salvage_torch", "brine_capacitor", "lighthouse_lens", "drowned_courier"],
-      "completionReward": { "spins": 3500, "credits": 8000000, "chest": "quantum" }
+      "unlockRequirement": {
+        "completedDistrictId": 2
+      },
+      "cards": [
+        "rust_anchor",
+        "tide_valve",
+        "scrap_servo",
+        "cargo_manifest",
+        "dock_crane_arm",
+        "salvage_torch",
+        "brine_capacitor",
+        "lighthouse_lens",
+        "drowned_courier"
+      ],
+      "completionReward": {
+        "spins": 3500,
+        "credits": 8000000,
+        "chest": "quantum"
+      }
     },
     {
       "setId": "exchange_protocols",
-      "name": "Exchange Protocols",
+      "name": "Web3 Culture",
       "visualTheme": "gold",
-      "unlockRequirement": { "completedDistrictId": 3 },
-      "cards": ["ledger_seal", "tick_recorder", "clearing_token", "escrow_bond", "spread_monitor", "arbitrage_daemon", "gilded_vault_key", "market_maker_crown", "insider_ghost"],
-      "completionReward": { "spins": 5000, "credits": 20000000, "chest": "elite" }
+      "unlockRequirement": {
+        "completedDistrictId": 3
+      },
+      "cards": [
+        "ledger_seal",
+        "tick_recorder",
+        "clearing_token",
+        "escrow_bond",
+        "spread_monitor",
+        "arbitrage_daemon",
+        "gilded_vault_key",
+        "market_maker_crown",
+        "insider_ghost"
+      ],
+      "completionReward": {
+        "spins": 5000,
+        "credits": 20000000,
+        "chest": "elite"
+      }
     },
     {
       "setId": "nullzone_relics",
-      "name": "Nullzone Relics",
+      "name": "Class of 2017",
       "visualTheme": "void",
-      "unlockRequirement": { "completedDistrictId": 4 },
-      "cards": ["null_fragment", "frost_conduit", "cache_line", "entropy_spool", "recursion_loop", "cipher_monolith", "coolant_heart", "zero_beacon_core", "final_commit"],
-      "completionReward": { "spins": 7500, "credits": 45000000, "chest": "elite" }
+      "unlockRequirement": {
+        "completedDistrictId": 4
+      },
+      "cards": [
+        "null_fragment",
+        "frost_conduit",
+        "cache_line",
+        "entropy_spool",
+        "recursion_loop",
+        "cipher_monolith",
+        "coolant_heart",
+        "zero_beacon_core",
+        "final_commit"
+      ],
+      "completionReward": {
+        "spins": 7500,
+        "credits": 45000000,
+        "chest": "elite"
+      }
     }
   ]
 }
