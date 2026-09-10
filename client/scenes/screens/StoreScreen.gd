@@ -65,6 +65,7 @@ func _refresh() -> void:
 	if not any_offer:
 		_content.add_child(Ui.label("No active offers. The game stays fully playable for free.", 14, Ui.TEXT_DIM))
 	_content.add_child(Ui.section_title("CREDIT CACHES", Ui.GOLD))
+	_content.add_child(Neon.feature("FILL YOUR ALBUMS", "Discover crypto cards in reward chests", 7, Ui.GOLD))
 	var cards_button := Ui.button("OPEN COLLECTION", Ui.GOLD, true)
 	cards_button.pressed.connect(func() -> void: navigate_requested.emit("collection"))
 	_content.add_child(cards_button)
@@ -73,7 +74,7 @@ func _free_card() -> PanelContainer:
 	var panel := Ui.panel()
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 9)
-	box.add_child(Ui.label("OPT-IN REWARD", 19, Ui.TEXT))
+	box.add_child(Neon.feature("ENERGY BOOST", "Optional reward • Keep the reels rolling", 4, Ui.NEON_CYAN))
 	var cfg: Dictionary = Config.economy().get("adsConfig", {})
 	if not _ad_offer_tracked:
 		_ad_offer_tracked = true
@@ -106,7 +107,7 @@ func _offer_card(offer: Dictionary) -> PanelContainer:
 	var panel := Ui.panel(Ui.PANEL_HI, Ui.NEON_MAGENTA)
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 8)
-	box.add_child(Ui.label(str(offer.get("name", "Offer")).to_upper(), 23, Ui.NEON_MAGENTA))
+	box.add_child(Neon.feature(str(offer.get("name", "Offer")).to_upper(), "LIMITED DROP • BONUS LOOT", 3, Ui.NEON_MAGENTA))
 	box.add_child(Ui.label("%s  •  %d LEFT" % [str(offer.get("kind", "limited")).to_upper(), int(offer.get("remainingPurchases", 0))], 11, Ui.TEXT_DIM))
 	var lines := ""
 	for content in offer.get("contents", []):

@@ -427,6 +427,7 @@ async fn guard(
     next: middleware::Next,
 ) -> Result<Response, ApiError> {
     let path = req.uri().path().to_string();
+    let enforce_quota = rate_limit::should_enforce(state.dev_auth, peer.ip());
 
     // Sans auth ni rate limit.
     if path == "/health" || path == "/ready" || path == "/config" {
@@ -437,7 +438,7 @@ async fn guard(
     if path.starts_with("/auth/") {
         // Ne jamais faire confiance à X-Forwarded-For sans proxy de confiance.
         let ip = peer.ip().to_string();
-        if !state.rate.check(&format!("ip:{ip}")).await? {
+        if enforce_quota && !state.rate.check(&format!("ip:{ip}")).await? {
             return Err(ApiError::RateLimited);
         }
         return Ok(next.run(req).await);
@@ -462,7 +463,7 @@ async fn guard(
             crate::error::AuthError::InvalidToken,
         ));
     }
-    if !state.rate.check(&format!("wallet:{address}")).await? {
+    if enforce_quota && !state.rate.check(&format!("wallet:{address}")).await? {
         return Err(ApiError::RateLimited);
     }
     req.extensions_mut().insert(auth::Addr(address));

@@ -24,6 +24,7 @@ var _current_tab := ""
 var qa_bypass_boot := false
 
 func _ready() -> void:
+	theme = Neon.control_theme()
 	_build_shell()
 	if qa_bypass_boot:
 		return
@@ -170,9 +171,14 @@ func _on_nav_pressed(tab: String) -> void:
 	match tab:
 		"clan":
 			_open_tab("spin")
+			_screen.set_meta("network_page", 2)
 			_screen.call("_open_network")
 		"events":
 			_open_tab("missions")
+			_screen.call("_select_page", 1)
+		"missions":
+			_open_tab("missions")
+			_screen.call("_select_page", 0)
 		_:
 			_open_tab(tab)
 	for key in _nav_buttons:
@@ -216,26 +222,16 @@ func _go_spin() -> void:
 func _show_network_error() -> void:
 	var c := Control.new()
 	c.set_anchors_preset(Control.PRESET_FULL_RECT)
-	var center := CenterContainer.new()
-	center.set_anchors_preset(Control.PRESET_FULL_RECT)
-	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 24)
-	box.custom_minimum_size = Vector2(0, 0)
-
-	var title := Ui.label("OFFLINE", 34, Ui.NEON_MAGENTA)
-	var msg := Ui.label("CyberSeeker server unreachable.\nCheck your connection and try again.", 18, Ui.TEXT_DIM)
+	var body := Ui.screen_body()
+	body.add_child(Neon.header("PUNK CITY / CONNECTION", "Offline", 2, Ui.NEON_MAGENTA))
+	body.add_child(Neon.feature("SIGNAL INTERRUPTED", "The city will be here when your connection returns.", 1, Ui.NEON_CYAN))
+	var msg := Ui.label("CyberSeeker server unreachable. Check your connection and try again.", 18, Ui.TEXT_DIM)
 	msg.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-
-	var retry := Button.new()
-	retry.text = "RETRY"
-	retry.custom_minimum_size = Vector2(0, 64)
+	body.add_child(msg)
+	var retry := Ui.button("RECONNECT", Ui.NEON_CYAN)
 	retry.pressed.connect(_on_retry)
-
-	box.add_child(title)
-	box.add_child(msg)
-	box.add_child(retry)
-	center.add_child(box)
-	c.add_child(center)
+	body.add_child(retry)
+	c.add_child(body)
 	_show(c)
 
 func _on_retry() -> void:

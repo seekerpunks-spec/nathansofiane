@@ -120,7 +120,8 @@ func _refresh() -> void:
 	_content.add_child(note)
 
 func _chest_card(chest: Dictionary) -> PanelContainer:
-	var panel := Ui.panel()
+	var accents := {"basic": Ui.NEON_CYAN, "neon": Ui.NEON_MAGENTA, "quantum": Ui.NEON_BLUE, "elite": Ui.GOLD}
+	var panel := Ui.panel(Ui.PANEL, accents.get(str(chest.get("chestId", "")), Ui.NEON_CYAN))
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 10)
 	var row := HBoxContainer.new()
@@ -129,19 +130,22 @@ func _chest_card(chest: Dictionary) -> PanelContainer:
 	if art_path != "" and ResourceLoader.exists(art_path):
 		var art := TextureRect.new()
 		art.texture = load(art_path)
-		art.custom_minimum_size = Vector2(88, 88)
+		art.custom_minimum_size = Vector2(148, 148)
 		art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		Ui.soften_tex(art)
 		row.add_child(art)
 	var text := VBoxContainer.new()
 	text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	var name := Ui.label(str(chest.get("name", "Cache")), 18, Ui.TEXT)
+	text.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	var name := Ui.label(str(chest.get("name", "Cache")), 24, Ui.TEXT)
+	name.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	name.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	text.add_child(name)
 	var id := str(chest.get("chestId", ""))
 	var qty := Store.chest_qty(id)
-	var info := Ui.label("%d owned • %d cards" % [qty, int(chest.get("cardsPerOpen", 0))], 12, Ui.TEXT_DIM)
+	var info := Ui.label("%d owned • %d cards" % [qty, int(chest.get("cardsPerOpen", 0))], 15, Ui.TEXT_DIM)
+	info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	info.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	text.add_child(info)
 	row.add_child(text)
@@ -267,32 +271,9 @@ func _set_card(set_data: Dictionary) -> PanelContainer:
 	return panel
 
 func _modal(title: String) -> Dictionary:
-	var overlay := ColorRect.new()
-	overlay.color = Color(0.02, 0.03, 0.08, 0.98)
-	overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	overlay.add_to_group("dismiss_on_back")
-	var body := Ui.screen_body()
-	var heading := Ui.label(title, 26, Ui.NEON_CYAN)
-	heading.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	body.add_child(heading)
-	var scroll := ScrollContainer.new()
-	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	Ui.style_scroll(scroll, Ui.NEON_MAGENTA)
-	var content := VBoxContainer.new()
-	content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	content.add_theme_constant_override("separation", 14)
-	scroll.add_child(content)
-	body.add_child(scroll)
-	var close := Ui.button("CLOSE", Ui.NEON_CYAN)
-	close.focus_mode = Control.FOCUS_ALL
-	close.pressed.connect(overlay.queue_free)
-	body.add_child(close)
-	overlay.add_child(body)
-	add_child(overlay)
-	Juice.modal(body)
-	close.grab_focus()
-	return {"overlay": overlay, "content": content, "close": close}
+	var dialog := Neon.modal(self, title, 7, Ui.NEON_MAGENTA, "CLOSE")
+	dialog.close.grab_focus()
+	return dialog
 
 func _show_card(data: Dictionary) -> void:
 	var modal := _modal(str(data.get("name", "Card")))

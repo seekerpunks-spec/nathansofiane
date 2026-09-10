@@ -5,6 +5,83 @@ const CITY := preload("res://assets/generated/punk_city/city.webp")
 const LOGO := preload("res://assets/generated/punk_city/logo.webp")
 const CABINET := preload("res://assets/generated/punk_city/cabinet.webp")
 const DISPLAY_FONT := preload("res://assets/fonts/Rajdhani-Bold.ttf")
+
+## Shared illustrated dialog. Content scrolls, dismissal stays reachable.
+static func modal(host: Control, title: String, index: int, accent: Color = Ui.NEON_CYAN, close_text: String = "CONTINUE") -> Dictionary:
+	var overlay := ColorRect.new()
+	overlay.color = Color("#020614", 0.98)
+	overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	overlay.add_to_group("dismiss_on_back")
+	overlay.theme = control_theme()
+	var body := Ui.screen_body()
+	var heading := header("PUNK CITY / NEURAL LINK", title, index, accent)
+	body.add_child(heading)
+	var scroll := ScrollContainer.new()
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	Ui.style_scroll(scroll, accent)
+	var content := VBoxContainer.new()
+	content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	content.add_theme_constant_override("separation", 14)
+	scroll.add_child(content)
+	body.add_child(scroll)
+	var close := Ui.button(close_text, accent, true)
+	close.focus_mode = Control.FOCUS_ALL
+	close.add_to_group("dialog_close")
+	close.pressed.connect(overlay.queue_free)
+	body.add_child(close)
+	overlay.add_child(body)
+	host.add_child(overlay)
+	Juice.modal(body)
+	return {"overlay": overlay, "content": content, "close": close, "body": body, "scroll": scroll}
+
+static func feature(title: String, subtitle: String, index: int, accent: Color = Ui.NEON_CYAN) -> Control:
+	var root := Control.new()
+	root.custom_minimum_size.y = 140
+	var chrome := frame(root, Rect2(0, 0, 500, 140), accent)
+	chrome.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	art(root, icon(index), Rect2(12, 10, 118, 118))
+	var name_label := text(root, title, Rect2(140, 26, 330, 42), 26, accent)
+	name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	name_label.anchor_right = 1
+	name_label.offset_right = -16
+	var sub := text(root, subtitle, Rect2(140, 71, 330, 49), 16)
+	sub.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	sub.anchor_right = 1
+	sub.offset_right = -16
+	return root
+
+static func tabs(labels: Array, selected_index: int, callback: Callable) -> HBoxContainer:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 6)
+	for i in labels.size():
+		var tab := Ui.button(str(labels[i]), Ui.NEON_CYAN, true)
+		tab.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		tab.custom_minimum_size.y = 48
+		tab.add_theme_font_size_override("font_size", 14)
+		tab.toggle_mode = true
+		tab.set_pressed_no_signal(i == selected_index)
+		tab.add_theme_stylebox_override("pressed", Ui.style_box(Color("#38124C"), Ui.NEON_MAGENTA, 12, 2))
+		tab.add_theme_stylebox_override("hover_pressed", Ui.style_box(Color("#481D5C"), Ui.NEON_MAGENTA, 12, 2))
+		tab.add_theme_color_override("font_pressed_color", Color.WHITE)
+		tab.pressed.connect(callback.bind(i))
+		row.add_child(tab)
+	return row
+
+static func control_theme() -> Theme:
+	var result := Theme.new()
+	result.default_font = DISPLAY_FONT
+	result.default_font_size = 18
+	for type in ["LineEdit", "OptionButton"]:
+		result.set_stylebox("normal", type, Ui.style_box(Color("#061224"), Ui.BORDER, 8, 1))
+		result.set_stylebox("focus", type, Ui.style_box(Color("#0D2340"), Ui.NEON_CYAN, 8, 2))
+		result.set_stylebox("hover", type, Ui.style_box(Color("#0D2340"), Ui.NEON_CYAN, 8, 1))
+		result.set_color("font_color", type, Ui.TEXT)
+		result.set_color("font_placeholder_color", type, Ui.TEXT_DIM)
+	result.set_stylebox("panel", "PopupMenu", Ui.style_box(Color("#061224"), Ui.NEON_CYAN, 8, 2))
+	result.set_stylebox("hover", "PopupMenu", Ui.style_box(Color("#184260"), Ui.NEON_CYAN, 4, 1))
+	return result
 ## Measured sprite bounds; generated grids contain non-uniform gutters.
 const ICON_RECTS := [
 	Rect2(68, 22, 302, 285), Rect2(480, 12, 292, 298), Rect2(854, 20, 325, 288),

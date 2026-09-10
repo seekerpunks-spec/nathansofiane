@@ -10,6 +10,7 @@ func _json(relative: String) -> Variant:
 
 func _ready() -> void:
 	Config.raw = {
+		"social": _json("social.json"), "progression": _json("progression.json"),
 		"economy": _json("economy.json"), "spinTable": _json("spin_table.json"),
 		"daily": _json("daily.json"), "districts": [_json("districts/district_01.json")],
 		"cards": _json("cards.json").get("items", []), "sets": _json("sets.json").get("items", []),
@@ -26,6 +27,7 @@ func _ready() -> void:
 	Config._index_outcomes()
 	Store.apply_state({
 		"spins": 47, "credits": 8500000,
+		"profile": {"playerId": "CYB-000000000001", "displayName": "Neon Runner", "districtIndex": 0},
 		"serverTimeMs": int(Time.get_unix_time_from_system() * 1000),
 		"nextSpinAtMs": int(Time.get_unix_time_from_system() * 1000) + 180000,
 		"districtProgress": [{"districtId": 1, "elementId": 1, "level": 2}],
@@ -57,6 +59,36 @@ func _ready() -> void:
 		if arg.begins_with("--tab=") and shell.SCREENS.has(arg.substr(6)):
 			tab = arg.substr(6)
 	shell._enter_game(tab)
+	if tab == "store" and OS.get_cmdline_user_args().has("--with-offer"):
+		var offer: Dictionary = Config.offers()[0].duplicate(true)
+		offer["remainingPurchases"] = 1
+		shell._screen._eligible_offers = [offer]
+		shell._screen._refresh()
+	if tab == "missions":
+		for arg in OS.get_cmdline_user_args():
+			if arg.begins_with("--mission-page="):
+				shell._screen._select_page(int(arg.substr(15)))
+			elif arg == "--leaderboard":
+				shell._screen._render_leaderboard({"cohortId": 42, "player": {"rank": 3, "points": 25000}, "leaders": [{"rank": 1, "displayName": "Rogue", "points": 78000}, {"rank": 2, "displayName": "Satoshi", "points": 42000}, {"rank": 3, "displayName": "Neon Runner", "points": 25000}]})
+	if tab == "spin":
+		for arg in OS.get_cmdline_user_args():
+			if arg.begins_with("--network-page="):
+				shell._screen.set_meta("network_page", int(arg.substr(15)))
+				shell._screen._network_snapshot = {"friends": [{"playerId": "CYB-000000000002", "displayName": "Satoshi", "score": 42000}], "giftRules": {"rewardSpins": 1, "maxSentPerDay": 20}}
+				shell._screen._team_snapshot = {"ownTeam": {"name": "Neon Syndicate", "teamCode": "NET-0000000000000001", "role": "member", "score": 84000, "members": [{"playerId": "CYB-000000000002", "displayName": "Satoshi", "role": "owner", "score": 42000}], "quickChatPhrases": Config.social().get("teams", {}).get("quickChatPhrases", []), "helpRules": {"requestSpins": 5}}}
+				shell._screen._trades_snapshot = {"rules": {"minQuantity": 2, "tradeableRarities": ["common", "rare"]}}
+				shell._screen._network_leaderboard = {"playerRank": 3, "entries": [{"rank": 1, "displayName": "Rogue", "score": 78000}, {"rank": 2, "displayName": "Satoshi", "score": 42000}, {"rank": 3, "displayName": "Neon Runner", "score": 25000}]}
+				shell._screen._render_network()
+			elif arg == "--spin-modal=attack":
+				shell._screen._show_social_encounter({"kind": "attack", "target": "NEON CORP", "choices": [1, 2, 3, 4, 5]})
+			elif arg == "--spin-modal=raid":
+				shell._screen._show_social_encounter({"kind": "raid", "target": "SATOSHI VAULT", "nodeCount": 6, "picked": [0], "unbankedCredits": 240000, "canCashout": true})
+			elif arg == "--spin-modal=result":
+				shell._screen._show_social_result("+240K CR • Your haul is safe!", false)
+			elif arg == "--spin-modal=energy":
+				shell._screen._no_spins.show()
+			elif arg == "--spin-modal=loading":
+				shell._screen._show_network_loading()
 	if tab == "collection":
 		for arg in OS.get_cmdline_user_args():
 			if arg.begins_with("--collection-set="):
@@ -76,6 +108,10 @@ func _ready() -> void:
 			elif arg == "--map-modal=complete":
 				shell._screen._map_view.complete({"spins": 500, "credits": 2000000, "chest": "neon"}, false)
 	# Avoid unrelated tooltips from the desktop pointer in deterministic captures.
+	if OS.get_cmdline_user_args().has("--offline"):
+		shell._show_network_error()
+	elif OS.get_cmdline_user_args().has("--onboarding"):
+		shell._go_onboarding()
 	Input.warp_mouse(Vector2(-1000, -1000))
 	await get_tree().create_timer(0.65).timeout
 	for node in shell._screen.find_children("*", "Control", true, false):

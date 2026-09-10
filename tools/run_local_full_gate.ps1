@@ -147,7 +147,8 @@ try {
         AUTH_DOMAIN = "cyberseeker.local"
         DEV_AUTH = "true"
         CONFIG_DIR = $configDir
-        RATE_LIMIT_PER_MINUTE = "1000"
+        # Keep the real quota low: local DEV must bypass it, not hide behind 1000.
+        RATE_LIMIT_PER_MINUTE = "30"
         RUST_LOG = "info"
     }
     Set-ProcessEnvironment $sharedEnvironment

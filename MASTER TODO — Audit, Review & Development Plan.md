@@ -1,5 +1,38 @@
 # MASTER TODO — AUDIT + REVIEW + DEVELOPMENT
 
+## Mise à jour R46 — Cohérence UI et MAP — 10/09/2026
+
+Nouvelle place nocturne MAP, bâtiments agrandis et fenêtres de construction
+harmonisées. Missions découpées en Daily/Events/Season/Settings, boutique et
+fenêtres réseau/rencontres/résultats/classements/énergie reprises dans le thème.
+Quatre nouveaux coffres assortis à Punk City ; illustrations R45 des cartes
+conservées. Retour Android, défilement et actions tactiles couverts par le smoke.
+Gate complète verte : 47 tests Rust, 16 PostgreSQL, contrats API/sociaux et
+6 scènes sur 3 formats. Pas d'APK/AAB ni de modification économique.
+Voir [livraison, inventaire et prompts R46](docs/R46_UI_COHERENCE.md).
+
+## Correctif local — Quota réseau — 09/09/2026
+
+À la demande du joueur, les requêtes d'authentification et de gameplay ne sont
+plus limitées pour un serveur debug en DEV_AUTH depuis une adresse loopback.
+Les connexions distantes, l'auth réelle et les builds release restent protégés.
+Le JWT, la révocation de session, l'idempotence et les validations économiques
+restent obligatoires. La gate utilise désormais le quota réel de 30/minute et
+vérifie 61 lectures protégées consécutives sans refus en mode local.
+Le message générique « NETWORK ERROR » du client reste une dette UX ; cette
+modification supprime le quota local, pas toutes les causes possibles d'erreur.
+
+## Mise à jour R45 — Collections crypto — 09/09/2026
+
+COLLECTION remplace le raccourci RAID redondant dans la navigation. Cinq albums
+de neuf cartes sont intégrés : Layer 1, Genesis Crew, DeFi District, Web3 Culture
+et Class of 2017. Illustrations originales, logos crypto, raretés, doublons,
+aperçu agrandi, coffres et récompenses de complétion.
+Inventaire, identifiants, probabilités, prérequis et récompenses conservés.
+Gate complète revérifiée : 46 tests Rust, dont 16 PostgreSQL, contrats API et
+six scènes sur trois formats. Aucun APK/AAB, aucune intégration wallet.
+Voir [livraison R45](docs/R45_CRYPTO_COLLECTIONS.md).
+
 ## Mise à jour R44 — Illustrations des bâtiments
 
 Les 55 anciens sprites sont archivés et remplacés par 75 nouvelles illustrations

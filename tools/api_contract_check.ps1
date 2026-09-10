@@ -135,6 +135,11 @@ if ($verify.Code -ne 200 -or -not $verify.Data.token -or -not $verify.Data.refre
 # Offres : le catalogue et l'éligibilité sont serveur-authoritative. Cette gate
 # utilise volontairement un compte DEV neuf afin d'exercer l'offre starter.
 $authHeaders = @{ Authorization = "Bearer $($verify.Data.token)" }
+# Exercise more than the desktop quota without consuming spins or rewards.
+for ($quotaProbe = 0; $quotaProbe -lt 61; $quotaProbe++) {
+    $null = Invoke-State $verify.Data.token
+}
+Write-Host "LOCAL_DEV_QUOTA_BYPASS_OK: 61 protected requests"
 $offersResponse = Invoke-WebRequest -Uri ($BaseUrl + "/offers") -Headers $authHeaders -UseBasicParsing
 $offers = $offersResponse.Content | ConvertFrom-Json
 $starter = $offers.items | Where-Object { $_.offerId -eq "welcome_signal" } | Select-Object -First 1

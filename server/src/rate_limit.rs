@@ -6,6 +6,12 @@
 use sqlx::PgPool;
 use std::time::Duration;
 
+/// Local debug sessions can exercise the game without a request quota.
+/// Remote peers, real-auth sessions and release builds retain protection.
+pub fn should_enforce(dev_auth: bool, peer: std::net::IpAddr) -> bool {
+    !(cfg!(debug_assertions) && dev_auth && peer.is_loopback())
+}
+
 #[derive(Clone)]
 pub struct RateLimiter {
     pool: PgPool,
@@ -55,6 +61,21 @@ impl RateLimiter {
 mod tests {
     use super::RateLimiter;
     use std::time::Duration;
+
+    #[test]
+    fn only_local_debug_dev_auth_can_bypass_quota() {
+        for ip in ["127.0.0.1", "::1"] {
+            assert_eq!(
+                super::should_enforce(true, ip.parse().unwrap()),
+                !cfg!(debug_assertions)
+            );
+            assert!(super::should_enforce(false, ip.parse().unwrap()));
+        }
+        for ip in ["192.168.1.10", "203.0.113.10", "2001:db8::1"] {
+            assert!(super::should_enforce(true, ip.parse().unwrap()));
+            assert!(super::should_enforce(false, ip.parse().unwrap()));
+        }
+    }
 
     #[tokio::test]
     async fn postgres_instances_share_the_same_limit() -> anyhow::Result<()> {

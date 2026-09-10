@@ -141,6 +141,15 @@ func _run() -> void:
 		if path.ends_with("CollectionScreen.tscn"):
 			_check_collection_screen(instance)
 			_check_horizontal_bounds(instance)
+		if path.ends_with("MissionsScreen.tscn"):
+			for page in range(4):
+				instance._select_page(page)
+				await get_tree().process_frame
+				_check(instance._page == page and instance._content.get_child_count() > 0, "R46: missing mission page %d" % page)
+				_check_content_width(instance._content)
+			instance._render_leaderboard({"cohortId": 1, "leaders": [{"rank": 1, "displayName": "A Long Runner Name", "points": 100000}], "player": {"rank": 2, "points": 1000}})
+			await get_tree().process_frame
+			_check_modal_bounds(instance)
 		if path.ends_with("SpinScreen.tscn"):
 			_check_reference_home(instance)
 			instance._network_snapshot = {
@@ -159,19 +168,37 @@ func _run() -> void:
 				"helpRules":{"requestSpins":5,"maxPerMember":2},
 				"helpRequests":[{"helpId":"00000000-0000-4000-8000-000000000001","requesterPlayerId":"CYB-000000000002","displayName":"Long Crew Member","requestedSpins":5,"donatedSpins":2,"canDonate":true}]
 			}}
-			instance._render_network()
-			await get_tree().process_frame
-			_check(is_instance_valid(instance._social_overlay), "Modale Seeker Network absente")
-			_check_horizontal_bounds(instance._social_overlay)
+			for page in range(5):
+				instance.set_meta("network_page", page)
+				instance._render_network()
+				await get_tree().process_frame
+				_check(is_instance_valid(instance._social_overlay), "Modale Seeker Network absente")
+				_check_horizontal_bounds(instance._social_overlay)
+				for button in instance._social_overlay.find_children("*", "Button", true, false):
+					if button.get_parent() is HBoxContainer and button.text not in ["PROFILE", "FRIENDS", "CREW", "TRADES", "RANK"]:
+						_check(button.size.x >= 100, "R46: social action collapsed: " + button.text)
+				_check_modal_bounds(instance._social_overlay)
+				_check(instance._social_overlay.is_in_group("dismiss_on_back"), "R46: network is not dismissible with Android Back")
+				var previous: Control = instance._social_overlay
+				instance.handle_back()
+				await get_tree().process_frame
+				_check(not is_instance_valid(previous), "R46: network did not close")
 			instance._clear_social_overlay()
 			instance._show_social_encounter({"kind":"attack","encounterId":"smoke-attack","target":"Runner","choices":[1,2],"multiplier":4})
 			await get_tree().process_frame
 			_check(is_instance_valid(instance._social_overlay), "Modale Attack absente")
+			_check_modal_bounds(instance._social_overlay)
 			instance._show_social_encounter({"kind":"raid","encounterId":"smoke-raid","target":"Vault","nodeCount":6,"picked":[0],"unbankedCredits":1000,"canCashout":true})
 			await get_tree().process_frame
 			_check(is_instance_valid(instance._social_overlay), "Modale Raid absente")
+			_check_modal_bounds(instance._social_overlay)
 			instance._show_social_result("SMOKE RESULT", false)
+			await get_tree().process_frame
+			_check_modal_bounds(instance._social_overlay)
 			instance._clear_social_overlay()
+			instance._no_spins.show()
+			await get_tree().process_frame
+			_check(instance.handle_back() and not instance._no_spins.visible, "R46: energy dialog back action")
 		instance.queue_free()
 		await get_tree().process_frame
 	await _check_reference_shell()
@@ -203,6 +230,10 @@ func _check_reference_shell() -> void:
 	shell._on_nav_pressed("events")
 	await get_tree().process_frame
 	_check(shell._current_tab == "missions", "R42: events route does not reach rewards")
+	_check(shell._screen._page == 1, "R46: Events must open the Events page")
+	shell._on_nav_pressed("missions")
+	await get_tree().process_frame
+	_check(shell._screen._page == 0, "R46: Missions must return to Daily")
 	for tab in ["missions", "collection", "store"]:
 		shell._open_tab(tab)
 		await get_tree().process_frame
@@ -258,6 +289,25 @@ func _check_horizontal_bounds(instance: Node) -> void:
 			rect.position.x >= -1.0 and rect.end.x <= viewport_width + 1.0,
 			"contrôle hors viewport (%s): %.1f..%.1f / %.1f" % [child.name, rect.position.x, rect.end.x, viewport_width]
 		)
+
+func _check_content_width(content: Control) -> void:
+	_check(content.get_combined_minimum_size().x <= get_viewport().get_visible_rect().size.x - Ui.SAFE_MARGIN * 2, "R46: content forces horizontal overflow")
+
+func _check_modal_bounds(instance: Node) -> void:
+	for close in get_tree().get_nodes_in_group("dialog_close"):
+		if instance != close and not instance.is_ancestor_of(close):
+			continue
+		var close_rect: Rect2 = close.get_global_rect()
+		_check(close_rect.end.y <= get_viewport().get_visible_rect().size.y - Ui.NAV_HEIGHT + 1, "R46: modal dismissal must remain above navigation")
+		_check(close_rect.size.y >= 48, "R46: modal dismissal target too small")
+	for node in instance.find_children("*", "ScrollContainer", true, false):
+		if not node.is_visible_in_tree():
+			continue
+		for child in node.get_children():
+			if child is VBoxContainer:
+				_check_content_width(child)
+		var rect: Rect2 = node.get_global_rect()
+		_check(rect.end.y <= get_viewport().get_visible_rect().size.y - Ui.NAV_HEIGHT + 1, "R46: modal scroll covers navigation")
 
 ## Les sets existent sous deux formes de récompense et peuvent être verrouillés.
 ## Sans cette couverture, un set en completionReward afficherait « +0 SPINS »
@@ -416,6 +466,10 @@ func _check_map_interactions(instance: Node) -> void:
 	var original: Dictionary = Store.state.duplicate(true)
 	var elements: Array = instance._district.get("elements", [])
 	_check(view.cards.size() == elements.size(), "R43: MAP structure count")
+	_check(view.plaza.visible and view.plaza.texture.resource_path.ends_with("map_plaza.webp"), "R46: nighttime plaza is not displayed")
+	for i in view.cards.size():
+		for j in range(i + 1, view.cards.size()):
+			_check(not view.cards[i].get_global_rect().intersects(view.cards[j].get_global_rect()), "R46: MAP hit targets overlap")
 	var before_credits := Store.credits()
 	var before_progress: Array = Store.state.get("districtProgress", []).duplicate(true)
 	var target: Control = view.cards[1].get_child(0)

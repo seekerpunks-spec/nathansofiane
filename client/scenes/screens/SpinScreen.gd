@@ -1,4 +1,5 @@
 extends Control
+const Neon := preload("res://scripts/components/NeonSkin.gd")
 ## SpinScreen R42 — vue Punk City indépendante, logique serveur préservée.
 ##
 ## Le serveur choisit toujours le résultat économique. Les symboles constituent
@@ -120,16 +121,13 @@ func _build_no_spins() -> Control:
 	overlay.visible = false
 
 	var dim := ColorRect.new()
-	dim.color = Color("#030B26", 0.90)
+	dim.color = Color("#020614", 0.98)
 	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
 	overlay.add_child(dim)
 
-	var center := CenterContainer.new()
-	center.set_anchors_preset(Control.PRESET_FULL_RECT)
-	var box := VBoxContainer.new()
-	box.custom_minimum_size = Vector2(390, 0)
-	box.add_theme_constant_override("separation", 18)
-	box.add_child(Ui.label("ENERGY EMPTY!", 32, Ui.NEON_MAGENTA))
+	var box := Ui.screen_body()
+	box.add_child(Neon.header("PUNK CITY / ENERGY", "Recharge", 4, Ui.NEON_CYAN))
+	box.add_child(Neon.feature("ENERGY EMPTY", "Grab rewards or wait for your next free spin.", 4, Ui.NEON_MAGENTA))
 	_no_spins_label = Ui.label("Network recharging…", 16, Ui.TEXT_DIM)
 	_no_spins_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(_no_spins_label)
@@ -147,8 +145,10 @@ func _build_no_spins() -> Control:
 		navigate_requested.emit("missions")
 	)
 	box.add_child(missions)
-	center.add_child(box)
-	overlay.add_child(center)
+	var close := Ui.button("BACK TO SPIN", Ui.NEON_CYAN, true)
+	close.pressed.connect(func() -> void: overlay.hide())
+	box.add_child(close)
+	overlay.add_child(box)
 	return overlay
 
 
@@ -487,23 +487,20 @@ func _open_network() -> void:
 		return
 	_social_busy = true
 	_show_network_loading()
+	var loading_overlay := _social_overlay
 	await _fetch_network_data()
 	_social_busy = false
+	if not is_instance_valid(loading_overlay) or loading_overlay.is_queued_for_deletion() or _social_overlay != loading_overlay:
+		return
 	_render_network()
 
 
 func _show_network_loading() -> void:
 	_clear_social_overlay()
 	_social_busy = true
-	_social_overlay = ColorRect.new()
-	_social_overlay.color = Color(0.015, 0.02, 0.07, 0.97)
-	_social_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_social_overlay.add_to_group("dismiss_on_back")
-	var center := CenterContainer.new()
-	center.set_anchors_preset(Control.PRESET_FULL_RECT)
-	center.add_child(Ui.label("SYNCING NETWORK…", 24, Ui.NEON_CYAN))
-	_social_overlay.add_child(center)
-	add_child(_social_overlay)
+	var dialog := Neon.modal(self, "Connecting", 1, Ui.NEON_CYAN, "BACK TO SPIN")
+	_social_overlay = dialog.overlay
+	dialog.content.add_child(Neon.feature("SYNCING NETWORK", "Connecting to your crew, friends and trading channels…", 1, Ui.NEON_CYAN))
 
 
 func _fetch_network_data() -> void:
@@ -619,15 +616,13 @@ func _resolve_attack(encounter: Dictionary, element_id: int, box: VBoxContainer)
 		Events.track("attack_completed", {"encounterId": encounter.get("encounterId", ""), "elementId": element_id, "blocked": blocked, "rewardCredits": response.data.get("rewardCredits", 0)})
 		Events.track("currency_earned", {"currency": "credits", "amount": int(response.data.get("rewardCredits", 0)), "source": "attack"})
 		_social_busy = false
-		box.add_child(Ui.label("BLOCKED BY FIREWALL" if blocked else "NODE JAMMED", 22, Ui.GOLD if blocked else Ui.NEON_MAGENTA))
-		box.add_child(Ui.label("+%s CR" % Ui.compact(int(response.data.get("rewardCredits", 0))), 20, Ui.GOLD))
-		var close := Ui.button("CONTINUE", Ui.NEON_CYAN)
-		close.pressed.connect(_clear_social_overlay)
-		box.add_child(close)
+		if is_instance_valid(box) and box.is_inside_tree():
+			_show_social_result(("BLOCKED BY FIREWALL" if blocked else "NODE JAMMED") + "  •  +%s CR" % Ui.compact(int(response.data.get("rewardCredits", 0))), false)
 	else:
 		_social_busy = false
 		Sfx.error()
-		box.add_child(Ui.label("SIGNAL LOST — TRY AGAIN", 15, Ui.NEON_MAGENTA))
+		if is_instance_valid(box) and box.is_inside_tree():
+			box.add_child(Ui.label("SIGNAL LOST — TRY AGAIN", 15, Ui.NEON_MAGENTA))
 
 
 func _raid_pick(encounter: Dictionary, node_index: int) -> void:
@@ -674,7 +669,8 @@ func _raid_cashout(encounter: Dictionary, box: VBoxContainer) -> void:
 	else:
 		_social_busy = false
 		Sfx.error()
-		box.add_child(Ui.label("CASH OUT IMPOSSIBLE", 15, Ui.NEON_MAGENTA))
+		if is_instance_valid(box) and box.is_inside_tree():
+			box.add_child(Ui.label("CASH OUT IMPOSSIBLE", 15, Ui.NEON_MAGENTA))
 
 
 func _show_social_result(message: String, failed: bool) -> void:

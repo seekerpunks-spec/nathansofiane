@@ -7,12 +7,18 @@ signal navigate_requested(tab: String)
 
 var _content: VBoxContainer
 var _busy := false
+var _page := 0
+var _tabs: VBoxContainer
+var _scroll: ScrollContainer
 
 func _ready() -> void:
 	add_child(Ui.illustrated_stage("res://assets/generated/punk_city/city.webp"))
 	var body := Ui.screen_body()
 	body.add_child(Neon.header("DAILY REWARDS • LIVE EVENTS", "Missions", 8, Ui.NEON_CYAN))
+	_tabs = VBoxContainer.new()
+	body.add_child(_tabs)
 	var scroll := ScrollContainer.new()
+	_scroll = scroll
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	Ui.style_scroll(scroll, Ui.NEON_CYAN)
@@ -32,91 +38,102 @@ func _load_fresh_state() -> void:
 	if response.ok and typeof(response.data) == TYPE_DICTIONARY:
 		Store.apply_state(response.data)
 
+func _select_page(index: int) -> void:
+	_page = clampi(index, 0, 3)
+	_scroll.scroll_vertical = 0
+	_refresh()
+
 func _refresh() -> void:
 	if _content == null:
 		return
 	for child in _content.get_children():
+		_content.remove_child(child)
 		child.queue_free()
-	_content.add_child(Ui.section_title("DAILY SIGNAL", Ui.GOLD))
-	var daily := Ui.panel()
-	var daily_box := VBoxContainer.new()
-	daily_box.add_child(Ui.label("CURRENT STREAK  %d DAYS" % int(Store.state.get("dailyStreak", 0)), 18, Ui.TEXT))
-	var daily_btn := Ui.button("CLAIM BONUS", Ui.GOLD)
-	daily_btn.disabled = _busy or not bool(Store.state.get("dailyAvailable", true))
-	daily_btn.pressed.connect(_claim_daily)
-	daily_box.add_child(daily_btn)
-	daily.add_child(daily_box)
-	_content.add_child(daily)
-	var bonus: Dictionary = Store.state.get("dailyBonus", {})
-	var bonus_panel := Ui.panel(Ui.PANEL_HI, Ui.NEON_CYAN)
-	var bonus_box := VBoxContainer.new()
-	bonus_box.add_child(Ui.label(str(bonus.get("name", "SIGNAL CACHE")).to_upper(), 18, Ui.NEON_CYAN))
-	bonus_box.add_child(Ui.label("One free signal per day • reward drawn server-side", 12, Ui.TEXT_DIM))
-	var bonus_btn := Ui.button("OPEN SIGNAL CACHE", Ui.NEON_CYAN)
-	bonus_btn.disabled = _busy or not bool(bonus.get("available", false))
-	bonus_btn.pressed.connect(_claim_daily_bonus)
-	bonus_box.add_child(bonus_btn)
-	bonus_panel.add_child(bonus_box)
-	_content.add_child(bonus_panel)
-
-	_content.add_child(Ui.section_title("DAILY MISSIONS", Ui.NEON_CYAN))
+	for child in _tabs.get_children():
+		_tabs.remove_child(child)
+		child.queue_free()
+	_tabs.add_child(Neon.tabs(["DAILY", "EVENTS", "SEASON", "SETTINGS"], _page, _select_page))
 	var reveal_index := 0
-	for mission in Store.state.get("missions", []):
-		if typeof(mission) == TYPE_DICTIONARY:
-			var card := _mission_card(mission)
-			_content.add_child(card)
-			Ui.reveal(card, reveal_index * 0.05)
-			reveal_index += 1
+	if _page == 0:
+		_content.add_child(Ui.section_title("DAILY SIGNAL", Ui.GOLD))
+		var daily := Ui.panel()
+		var daily_box := VBoxContainer.new()
+		daily_box.add_child(Neon.feature("DAILY REWARDS", "%d DAY STREAK • COME BACK DAILY" % int(Store.state.get("dailyStreak", 0)), 8, Ui.GOLD))
+		var daily_btn := Ui.button("CLAIM BONUS", Ui.GOLD)
+		daily_btn.disabled = _busy or not bool(Store.state.get("dailyAvailable", true))
+		daily_btn.pressed.connect(_claim_daily)
+		daily_box.add_child(daily_btn)
+		daily.add_child(daily_box)
+		_content.add_child(daily)
+		var bonus: Dictionary = Store.state.get("dailyBonus", {})
+		var bonus_panel := Ui.panel(Ui.PANEL_HI, Ui.NEON_CYAN)
+		var bonus_box := VBoxContainer.new()
+		bonus_box.add_child(Neon.feature("SIGNAL CACHE", str(bonus.get("name", "Your daily surprise")), 3))
+		bonus_box.add_child(Ui.label("One free signal per day • reward drawn server-side", 12, Ui.TEXT_DIM))
+		var bonus_btn := Ui.button("OPEN SIGNAL CACHE", Ui.NEON_CYAN)
+		bonus_btn.disabled = _busy or not bool(bonus.get("available", false))
+		bonus_btn.pressed.connect(_claim_daily_bonus)
+		bonus_box.add_child(bonus_btn)
+		bonus_panel.add_child(bonus_box)
+		_content.add_child(bonus_panel)
 
-	_content.add_child(Ui.section_title("STANDING CONTRACTS", Ui.GOLD))
-	for achievement in Store.state.get("achievements", []):
-		if typeof(achievement) == TYPE_DICTIONARY:
-			var card := _achievement_card(achievement)
-			_content.add_child(card)
-			Ui.reveal(card, reveal_index * 0.04)
-			reveal_index += 1
-
-	var reward_pool: Dictionary = Store.state.get("rewardPool", {})
-	if bool(reward_pool.get("enabled", false)):
-		_content.add_child(Ui.section_title("SEASON REWARD POOL", Ui.GOLD))
-		for pool in reward_pool.get("pools", []):
-			if typeof(pool) == TYPE_DICTIONARY:
-				var pool_panel := Ui.panel()
-				var pool_box := VBoxContainer.new()
-				pool_box.add_child(Ui.label(str(pool.get("poolId", "POOL")).to_upper(), 17, Ui.GOLD))
-				pool_box.add_child(Ui.label("Pending %s • minimum %s" % [Ui.compact(int(pool.get("pendingU64", 0))), Ui.compact(int(pool.get("minClaimU64", 0)))], 13, Ui.TEXT_DIM))
-				pool_box.add_child(Ui.label("Provider required" if not bool(pool.get("claimable", false)) else "Claim available", 12, Ui.TEXT_DIM))
-				pool_panel.add_child(pool_box)
-				_content.add_child(pool_panel)
-
-	_content.add_child(Ui.section_title("LIVE EVENT", Ui.NEON_MAGENTA))
-	for event in Store.state.get("events", []):
-		if typeof(event) == TYPE_DICTIONARY:
-			var card := _event_card(event)
-			_content.add_child(card)
-			Ui.reveal(card, reveal_index * 0.05)
-			reveal_index += 1
-
-	var team_events: Array = Store.state.get("teamEvents", [])
-	if not team_events.is_empty():
-		_content.add_child(Ui.section_title("CREW EVENT", Ui.NEON_CYAN))
-		for event in team_events:
-			if typeof(event) == TYPE_DICTIONARY:
-				var card := _team_event_card(event)
+		_content.add_child(Ui.section_title("DAILY MISSIONS", Ui.NEON_CYAN))
+		for mission in Store.state.get("missions", []):
+			if typeof(mission) == TYPE_DICTIONARY:
+				var card := _mission_card(mission)
 				_content.add_child(card)
 				Ui.reveal(card, reveal_index * 0.05)
 				reveal_index += 1
 
-	_content.add_child(Ui.section_title("SEASON PASS", Ui.GOLD))
-	for season in Store.state.get("seasons", []):
-		if typeof(season) == TYPE_DICTIONARY:
-			var card := _season_card(season)
-			_content.add_child(card)
-			Ui.reveal(card, reveal_index * 0.05)
-			reveal_index += 1
+		_content.add_child(Ui.section_title("STANDING CONTRACTS", Ui.GOLD))
+		for achievement in Store.state.get("achievements", []):
+			if typeof(achievement) == TYPE_DICTIONARY:
+				var card := _achievement_card(achievement)
+				_content.add_child(card)
+				Ui.reveal(card, reveal_index * 0.04)
+				reveal_index += 1
+	if _page == 2:
+		var reward_pool: Dictionary = Store.state.get("rewardPool", {})
+		if bool(reward_pool.get("enabled", false)):
+			_content.add_child(Ui.section_title("SEASON REWARD POOL", Ui.GOLD))
+			for pool in reward_pool.get("pools", []):
+				if typeof(pool) == TYPE_DICTIONARY:
+					var pool_panel := Ui.panel()
+					var pool_box := VBoxContainer.new()
+					pool_box.add_child(Ui.label(str(pool.get("poolId", "POOL")).to_upper(), 17, Ui.GOLD))
+					pool_box.add_child(Ui.label("Pending %s • minimum %s" % [Ui.compact(int(pool.get("pendingU64", 0))), Ui.compact(int(pool.get("minClaimU64", 0)))], 13, Ui.TEXT_DIM))
+					pool_box.add_child(Ui.label("Provider required" if not bool(pool.get("claimable", false)) else "Claim available", 12, Ui.TEXT_DIM))
+					pool_panel.add_child(pool_box)
+					_content.add_child(pool_panel)
+	if _page == 1:
+		_content.add_child(Ui.section_title("LIVE EVENT", Ui.NEON_MAGENTA))
+		for event in Store.state.get("events", []):
+			if typeof(event) == TYPE_DICTIONARY:
+				var card := _event_card(event)
+				_content.add_child(card)
+				Ui.reveal(card, reveal_index * 0.05)
+				reveal_index += 1
 
-	_content.add_child(Ui.section_title("ACCESSIBILITY", Ui.TEXT_DIM))
-	_content.add_child(_settings_card())
+		var team_events: Array = Store.state.get("teamEvents", [])
+		if not team_events.is_empty():
+			_content.add_child(Ui.section_title("CREW EVENT", Ui.NEON_CYAN))
+			for event in team_events:
+				if typeof(event) == TYPE_DICTIONARY:
+					var card := _team_event_card(event)
+					_content.add_child(card)
+					Ui.reveal(card, reveal_index * 0.05)
+					reveal_index += 1
+	if _page == 2:
+		_content.add_child(Ui.section_title("SEASON PASS", Ui.GOLD))
+		for season in Store.state.get("seasons", []):
+			if typeof(season) == TYPE_DICTIONARY:
+				var card := _season_card(season)
+				_content.add_child(card)
+				Ui.reveal(card, reveal_index * 0.05)
+				reveal_index += 1
+	if _page == 3:
+		_content.add_child(Ui.section_title("ACCESSIBILITY", Ui.TEXT_DIM))
+		_content.add_child(_settings_card())
 
 func _mission_card(mission: Dictionary) -> PanelContainer:
 	var panel := Ui.panel()
@@ -174,7 +191,7 @@ func _event_card(event: Dictionary) -> PanelContainer:
 	var title := str(event.get("name", "Event"))
 	if bool(event.get("recurring", false)):
 		title += "  •  WAVE %d" % (int(event.get("occurrence", 0)) + 1)
-	box.add_child(Ui.label(title, 21, Ui.NEON_MAGENTA))
+	box.add_child(Neon.feature(title, "LIVE EVENT • PLAY TO PROGRESS", 5, Ui.NEON_MAGENTA))
 	var now := Store.now_ms()
 	var starts := int(event.get("startsAtMs", 0))
 	var remain := int(event.get("endsAtMs", 0)) - now
@@ -275,7 +292,7 @@ func _season_card(season: Dictionary) -> PanelContainer:
 	var panel := Ui.panel()
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 8)
-	box.add_child(Ui.label(str(season.get("name", "Season")), 20, Ui.GOLD))
+	box.add_child(Neon.feature(str(season.get("name", "Season")).to_upper(), "SEASON PASS • UNLOCK YOUR REWARDS", 10, Ui.GOLD))
 	var points := int(season.get("points", 0))
 	var premium := bool(season.get("premium", false))
 	var remain := int(season.get("endsAtMs", 0)) - Store.now_ms()
@@ -318,12 +335,16 @@ func _season_card(season: Dictionary) -> PanelContainer:
 func _settings_card() -> PanelContainer:
 	var panel := Ui.panel()
 	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 12)
+	box.add_child(Neon.feature("YOUR EXPERIENCE", "Tune the city to your play style", 4, Ui.NEON_CYAN))
 	for data in [["SOUND", "sound_enabled"], ["HAPTICS", "haptics_enabled"], ["REDUCE MOTION", "reduced_motion"]]:
-		var toggle := CheckButton.new()
-		toggle.custom_minimum_size.y = 52
-		toggle.text = data[0]
+		var toggle := Ui.button("", Ui.NEON_CYAN, true)
+		toggle.toggle_mode = true
 		toggle.button_pressed = bool(Preferences.get(data[1]))
+		toggle.text = str(data[0]) + ("  •  ON" if toggle.button_pressed else "  •  OFF")
+		toggle.add_theme_stylebox_override("pressed", Ui.style_box(Color("#123F50"), Ui.NEON_CYAN, 12, 2))
 		toggle.toggled.connect(_set_preference.bind(data[1]))
+		toggle.toggled.connect(func(enabled: bool) -> void: toggle.text = str(data[0]) + ("  •  ON" if enabled else "  •  OFF"))
 		box.add_child(toggle)
 	panel.add_child(box)
 	return panel
@@ -432,25 +453,24 @@ func _show_leaderboard(event_id: String) -> void:
 		"rank": int(player.get("rank", 0)),
 		"points": int(player.get("points", 0)),
 	})
-	var overlay := ColorRect.new()
-	overlay.color = Color(0.02, 0.03, 0.08, 0.96)
-	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
-	overlay.add_to_group("dismiss_on_back")
-	var center := CenterContainer.new()
-	center.set_anchors_preset(Control.PRESET_FULL_RECT)
-	var box := VBoxContainer.new()
-	box.custom_minimum_size.x = 0
-	box.add_theme_constant_override("separation", 8)
-	box.add_child(Ui.label("NEON LEADERBOARD  •  GROUP %d" % int(response.data.get("cohortId", 1)), 24, Ui.NEON_MAGENTA))
-	var leaders: Array = response.data.get("leaders", [])
+	_render_leaderboard(response.data)
+
+func _render_leaderboard(data: Dictionary) -> void:
+	var dialog := Neon.modal(self, "Leaderboard", 10, Ui.GOLD, "BACK TO EVENTS")
+	var box: VBoxContainer = dialog.content
+	box.add_child(Neon.feature("GROUP %d" % int(data.get("cohortId", 1)), "Event rankings • Every point counts", 10, Ui.GOLD))
+	var leaders: Array = data.get("leaders", [])
 	for row in leaders.slice(0, mini(10, leaders.size())):
-		box.add_child(Ui.label("#%d   %s   %s" % [int(row.get("rank", 0)), str(row.get("displayName", "Runner")), Ui.compact(int(row.get("points", 0)))], 14, Ui.TEXT))
-	var me: Dictionary = response.data.get("player", {})
+		var plate := Ui.panel(Ui.PANEL, Ui.GOLD if int(row.get("rank", 0)) <= 3 else Ui.BORDER)
+		var layout := HBoxContainer.new()
+		layout.add_child(Ui.label("#%d" % int(row.get("rank", 0)), 24, Ui.GOLD))
+		var name_label := Ui.label(str(row.get("displayName", "Runner")), 19)
+		name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		name_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		layout.add_child(name_label)
+		layout.add_child(Ui.label(Ui.compact(int(row.get("points", 0))), 20, Ui.NEON_CYAN))
+		plate.add_child(layout)
+		box.add_child(plate)
+	var me: Dictionary = data.get("player", {})
 	var my_rank := int(me.get("rank", 0))
-	box.add_child(Ui.label("YOUR RANK  %s  •  %s PTS" % ["#%d" % my_rank if my_rank > 0 else "--", Ui.compact(int(me.get("points", 0)))], 16, Ui.GOLD))
-	var close := Ui.button("CLOSE", Ui.NEON_MAGENTA)
-	close.pressed.connect(overlay.queue_free)
-	box.add_child(close)
-	center.add_child(box)
-	overlay.add_child(center)
-	add_child(overlay)
+	box.add_child(Ui.label("YOUR RANK  %s  •  %s PTS" % ["#%d" % my_rank if my_rank > 0 else "--", Ui.compact(int(me.get("points", 0)))], 20, Ui.GOLD))

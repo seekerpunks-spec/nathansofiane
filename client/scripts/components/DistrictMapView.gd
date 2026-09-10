@@ -14,6 +14,7 @@ var feedback: Label
 var selected: Dictionary = {}
 var cards: Array[Control] = []
 var _modal: Control
+var plaza: TextureRect
 
 func build(screen: Control) -> void:
 	host = screen
@@ -31,6 +32,11 @@ func build(screen: Control) -> void:
 	stage.clip_contents = true
 	host.add_child(stage)
 	host._background.reparent(stage)
+	host._background.visible = false
+	plaza = Neon.art(stage, Neon.CITY, Rect2(0, 0, 540, 640), true)
+	plaza.name = "NightPlaza"
+	if ResourceLoader.exists("res://assets/generated/punk_city/map_plaza.webp"):
+		plaza.texture = load("res://assets/generated/punk_city/map_plaza.webp")
 	detail = Control.new()
 	host.add_child(detail)
 	host._hero_holder = VBoxContainer.new()
@@ -67,16 +73,19 @@ func layout() -> void:
 	host._hero_holder.size = header.size
 	wallet.position = Vector2(12 + safe.x, top + 98)
 	wallet.size = Vector2(width, 50)
-	reward.position = Vector2(12 + safe.x, top + 156)
+	reward.position = Vector2(12 + safe.x, top + 152)
 	reward.size = Vector2(width, 82)
-	detail.position = Vector2(12 + safe.x, bottom - 178)
-	detail.size = Vector2(width, 178)
-	stage.position = Vector2(12 + safe.x, top + 248)
+	detail.position = Vector2(12 + safe.x, bottom - 160)
+	detail.size = Vector2(width, 160)
+	stage.position = Vector2(12 + safe.x, top + 242)
 	stage.size = Vector2(width, maxf(180, detail.position.y - stage.position.y - 10))
 	host._background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	host._background.modulate = Color(0.48, 0.55, 0.72)
-	host._list.position = Vector2(8, 38)
-	host._list.size = stage.size - Vector2(16, 66)
+	plaza.position = Vector2.ZERO
+	plaza.size = stage.size
+	var palette := [Color.WHITE, Color(0.80, 0.91, 1.0), Color(0.9, 0.8, 1.0), Color(1.0, 0.88, 0.88), Color(0.74, 0.89, 1.0)]
+	plaza.modulate = palette[(int(host._district.get("id", 1)) - 1) % palette.size()]
+	host._list.position = Vector2(10, 36)
+	host._list.size = stage.size - Vector2(20, 58)
 	render_wallet()
 	render_reward()
 	render_stage()
@@ -128,13 +137,13 @@ func render_reward() -> void:
 
 func render_stage() -> void:
 	for child in stage.get_children():
-		if child != host._background and child != host._list:
+		if child != host._background and child != host._list and child != plaza:
 			stage.remove_child(child)
 			child.queue_free()
 	var rim := Neon.frame(stage, Rect2(Vector2.ZERO, stage.size))
 	rim.fill = Color(0.01, 0.025, 0.09, 0.2)
 	rim.queue_redraw()
-	stage.move_child(rim, 1)
+	stage.move_child(rim, stage.get_child_count() - 1)
 	Neon.text(stage, "BUILD YOUR CITY", Rect2(14, 5, stage.size.x - 28, 30), 20, Ui.NEON_CYAN)
 	Neon.text(stage, "SELECT A STRUCTURE TO UPGRADE", Rect2(12, stage.size.y - 27, stage.size.x - 24, 23), 13, Ui.TEXT_DIM)
 	clear(host._list)
@@ -150,16 +159,14 @@ func render_stage() -> void:
 		host._list.add_child(cell)
 		cards.append(cell)
 		var area: Vector2 = host._list.size
-		var rows := 3 if count <= 5 else ceili(count / 2.0)
-		var cell_height := area.y / maxi(1, rows)
-		var cell_width := minf(area.x * 0.47, cell_height * 1.2)
-		var column := float(i % 2)
-		var row := int(i / 2.0)
-		if count == 5:
-			row = 0 if i < 2 else (1 if i == 2 else 2)
-			column = 0.5 if i == 2 else float(i % 2) if i < 2 else float((i - 3) % 2)
-		cell.position = Vector2(lerpf(0.03 * area.x, area.x * 0.97 - cell_width, column), row * cell_height)
-		cell.size = Vector2(cell_width, cell_height - 3)
+		var anchors := [Vector2(0.24, 0.34), Vector2(0.76, 0.34), Vector2(0.50, 0.66), Vector2(0.24, 0.98), Vector2(0.76, 0.98)]
+		var cell_width := area.x * 0.46
+		# Keep hit rectangles separate: a tall center card must not steal taps
+		# from the labels on the two structures above it.
+		var cell_height := minf(area.y * 0.30, cell_width * 1.12)
+		var anchor: Vector2 = anchors[i] if count == 5 else Vector2(0.25 + (i % 2) * 0.5, float(i / 2 + 1) / (ceili(count / 2.0) + 0.1))
+		cell.position = Vector2(area.x * anchor.x - cell_width * 0.5, area.y * anchor.y - cell_height)
+		cell.size = Vector2(cell_width, cell_height)
 		render_card(cell, element)
 
 func render_card(cell: Control, element: Dictionary) -> void:
@@ -171,10 +178,17 @@ func render_card(cell: Control, element: Dictionary) -> void:
 	var accent := Ui.NEON_MAGENTA if active or damaged else Ui.NEON_CYAN
 	var button := Neon.button(cell, "", Rect2(Vector2.ZERO, cell.size), accent, false)
 	button.tooltip_text = str(element.get("name", "")) + " • LEVEL %d / %d" % [current, maximum]
+	var pad := LandingPad.new()
+	pad.accent = accent
+	pad.active = active
+	pad.position = Vector2(cell.size.x * 0.18, cell.size.y - 66)
+	pad.size = Vector2(cell.size.x * 0.64, 36)
+	pad.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	button.add_child(pad)
 	var art: Control = host._element_visual(element, current)
 	art.custom_minimum_size = Vector2.ZERO
-	art.position = Vector2(0, -3)
-	art.size = Vector2(cell.size.x, maxf(28, cell.size.y - 37))
+	art.position = Vector2(0, -8)
+	art.size = Vector2(cell.size.x, maxf(28, cell.size.y - 16))
 	button.add_child(art)
 	if damaged:
 		art.modulate = Color(1, 0.55, 0.7)
@@ -224,7 +238,7 @@ func render_detail() -> void:
 	Neon.text(detail, str(selected.get("name", "")).to_upper(), Rect2(106, 27, width - 120, 29), 24)
 	var level_copy := "LEVEL %d / %d" % [q.current, q.maximum] if q.maxed or q.damaged else "LEVEL %d  >  %d" % [q.current, int(q.current) + 1]
 	Neon.text(detail, level_copy, Rect2(106, 56, width - 120, 22), 17, Ui.GOLD)
-	feedback = Neon.text(detail, "RESTORE TO ENABLE UPGRADES" if q.damaged else "UPGRADE ALL STRUCTURES TO UNLOCK THE NEXT VILLAGE", Rect2(12, 87, width - 24, 22), 12, Ui.TEXT_DIM)
+	feedback = Neon.text(detail, "RESTORE TO ENABLE UPGRADES" if q.damaged else "UPGRADE ALL STRUCTURES TO UNLOCK THE NEXT VILLAGE", Rect2(12, 79, width - 24, 22), 12, Ui.TEXT_DIM)
 	if not host._map_message.is_empty():
 		feedback.text = host._map_message
 		feedback.add_theme_color_override("font_color", Ui.GOLD)
@@ -235,11 +249,11 @@ func render_detail() -> void:
 		caption = "MAX LEVEL"
 	if host._busy:
 		caption = "CONNECTING..."
-	action = Neon.button(detail, caption, Rect2(12, 117, width * 0.68 - 14, 49), Ui.NEON_MAGENTA if q.damaged else Ui.GREEN)
+	action = Neon.button(detail, caption, Rect2(12, 105, width * 0.68 - 14, 49), Ui.NEON_MAGENTA if q.damaged else Ui.GREEN)
 	action.add_theme_font_size_override("font_size", 20)
 	action.disabled = host._busy or q.maxed or not q.affordable
 	action.pressed.connect(confirm_selected)
-	bay = Neon.button(detail, "BUILD BAY", Rect2(width * 0.68 + 4, 117, width * 0.32 - 16, 49))
+	bay = Neon.button(detail, "BUILD BAY", Rect2(width * 0.68 + 4, 105, width * 0.32 - 16, 49))
 	bay.add_theme_font_size_override("font_size", 16)
 	bay.disabled = host._busy
 	bay.pressed.connect(host._open_build_bay)
@@ -257,33 +271,12 @@ func confirm_selected() -> void:
 	else:
 		host._upgrade(int(q.id))
 
-func modal(title: String, accent: Color = Ui.NEON_CYAN, preferred_height: float = 0) -> VBoxContainer:
+func modal(title: String, accent: Color = Ui.NEON_CYAN, _preferred_height: float = 0) -> VBoxContainer:
 	if is_instance_valid(_modal):
 		_modal.queue_free()
-	_modal = ColorRect.new()
-	_modal.color = Color(0.005, 0.01, 0.04, 0.96)
-	_modal.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	_modal.add_to_group("dismiss_on_back")
-	host.add_child(_modal)
-	var safe := Ui.safe_insets()
-	var bounds := Rect2(safe.x + 14, safe.y + 20, host.size.x - safe.x - safe.z - 28, host.size.y - safe.y - safe.w - Ui.NAV_HEIGHT - 40)
-	if preferred_height > 0 and bounds.size.y > preferred_height:
-		bounds.position.y += (bounds.size.y - preferred_height) * 0.5
-		bounds.size.y = preferred_height
-	Neon.frame(_modal, bounds, accent)
-	Neon.text(_modal, title, Rect2(bounds.position + Vector2(18, 14), Vector2(bounds.size.x - 36, 42)), 27, accent)
-	var scroll := ScrollContainer.new()
-	scroll.position = bounds.position + Vector2(16, 66)
-	scroll.size = bounds.size - Vector2(32, 140)
-	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	_modal.add_child(scroll)
-	var list := VBoxContainer.new()
-	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	list.add_theme_constant_override("separation", 12)
-	scroll.add_child(list)
-	var close := Neon.button(_modal, "BACK TO VILLAGE", Rect2(bounds.position + Vector2(16, bounds.size.y - 64), Vector2(bounds.size.x - 32, 48)), accent)
-	close.pressed.connect(_modal.queue_free)
-	return list
+	var dialog := Neon.modal(host, title, 10 if title == "VILLAGE COMPLETE" else 9, accent, "BACK TO VILLAGE")
+	_modal = dialog.overlay
+	return dialog.content
 
 func open_bay() -> void:
 	var list := modal("BUILD BAY", Ui.NEON_MAGENTA)
@@ -301,7 +294,7 @@ func open_bay() -> void:
 		heading.add_theme_constant_override("separation", 12)
 		box.add_child(heading)
 		var thumb: Control = host._element_visual(element, int(q.current))
-		thumb.custom_minimum_size = Vector2(64, 72)
+		thumb.custom_minimum_size = Vector2(110, 112)
 		heading.add_child(thumb)
 		var label := Ui.label(str(element.get("name", "")).to_upper() + " • LV. %d/%d" % [q.current, q.maximum], 22)
 		label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -335,11 +328,19 @@ func open_route() -> void:
 		var box := VBoxContainer.new()
 		panel.add_child(box)
 		var picture := TextureRect.new()
-		picture.texture = host._asset_texture(str(district.get("background", "")))
+		picture.texture = plaza.texture
 		picture.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		picture.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
 		picture.custom_minimum_size.y = 125
 		box.add_child(picture)
+		var showcase := HBoxContainer.new()
+		showcase.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		picture.add_child(showcase)
+		for element in district.get("elements", []):
+			var visual: Control = host._element_visual(element, 5)
+			visual.custom_minimum_size = Vector2.ZERO
+			visual.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			showcase.add_child(visual)
 		var status := "COMPLETE" if int(district.id) <= completed else ("CURRENT VILLAGE" if district.id == host._district.get("id", 0) else "LOCKED • COMPLETE PREVIOUS VILLAGES")
 		var title := Ui.label("%02d  %s" % [district.id, str(district.get("name", "")).to_upper()], 24)
 		title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -368,3 +369,12 @@ func complete(reward_data: Dictionary, all_complete: bool) -> void:
 		_modal.queue_free()
 		host._refresh()
 	)
+class LandingPad extends Control:
+	var accent := Ui.NEON_CYAN
+	var active := false
+	func _draw() -> void:
+		draw_set_transform(Vector2(size.x / 2, size.y / 2), 0, Vector2(1, 0.25))
+		var radius := size.x / 2
+		draw_circle(Vector2.ZERO, radius, Color("#05122A"))
+		draw_arc(Vector2.ZERO, radius - 3, 0, TAU, 64, Color(accent, 0.2), 12, true)
+		draw_arc(Vector2.ZERO, radius - 3, 0, TAU, 64, accent if active else Color(accent, 0.6), 3, true)

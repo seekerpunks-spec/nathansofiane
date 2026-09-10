@@ -40,7 +40,16 @@ foreach ($overlay in @('_render_network', 'smoke-attack', 'smoke-raid', '_show_s
 }
 
 $touchInputs = ([regex]::Matches($joined, 'custom_minimum_size\.y\s*=\s*52')).Count
-$dismissibleModals = ([regex]::Matches($joined, 'add_to_group\("dismiss_on_back"\)')).Count
+# R46: dialog construction is shared; validate the factory and its call sites,
+# rather than requiring seven copies of the same overlay implementation.
+$neon = Get-Content -Encoding UTF8 -LiteralPath (Join-Path $client "scripts\components\NeonSkin.gd") -Raw
+if ($neon -notmatch 'add_to_group\("dismiss_on_back"\)' -or $neon -notmatch 'close\.pressed\.connect\(overlay\.queue_free\)') {
+    throw "Factory de modales: groupe Retour ou fermeture absent"
+}
+$dismissibleModals = ([regex]::Matches($joined, 'Neon\.modal\(')).Count
+if ($smoke -notmatch '_check_modal_bounds' -or $smoke -notmatch 'range\(5\)') {
+    throw "Couverture runtime des pages/modales partagees absente"
+}
 if ($touchInputs -lt 8) { throw "Inputs tactiles renforcés insuffisants: $touchInputs" }
 if ($dismissibleModals -lt 7) { throw "Modales Retour insuffisamment couvertes: $dismissibleModals" }
 

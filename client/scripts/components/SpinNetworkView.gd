@@ -2,6 +2,8 @@ extends RefCounted
 ## Vue du Seeker Network. Le contrôleur SpinScreen conserve les mutations et
 ## snapshots ; cette classe ne fait qu'assembler la modale et câbler ses actions.
 
+const Neon := preload("res://scripts/components/NeonSkin.gd")
+
 var host
 
 func _init(owner: Control) -> void:
@@ -9,48 +11,46 @@ func _init(owner: Control) -> void:
 
 func render() -> void:
 	host._clear_social_overlay()
-	host._social_overlay = ColorRect.new()
-	host._social_overlay.color = Color(0.015, 0.02, 0.07, 0.97)
-	host._social_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
-	host._social_overlay.add_to_group("dismiss_on_back")
-	var center := CenterContainer.new()
-	center.set_anchors_preset(Control.PRESET_FULL_RECT)
-	var panel := Ui.panel(Ui.PANEL_HI, Ui.NEON_CYAN)
-	panel.custom_minimum_size = Vector2(0, 0)
-	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	var shell := VBoxContainer.new()
-	shell.add_theme_constant_override("separation", 10)
-	var title_row := HBoxContainer.new()
-	var title := Ui.label("SEEKER NETWORK", 28, Ui.NEON_CYAN)
-	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	title_row.add_child(title)
-	var close := Ui.button("✕", Ui.NEON_MAGENTA, true)
-	close.pressed.connect(host._clear_social_overlay)
-	title_row.add_child(close)
-	shell.add_child(title_row)
-	var scroll := ScrollContainer.new()
-	scroll.custom_minimum_size = Vector2(0, 0)
-	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	Ui.style_scroll(scroll, Ui.NEON_CYAN)
-	var content := VBoxContainer.new()
-	content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	content.add_theme_constant_override("separation", 10)
-	_build_profile(content)
-	_build_search(content)
-	_build_requests(content)
-	_build_friends(content)
-	_build_revenge(content)
-	_build_team(content)
-	_build_trades(content)
-	_build_leaderboard(content)
-	scroll.add_child(content)
-	shell.add_child(scroll)
-	panel.add_child(shell)
-	center.add_child(panel)
-	host._social_overlay.add_child(center)
-	host.add_child(host._social_overlay)
+	var page := clampi(int(host.get_meta("network_page", 0)), 0, 4)
+	var dialog := Neon.modal(host, "Seeker Network", 1, Ui.NEON_CYAN, "BACK TO SPIN")
+	host._social_overlay = dialog.overlay
+	var content: VBoxContainer = dialog.content
+	var tabs := Neon.tabs(["PROFILE", "FRIENDS", "CREW", "TRADES", "RANK"], page, _select_page)
+	dialog.body.add_child(tabs)
+	dialog.body.move_child(tabs, 1)
+	match page:
+		0:
+			content.add_child(Neon.feature("RUNNER ID", "Your reputation across Punk City", 1))
+			_build_profile(content)
+		1:
+			content.add_child(Neon.feature("YOUR NETWORK", "Find allies • Send gifts • Take revenge", 9))
+			_build_search(content)
+			_build_requests(content)
+			_build_friends(content)
+			_build_revenge(content)
+		2:
+			content.add_child(Neon.feature("CREW HQ", "Join forces and build your crew", 5, Ui.NEON_MAGENTA))
+			_build_team(content)
+		3:
+			content.add_child(Neon.feature("CARD EXCHANGE", "Trade duplicates with your friends", 7, Ui.NEON_MAGENTA))
+			_build_trades(content)
+		4:
+			content.add_child(Neon.feature("CITY LEGENDS", "Climb the global ranking", 10, Ui.GOLD))
+			_build_leaderboard(content)
+	# Server-provided names must wrap without widening the scroll area.
+	for node in content.find_children("*", "Label", true, false):
+		if node.get_parent() is VBoxContainer or (node.get_parent() is HBoxContainer and node.size_flags_horizontal & Control.SIZE_EXPAND):
+			node.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	for node in content.find_children("*", "OptionButton", true, false):
+		node.fit_to_longest_item = false
+		node.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	for node in content.find_children("*", "Button", true, false):
+		if node.get_parent() is HBoxContainer:
+			node.custom_minimum_size.x = maxf(node.custom_minimum_size.x, 104)
+
+func _select_page(index: int) -> void:
+	host.set_meta("network_page", index)
+	render()
 
 func _section(parent: VBoxContainer, title: String) -> void:
 	var label := Ui.label(title, 17, Ui.GOLD)
@@ -383,6 +383,12 @@ func _build_leaderboard(parent: VBoxContainer) -> void:
 	var entries: Array = host._network_leaderboard.get("entries", [])
 	for entry in entries.slice(0, mini(10, entries.size())):
 		if typeof(entry) == TYPE_DICTIONARY:
-			var line := Ui.label("#%d  %s  •  %s PWR" % [int(entry.get("rank", 0)), str(entry.get("displayName", "Runner")), Ui.compact(int(entry.get("score", 0)))], 13, Ui.TEXT_DIM)
-			line.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-			parent.add_child(line)
+			var plate := Ui.panel(Ui.PANEL, Ui.GOLD if int(entry.get("rank", 0)) <= 3 else Ui.BORDER)
+			var row := HBoxContainer.new()
+			row.add_child(Ui.label("#%d" % int(entry.get("rank", 0)), 24, Ui.GOLD))
+			var name_label := Ui.label(str(entry.get("displayName", "Runner")), 20)
+			name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			row.add_child(name_label)
+			row.add_child(Ui.label(Ui.compact(int(entry.get("score", 0))) + " PWR", 18, Ui.NEON_CYAN))
+			plate.add_child(row)
+			parent.add_child(plate)
